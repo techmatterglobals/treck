@@ -55,6 +55,7 @@ The full technical design lives in [`docs/`](docs/):
 8. [Getting Started (project setup)](docs/08-getting-started.md)
 9. [Database Migrations & Model Relationships](docs/09-database-migrations.md)
 10. [Eloquent Models Reference](docs/10-models.md)
+11. [Authentication & Authorization](docs/11-authentication-authorization.md)
 
 Concrete reference DDL: [`docs/database/schema.sql`](docs/database/schema.sql)
 

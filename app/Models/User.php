@@ -79,6 +79,12 @@ class User extends Authenticatable
     /** Whether this user can administer the system. */
     public function isAdministrator(): bool
     {
-        return $this->hasAnyRole([UserRole::SuperAdmin->value, UserRole::Admin->value]);
+        return $this->hasRole(UserRole::Admin->value);
+    }
+
+    /** Convenience check for the employee (self-service) role. */
+    public function isEmployee(): bool
+    {
+        return $this->hasRole(UserRole::Employee->value);
     }
 }

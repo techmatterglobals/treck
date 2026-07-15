@@ -18,6 +18,7 @@ directly to the area you need.
 | 8 | [Getting Started](08-getting-started.md) | Step-by-step project creation: install, packages, env, DB, Breeze auth, folder structure |
 | 9 | [Database Migrations & Model Relationships](09-database-migrations.md) | The delivered migration set + Eloquent models: FKs, indexes, relationships |
 | 10 | [Eloquent Models Reference](10-models.md) | Model best practices, enums, scopes, accessors, and helper methods |
+| 11 | [Authentication & Authorization](11-authentication-authorization.md) | Breeze + Sanctum auth, Spatie roles/permissions, middleware, controllers |
 
 ## Code delivered
 
