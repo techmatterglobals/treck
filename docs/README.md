@@ -22,6 +22,7 @@ directly to the area you need.
 | 12 | [Employee Management Module](12-employee-management.md) | Resourceful controller + Livewire table: CRUD, department & computer assignment |
 | 13 | [Desktop PC Agent API](13-agent-api.md) | Sanctum device-token API: register, login, activity, logout + Windows agent comms |
 | 14 | [Employee Activity Tracking System](14-activity-tracking.md) | Active/idle time, online status, last activity — service classes, controllers, offline reconciliation |
+| 15 | [Admin Dashboard (Livewire)](15-admin-dashboard.md) | KPI cards, employee status table, productivity & department charts |
 
 ## Code delivered
 
