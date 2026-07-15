@@ -7,19 +7,20 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Agent\ActivityReportRequest;
 use App\Models\ActivityLog;
 use App\Models\Computer;
+use App\Services\Activity\ActivityTrackingService;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * POST /api/activity
  *
- * Periodic activity report: accumulates the active/idle seconds the agent
- * measured since its last report onto the open session, and refreshes the
- * computer's live status.
+ * Periodic activity report. Validation lives in the FormRequest; the
+ * accumulation rules live in ActivityTrackingService — this controller only
+ * resolves + guards the session and shapes the response.
  */
 class ActivityController extends Controller
 {
-    public function store(ActivityReportRequest $request): JsonResponse
+    public function store(ActivityReportRequest $request, ActivityTrackingService $tracker): JsonResponse
     {
         /** @var Computer $computer */
         $computer = $request->user();
@@ -31,16 +32,16 @@ class ActivityController extends Controller
         abort_unless($session->computer_id === $computer->id, Response::HTTP_FORBIDDEN);
         abort_if(! $session->is_open, Response::HTTP_CONFLICT, 'Session is already closed.');
 
-        // Accumulate the deltas.
-        $session->increment('active_seconds', (int) $data['active_seconds']);
-        $session->increment('idle_seconds', (int) $data['idle_seconds']);
-
         $status = isset($data['status'])
             ? ComputerStatus::from($data['status'])
             : ComputerStatus::Online;
 
-        $session->update(['status' => $status]);
-        $computer->markSeen($status);
+        $session = $tracker->record(
+            $session,
+            (int) $data['active_seconds'],
+            (int) $data['idle_seconds'],
+            $status,
+        );
 
         return response()->json([
             'message' => 'Activity recorded.',

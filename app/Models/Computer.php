@@ -26,6 +26,7 @@ class Computer extends Model
         'agent_version',
         'status',
         'last_seen_at',
+        'last_activity_at',
         'paired_at',
     ];
 
@@ -34,6 +35,7 @@ class Computer extends Model
         return [
             'status' => ComputerStatus::class,
             'last_seen_at' => 'datetime',
+            'last_activity_at' => 'datetime',
             'paired_at' => 'datetime',
         ];
     }

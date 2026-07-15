@@ -58,6 +58,7 @@ The full technical design lives in [`docs/`](docs/):
 11. [Authentication & Authorization](docs/11-authentication-authorization.md)
 12. [Employee Management Module](docs/12-employee-management.md)
 13. [Desktop PC Agent API](docs/13-agent-api.md)
+14. [Employee Activity Tracking System](docs/14-activity-tracking.md)
 
 Concrete reference DDL: [`docs/database/schema.sql`](docs/database/schema.sql)
 
