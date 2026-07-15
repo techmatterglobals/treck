@@ -60,6 +60,7 @@ The full technical design lives in [`docs/`](docs/):
 13. [Desktop PC Agent API](docs/13-agent-api.md)
 14. [Employee Activity Tracking System](docs/14-activity-tracking.md)
 15. [Admin Dashboard (Livewire)](docs/15-admin-dashboard.md)
+16. [Reporting Module](docs/16-reporting.md)
 
 Concrete reference DDL: [`docs/database/schema.sql`](docs/database/schema.sql)
 
