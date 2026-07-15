@@ -64,6 +64,7 @@ The full technical design lives in [`docs/`](docs/):
 17. [Windows PC Agent (C#)](docs/17-windows-agent.md) — client in [`agent/`](agent/)
 18. [Aggregation Rollups & Demo Seeding](docs/18-rollups-and-seeding.md)
 19. [Production Deployment](docs/19-production-deployment.md) — configs in [`deploy/`](deploy/)
+20. [Codebase Audit Report](docs/20-audit-report.md)
 
 Concrete reference DDL: [`docs/database/schema.sql`](docs/database/schema.sql)
 
