@@ -26,6 +26,11 @@ directly to the area you need.
 | 16 | [Reporting Module](16-reporting.md) | Daily/weekly/monthly reports, filters, Excel & PDF export |
 | 17 | [Windows PC Agent (C#)](17-windows-agent.md) | .NET 8 Windows Service: architecture, project structure, API comms, security |
 | 18 | [Aggregation Rollups & Demo Seeding](18-rollups-and-seeding.md) | Attendance & productivity rollup jobs, scheduled command, factories & demo seeder |
+| 19 | [Production Deployment](19-production-deployment.md) | Server, SSL, queues, cron, backups, API security, rate limiting, monitoring, checklist |
+
+## Deployment artifacts
+
+- [`deploy/nginx.conf.example`](../deploy/nginx.conf.example), [`deploy/supervisor-treck-worker.conf.example`](../deploy/supervisor-treck-worker.conf.example), [`deploy/.env.production.example`](../deploy/.env.production.example)
 
 ## Code delivered
 

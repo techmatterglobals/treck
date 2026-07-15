@@ -1,0 +1,63 @@
+# Treck — Nginx server block (reference)
+# Adjust server_name, paths, and certificate locations for your host.
+
+# Redirect all HTTP to HTTPS.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name treck.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name treck.example.com;
+
+    root /var/www/treck/public;
+    index index.php;
+
+    # --- TLS ---
+    ssl_certificate     /etc/letsencrypt/live/treck.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/treck.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    # --- Security headers ---
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    client_max_body_size 20M;   # screenshot uploads / imports
+    charset utf-8;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    error_page 404 /index.php;
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+        fastcgi_hide_header X-Powered-By;
+    }
+
+    # Deny access to hidden files (.env, .git, etc.)
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+
+    # Edge rate limiting (define zones in http{} — see below).
+    # limit_req zone=treck_api burst=40 nodelay;
+}
+
+# Put these in the http{} context (nginx.conf):
+# limit_req_zone $binary_remote_addr zone=treck_api:10m rate=10r/s;
