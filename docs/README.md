@@ -20,6 +20,7 @@ directly to the area you need.
 | 10 | [Eloquent Models Reference](10-models.md) | Model best practices, enums, scopes, accessors, and helper methods |
 | 11 | [Authentication & Authorization](11-authentication-authorization.md) | Breeze + Sanctum auth, Spatie roles/permissions, middleware, controllers |
 | 12 | [Employee Management Module](12-employee-management.md) | Resourceful controller + Livewire table: CRUD, department & computer assignment |
+| 13 | [Desktop PC Agent API](13-agent-api.md) | Sanctum device-token API: register, login, activity, logout + Windows agent comms |
 
 ## Code delivered
 

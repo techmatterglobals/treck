@@ -10,10 +10,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Laravel\Sanctum\HasApiTokens;
 
 class Computer extends Model
 {
-    use HasFactory, SoftDeletes;
+    // A computer is a token holder: the desktop agent authenticates as its
+    // Computer via a Sanctum device token (tokenable_type = Computer).
+    use HasApiTokens, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'employee_id',
