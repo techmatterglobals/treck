@@ -114,10 +114,13 @@ class Employee extends Model
             return $query;
         }
 
-        return $query->where('employee_code', 'like', "%{$term}%")
-            ->orWhereHas('user', fn (Builder $q) => $q
-                ->where('name', 'like', "%{$term}%")
-                ->orWhere('email', 'like', "%{$term}%"));
+        // Grouped so the OR conditions don't leak past other where clauses.
+        return $query->where(function (Builder $q) use ($term) {
+            $q->where('employee_code', 'like', "%{$term}%")
+                ->orWhereHas('user', fn (Builder $u) => $u
+                    ->where('name', 'like', "%{$term}%")
+                    ->orWhere('email', 'like', "%{$term}%"));
+        });
     }
 
     // ----------------------------------------------------------------

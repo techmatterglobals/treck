@@ -19,6 +19,7 @@ directly to the area you need.
 | 9 | [Database Migrations & Model Relationships](09-database-migrations.md) | The delivered migration set + Eloquent models: FKs, indexes, relationships |
 | 10 | [Eloquent Models Reference](10-models.md) | Model best practices, enums, scopes, accessors, and helper methods |
 | 11 | [Authentication & Authorization](11-authentication-authorization.md) | Breeze + Sanctum auth, Spatie roles/permissions, middleware, controllers |
+| 12 | [Employee Management Module](12-employee-management.md) | Resourceful controller + Livewire table: CRUD, department & computer assignment |
 
 ## Code delivered
 

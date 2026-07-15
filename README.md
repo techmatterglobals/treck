@@ -56,6 +56,7 @@ The full technical design lives in [`docs/`](docs/):
 9. [Database Migrations & Model Relationships](docs/09-database-migrations.md)
 10. [Eloquent Models Reference](docs/10-models.md)
 11. [Authentication & Authorization](docs/11-authentication-authorization.md)
+12. [Employee Management Module](docs/12-employee-management.md)
 
 Concrete reference DDL: [`docs/database/schema.sql`](docs/database/schema.sql)
 
