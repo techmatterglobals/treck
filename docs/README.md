@@ -15,6 +15,7 @@ directly to the area you need.
 | 5 | [API Structure](05-api-structure.md) | Sanctum auth model, versioning, agent & user endpoints, payloads |
 | 6 | [Admin Dashboard Structure](06-admin-dashboard.md) | Livewire component tree, pages, real-time strategy |
 | 7 | [Development Roadmap](07-development-roadmap.md) | Phased delivery plan, milestones, testing strategy |
+| 8 | [Getting Started](08-getting-started.md) | Step-by-step project creation: install, packages, env, DB, Breeze auth, folder structure |
 
 ## Reference artifacts
 

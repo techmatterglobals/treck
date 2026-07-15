@@ -52,6 +52,7 @@ The full technical design lives in [`docs/`](docs/):
 5. [API Structure](docs/05-api-structure.md)
 6. [Admin Dashboard Structure](docs/06-admin-dashboard.md)
 7. [Development Roadmap](docs/07-development-roadmap.md)
+8. [Getting Started (project setup)](docs/08-getting-started.md)
 
 Concrete reference DDL: [`docs/database/schema.sql`](docs/database/schema.sql)
 
