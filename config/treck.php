@@ -1,0 +1,59 @@
+<?php
+
+return [
+
+    /*
+    |--------------------------------------------------------------------------
+    | Activity tracking
+    |--------------------------------------------------------------------------
+    */
+    'activity' => [
+        'heartbeat_interval_seconds' => (int) env('TRECK_HEARTBEAT_INTERVAL', 60),
+        'idle_threshold_seconds' => (int) env('TRECK_IDLE_THRESHOLD', 300),
+        'offline_grace_seconds' => (int) env('TRECK_OFFLINE_GRACE', 180),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Attendance
+    |--------------------------------------------------------------------------
+    */
+    'attendance' => [
+        'workday_start' => env('TRECK_WORKDAY_START', '09:00'),
+        'late_grace_minutes' => (int) env('TRECK_LATE_GRACE', 15),
+        'full_day_hours' => (int) env('TRECK_FULL_DAY_HOURS', 8),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Screenshots (opt-in)
+    |--------------------------------------------------------------------------
+    */
+    'screenshots' => [
+        'enabled' => (bool) env('TRECK_SCREENSHOTS', false),
+        'interval_seconds' => (int) env('TRECK_SCREENSHOT_INTERVAL', 600),
+        'blur' => (bool) env('TRECK_SCREENSHOT_BLUR', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Data retention (days)
+    |--------------------------------------------------------------------------
+    */
+    'retention' => [
+        'raw_heartbeat_days' => (int) env('TRECK_RAW_RETENTION', 90),
+        'aggregate_days' => (int) env('TRECK_AGG_RETENTION', 730),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Desktop agent
+    |--------------------------------------------------------------------------
+    | Shared provisioning key used once per device to obtain a Sanctum token.
+    | Leave null to disable device registration entirely.
+    */
+    'agent' => [
+        'provisioning_key' => env('TRECK_AGENT_PROVISIONING_KEY'),
+    ],
+
+];

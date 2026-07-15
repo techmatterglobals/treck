@@ -28,6 +28,7 @@ directly to the area you need.
 | 18 | [Aggregation Rollups & Demo Seeding](18-rollups-and-seeding.md) | Attendance & productivity rollup jobs, scheduled command, factories & demo seeder |
 | 19 | [Production Deployment](19-production-deployment.md) | Server, SSL, queues, cron, backups, API security, rate limiting, monitoring, checklist |
 | 20 | [Codebase Audit Report](20-audit-report.md) | Full review: missing deps/migrations/routes, security, performance, best practices, prioritized fixes |
+| 21 | [P0 Remediation — Application Skeleton](21-p0-remediation.md) | Bootable Laravel 11 skeleton: composer, config, routes wiring, framework migrations, run/test steps |
 
 ## Deployment artifacts
 

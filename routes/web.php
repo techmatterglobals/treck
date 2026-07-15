@@ -1,0 +1,23 @@
+<?php
+
+use App\Http\Controllers\Admin\UserRoleController;
+use App\Http\Controllers\DashboardController;
+use Illuminate\Support\Facades\Route;
+
+Route::get('/', fn () => redirect()->route('dashboard'));
+
+Route::middleware(['auth', 'active'])->group(function () {
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Admin-only management (role assignment).
+    Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function () {
+        Route::patch('users/{user}/role', [UserRoleController::class, 'update'])->name('users.role');
+    });
+});
+
+// Feature modules (each file self-applies its own middleware group).
+require __DIR__.'/modules/employees.php';
+require __DIR__.'/modules/reports.php';
+
+// Authentication (login / logout).
+require __DIR__.'/auth.php';
