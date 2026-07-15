@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\UserRole;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -36,6 +38,10 @@ class User extends Authenticatable
         ];
     }
 
+    // ----------------------------------------------------------------
+    // Relationships
+    // ----------------------------------------------------------------
+
     /** The HR/employee profile paired with this login account (1:1). */
     public function employee(): HasOne
     {
@@ -46,5 +52,33 @@ class User extends Authenticatable
     public function managedDepartments(): HasMany
     {
         return $this->hasMany(Department::class, 'manager_id');
+    }
+
+    // ----------------------------------------------------------------
+    // Scopes
+    // ----------------------------------------------------------------
+
+    /** Only active (non-disabled) accounts. */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_active', true);
+    }
+
+    /** Filter by a role name / enum (uses Spatie's roles relation). */
+    public function scopeWithRole(Builder $query, UserRole|string $role): Builder
+    {
+        $name = $role instanceof UserRole ? $role->value : $role;
+
+        return $query->whereHas('roles', fn (Builder $q) => $q->where('name', $name));
+    }
+
+    // ----------------------------------------------------------------
+    // Helpers
+    // ----------------------------------------------------------------
+
+    /** Whether this user can administer the system. */
+    public function isAdministrator(): bool
+    {
+        return $this->hasAnyRole([UserRole::SuperAdmin->value, UserRole::Admin->value]);
     }
 }

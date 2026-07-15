@@ -54,6 +54,7 @@ The full technical design lives in [`docs/`](docs/):
 7. [Development Roadmap](docs/07-development-roadmap.md)
 8. [Getting Started (project setup)](docs/08-getting-started.md)
 9. [Database Migrations & Model Relationships](docs/09-database-migrations.md)
+10. [Eloquent Models Reference](docs/10-models.md)
 
 Concrete reference DDL: [`docs/database/schema.sql`](docs/database/schema.sql)
 

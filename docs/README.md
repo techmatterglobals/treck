@@ -17,11 +17,13 @@ directly to the area you need.
 | 7 | [Development Roadmap](07-development-roadmap.md) | Phased delivery plan, milestones, testing strategy |
 | 8 | [Getting Started](08-getting-started.md) | Step-by-step project creation: install, packages, env, DB, Breeze auth, folder structure |
 | 9 | [Database Migrations & Model Relationships](09-database-migrations.md) | The delivered migration set + Eloquent models: FKs, indexes, relationships |
+| 10 | [Eloquent Models Reference](10-models.md) | Model best practices, enums, scopes, accessors, and helper methods |
 
 ## Code delivered
 
 - [`database/migrations/`](../database/migrations) — the eight core table migrations.
-- [`app/Models/`](../app/Models) — matching Eloquent models with relationships.
+- [`app/Models/`](../app/Models) — Eloquent models with relationships, casts, scopes, accessors, and helpers.
+- [`app/Enums/`](../app/Enums) — status/rating enums cast onto the models.
 
 ## Reference artifacts
 

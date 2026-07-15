@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +18,10 @@ class Department extends Model
         'manager_id',
     ];
 
+    // ----------------------------------------------------------------
+    // Relationships
+    // ----------------------------------------------------------------
+
     /** The user who manages this department (N:1). */
     public function manager(): BelongsTo
     {
@@ -27,5 +32,20 @@ class Department extends Model
     public function employees(): HasMany
     {
         return $this->hasMany(Employee::class);
+    }
+
+    // ----------------------------------------------------------------
+    // Accessors
+    // ----------------------------------------------------------------
+
+    /**
+     * Number of employees. Uses the eager-loaded `employees_count` when the
+     * query used withCount('employees'), otherwise falls back to a count query.
+     */
+    protected function headcount(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->employees_count ?? $this->employees()->count(),
+        )->shouldCache();
     }
 }
