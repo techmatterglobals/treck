@@ -1,9 +1,13 @@
 <?php
 
 use App\Http\Middleware\EnsureUserIsActive;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Http\Middleware\CheckAbilities;
 use Laravel\Sanctum\Http\Middleware\CheckForAnyAbility;
 use Spatie\Permission\Middleware\PermissionMiddleware;
@@ -28,6 +32,27 @@ return Application::configure(basePath: dirname(__DIR__))
             'abilities' => CheckAbilities::class,
             'ability' => CheckForAnyAbility::class,
         ]);
+
+        // --- Named rate limiters (SEC-2) ---------------------------------
+        // Applied via `throttle:<name>` on routes.
+
+        // Login: strict, per email + IP to blunt credential stuffing.
+        RateLimiter::for('login', fn (Request $request) => [
+            Limit::perMinute(5)->by(Str::lower((string) $request->input('email')).'|'.$request->ip()),
+        ]);
+
+        // Device registration: strict, per IP (protects the provisioning key).
+        RateLimiter::for('agent-register', fn (Request $request) => Limit::perMinute(10)->by($request->ip()));
+
+        // Agent telemetry (login/activity/logout): generous, per device token.
+        RateLimiter::for('agent', fn (Request $request) => Limit::perMinute(120)->by(
+            $request->user()?->getAuthIdentifier() ? 'device:'.$request->user()->getAuthIdentifier() : 'ip:'.$request->ip()
+        ));
+
+        // Authenticated user API: per user (falls back to IP pre-auth).
+        RateLimiter::for('user', fn (Request $request) => Limit::perMinute(60)->by(
+            $request->user()?->getAuthIdentifier() ? 'user:'.$request->user()->getAuthIdentifier() : 'ip:'.$request->ip()
+        ));
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

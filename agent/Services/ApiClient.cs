@@ -50,9 +50,9 @@ public sealed class ApiClient
         return envelope.Data;
     }
 
-    public async Task<long> LoginAsync(long employeeId, string computerName, CancellationToken ct)
+    public async Task<long> LoginAsync(string computerName, CancellationToken ct)
     {
-        var body = new LoginRequest(employeeId, computerName);
+        var body = new LoginRequest(computerName);
         var envelope = await PostAsync<ApiEnvelope<LoginData>>("/api/agent/login", body, authorize: true, ct);
         return envelope.Data.SessionId;
     }

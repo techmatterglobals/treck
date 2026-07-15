@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Route;
 | enforced inside the controller (view attendance permission, or self).
 */
 
-Route::middleware(['auth:sanctum', 'active'])->prefix('v1')->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'throttle:user'])->prefix('v1')->group(function () {
     Route::get('activity/live', [ActivityController::class, 'live'])
         ->name('activity.live');
 

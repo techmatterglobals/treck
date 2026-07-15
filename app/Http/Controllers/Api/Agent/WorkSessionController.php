@@ -30,6 +30,15 @@ class WorkSessionController extends Controller
         $computer = $request->user();
         $data = $request->validated();
 
+        // SEC-1: the employee is resolved from the registered computer, never
+        // from the request. A device may only report for its assigned owner.
+        // Any `employee_id` in the payload is ignored (and no longer accepted).
+        abort_if(
+            $computer->employee_id === null,
+            Response::HTTP_CONFLICT,
+            'This computer is not assigned to an employee.',
+        );
+
         $loginAt = isset($data['login_time']) ? Carbon::parse($data['login_time']) : now();
 
         // Keep the reported hostname current.
@@ -41,7 +50,7 @@ class WorkSessionController extends Controller
 
         // Idempotent: reuse an already-open session instead of duplicating.
         $session = $computer->openSession() ?? ActivityLog::create([
-            'employee_id' => (int) $data['employee_id'],
+            'employee_id' => $computer->employee_id,
             'computer_id' => $computer->id,
             'login_at' => $loginAt,
             'work_date' => $loginAt->toDateString(),

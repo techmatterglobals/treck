@@ -88,7 +88,6 @@ Add to `config/treck.php`:
 ```jsonc
 // Headers: Authorization: Bearer <device token>
 {
-  "employee_id": 42,
   "computer_name": "HR-PC-07",
   "login_time": "2026-07-15T09:00:00Z"   // optional; server uses now() if omitted
 }
@@ -100,8 +99,10 @@ Add to `config/treck.php`:
   "data": { "session_id": 8801, "login_time": "2026-07-15T09:00:00+00:00" }
 }
 ```
-Idempotent: if a session is already open for the device, its id is returned
-instead of creating a duplicate.
+**SEC-1:** the employee is resolved server-side from the device's registration.
+Any `employee_id` in the body is ignored; a device assigned to no employee gets
+`409 Conflict`. Idempotent: if a session is already open for the device, its id
+is returned instead of creating a duplicate.
 
 ### POST /api/activity
 
@@ -154,8 +155,8 @@ Idempotent: closing an already-closed session returns `200` without change.
 Validation failures return Laravel's standard `422`:
 
 ```jsonc
-{ "message": "The employee id field is required.",
-  "errors": { "employee_id": ["The employee id field is required."] } }
+{ "message": "The session id field is required.",
+  "errors": { "session_id": ["The session id field is required."] } }
 ```
 
 `401` for a missing/invalid token, `403` for a token without `agent:report` or a
@@ -190,7 +191,7 @@ sequenceDiagram
     Note over Agent: Store token in Windows Credential Manager (DPAPI)
 
     Note over OS,Agent: User signs in to Windows (WTS session logon)
-    Agent->>API: POST /api/agent/login (Bearer token, employee_id, computer_name, login_time)
+    Agent->>API: POST /api/agent/login (Bearer token, computer_name, login_time)
     API-->>Agent: 201 { session_id }
 
     loop Every ~60s while signed in
@@ -267,7 +268,7 @@ TOKEN=12|...
 # 2. Login (open a session)
 curl -sX POST https://treck.test/api/agent/login \
   -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json' \
-  -d employee_id=42 -d computer_name=HR-PC-07
+  -d computer_name=HR-PC-07
 # → { "data": { "session_id": 8801 } }
 
 # 3. Activity

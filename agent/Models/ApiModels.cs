@@ -28,7 +28,9 @@ public sealed record RegisterRequest(
     string Os,
     string AgentVersion);
 
-public sealed record LoginRequest(long EmployeeId, string ComputerName);
+// SEC-1: the server resolves the employee from the device's registration,
+// so login carries no employee_id.
+public sealed record LoginRequest(string ComputerName);
 
 public sealed record ActivityRequest(long SessionId, int ActiveSeconds, int IdleSeconds, string Status);
 

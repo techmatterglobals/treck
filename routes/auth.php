@@ -17,6 +17,7 @@ Route::middleware('guest')->group(function () {
     Route::get('login', fn () => view('auth.login'))->name('login');
 
     Route::post('login', function (Request $request) {
+        // SEC-2: login throttled (5/min per email+IP).
         $credentials = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
@@ -31,7 +32,7 @@ Route::middleware('guest')->group(function () {
         $request->session()->regenerate();
 
         return redirect()->intended(route('dashboard'));
-    });
+    })->middleware('throttle:login');
 });
 
 Route::post('logout', function (Request $request) {

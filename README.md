@@ -66,6 +66,7 @@ The full technical design lives in [`docs/`](docs/):
 19. [Production Deployment](docs/19-production-deployment.md) — configs in [`deploy/`](deploy/)
 20. [Codebase Audit Report](docs/20-audit-report.md)
 21. [P0 Remediation — Application Skeleton](docs/21-p0-remediation.md)
+22. [P1 Security Remediation](docs/22-p1-security-remediation.md)
 
 Concrete reference DDL: [`docs/database/schema.sql`](docs/database/schema.sql)
 

@@ -119,7 +119,7 @@ public sealed class Worker : BackgroundService
 
     private async Task OpenSessionAsync(CancellationToken ct)
     {
-        _sessionId = await _api.LoginAsync(_tokens.EmployeeId, Environment.MachineName, ct);
+        _sessionId = await _api.LoginAsync(Environment.MachineName, ct);
         _logger.LogInformation("Opened session {SessionId}.", _sessionId);
     }
 }

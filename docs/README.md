@@ -29,6 +29,7 @@ directly to the area you need.
 | 19 | [Production Deployment](19-production-deployment.md) | Server, SSL, queues, cron, backups, API security, rate limiting, monitoring, checklist |
 | 20 | [Codebase Audit Report](20-audit-report.md) | Full review: missing deps/migrations/routes, security, performance, best practices, prioritized fixes |
 | 21 | [P0 Remediation — Application Skeleton](21-p0-remediation.md) | Bootable Laravel 11 skeleton: composer, config, routes wiring, framework migrations, run/test steps |
+| 22 | [P1 Security Remediation](22-p1-security-remediation.md) | SEC-1 agent identity binding, SEC-2 rate limiting, auth hardening, scheduler + security tests |
 
 ## Deployment artifacts
 

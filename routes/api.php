@@ -9,10 +9,12 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-// User token auth (Sanctum).
-Route::post('v1/auth/login', [AuthController::class, 'login'])->name('api.auth.login');
+// User token auth (Sanctum). Login is throttled (SEC-2).
+Route::post('v1/auth/login', [AuthController::class, 'login'])
+    ->middleware('throttle:login')
+    ->name('api.auth.login');
 
-Route::middleware(['auth:sanctum', 'active'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'throttle:user'])->group(function () {
     Route::get('v1/auth/me', [AuthController::class, 'me'])->name('api.auth.me');
     Route::post('v1/auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
 });

@@ -15,8 +15,10 @@ use Illuminate\Support\Facades\Route;
 |
 | Public:
 |   POST /api/agent/register   → provisioning-key gated; mints a device token
+|                                (throttled: agent-register)
 |
-| Authenticated (Bearer device token with the `agent:report` ability):
+| Authenticated (Bearer device token with the `agent:report` ability;
+| throttled: agent):
 |   POST /api/agent/login      → open a PC session
 |   POST /api/activity         → report active/idle seconds
 |   POST /api/agent/logout     → close the PC session
@@ -24,9 +26,10 @@ use Illuminate\Support\Facades\Route;
 
 // Token bootstrap (guarded by the provisioning key inside the FormRequest).
 Route::post('agent/register', [DeviceRegistrationController::class, 'store'])
+    ->middleware('throttle:agent-register')
     ->name('agent.register');
 
-Route::middleware(['auth:sanctum', 'ability:agent:report'])->group(function () {
+Route::middleware(['auth:sanctum', 'ability:agent:report', 'throttle:agent'])->group(function () {
     Route::post('agent/login', [WorkSessionController::class, 'login'])->name('agent.login');
     Route::post('activity', [ActivityController::class, 'store'])->name('agent.activity');
     Route::post('agent/logout', [WorkSessionController::class, 'logout'])->name('agent.logout');
