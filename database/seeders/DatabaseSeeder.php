@@ -10,9 +10,11 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             RolePermissionSeeder::class,
-            // Add module seeders here as they are built:
-            // DepartmentSeeder::class,
-            // EmployeeSeeder::class,
         ]);
+
+        // Demo data for local/staging only — never in production.
+        if (! app()->environment('production')) {
+            $this->call(DemoDataSeeder::class);
+        }
     }
 }

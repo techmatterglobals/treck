@@ -62,6 +62,7 @@ The full technical design lives in [`docs/`](docs/):
 15. [Admin Dashboard (Livewire)](docs/15-admin-dashboard.md)
 16. [Reporting Module](docs/16-reporting.md)
 17. [Windows PC Agent (C#)](docs/17-windows-agent.md) — client in [`agent/`](agent/)
+18. [Aggregation Rollups & Demo Seeding](docs/18-rollups-and-seeding.md)
 
 Concrete reference DDL: [`docs/database/schema.sql`](docs/database/schema.sql)
 
