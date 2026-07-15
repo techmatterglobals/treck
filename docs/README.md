@@ -16,6 +16,12 @@ directly to the area you need.
 | 6 | [Admin Dashboard Structure](06-admin-dashboard.md) | Livewire component tree, pages, real-time strategy |
 | 7 | [Development Roadmap](07-development-roadmap.md) | Phased delivery plan, milestones, testing strategy |
 | 8 | [Getting Started](08-getting-started.md) | Step-by-step project creation: install, packages, env, DB, Breeze auth, folder structure |
+| 9 | [Database Migrations & Model Relationships](09-database-migrations.md) | The delivered migration set + Eloquent models: FKs, indexes, relationships |
+
+## Code delivered
+
+- [`database/migrations/`](../database/migrations) — the eight core table migrations.
+- [`app/Models/`](../app/Models) — matching Eloquent models with relationships.
 
 ## Reference artifacts
 
