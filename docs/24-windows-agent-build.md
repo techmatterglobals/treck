@@ -11,7 +11,7 @@ rationale in [doc 17](17-windows-agent.md) still applies).
 | - | ----- | ------------ | ------ |
 | **M1** | Skeleton, configuration, structured logging, service lifecycle | 9, 10 | ✅ Complete |
 | **M2** | API client + device registration + token storage | 1, 2, 3, 4, 5, 6, 7, 8, 12, 13, 14 | ✅ Complete |
-| M3 | Windows login/logout detection | 3, 4 | Planned |
+| **M3** | Windows session detection (logon/logoff/lock/unlock/shutdown) | — | ✅ Complete |
 | M4 | Idle-time calculation (Win32) + 60s heartbeat | 5, 6 | Planned |
 | M5 | Reconnect on network failure + SQLite offline cache | 7, 8 | Planned |
 | M6 | Windows Service packaging & install | — | Planned |
@@ -205,4 +205,90 @@ invalidation — all interface-driven and unit-tested. ✅
 
 ---
 
-*Next: M3 — Windows login/logout detection. Not started until M2 is confirmed.*
+---
+
+## M3 — Windows session detection ✅
+
+### Architecture
+
+Event-driven, no polling, split into a testable core + native adapter:
+
+- **`ISessionMonitor`** — `Start()` / `Stop()` and a `SessionChanged` event;
+  the internal publisher (no API involvement).
+- **`SessionMonitorBase`** — platform-agnostic core: thread-safe start/stop
+  (lock-guarded), **duplicate suppression** (drops consecutive identical events
+  within `DuplicateSuppressionMilliseconds`, via an injected `TimeProvider`),
+  structured logging, and event raising **outside the lock** (no handler
+  reentrancy/deadlock). This is what the unit tests exercise.
+- **`WindowsSessionMonitor : SessionMonitorBase`** — native adapter using
+  `Microsoft.Win32.SystemEvents` (a managed wrapper over WM_WTSSESSION_CHANGE /
+  WM_ENDSESSION). Maps `SessionSwitch`→ Logon/Logoff/Lock/Unlock and
+  `SessionEnding`→ Logoff/Shutdown, then calls `Publish`. `[SupportedOSPlatform("windows")]`.
+- **`SessionEvent`** (`Type`, `TimestampUtc`), **`SessionEventType`** (Unknown,
+  Logon, Logoff, Lock, Unlock, Shutdown, Restart), **`SessionMonitorOptions`**.
+
+The `Worker` starts the monitor and subscribes, logging each event — **it does
+not call the API** (that begins in M4).
+
+Two honest limitations, documented in code:
+- **Restart vs. shutdown** isn't reliably distinguishable through this API; a
+  system-ending notification surfaces as `Shutdown`. `Restart` stays in the enum
+  for when a lower-level hook is added.
+- `SystemEvents` delivers to the interactive desktop session, so the monitor is
+  intended for the per-user session context (helper) per doc 17; a pure
+  session-0 service would hook `ServiceBase.OnSessionChange` instead — the
+  `SessionMonitorBase` contract is unchanged.
+
+### Folders added
+
+```
+agent/Sessions/
+├── ISessionMonitor.cs
+├── SessionMonitorBase.cs        # thread-safe dedup + publish (testable)
+├── WindowsSessionMonitor.cs     # SystemEvents adapter (Windows-only)
+├── SessionEvent.cs
+├── SessionEventType.cs
+└── SessionMonitorOptions.cs
+```
+
+### Sequence
+
+```mermaid
+sequenceDiagram
+    participant OS as Windows (SystemEvents)
+    participant M as WindowsSessionMonitor
+    participant B as SessionMonitorBase
+    participant W as Worker
+
+    W->>M: Start()  (subscribe SessionSwitch/SessionEnding)
+    Note over OS: user locks the workstation
+    OS-->>M: SessionSwitch(SessionLock)
+    M->>B: Publish(Lock)
+    B->>B: dedup check (lock + TimeProvider)
+    B-->>W: SessionChanged(Lock)  (logged; no API)
+    Note over OS: duplicate lock within window
+    OS-->>M: SessionSwitch(SessionLock)
+    M->>B: Publish(Lock)
+    B->>B: within suppression window → dropped
+```
+
+### How to test
+
+- **Unit (`dotnet test`)** — `SessionMonitorTests` covers: event raised with
+  correct type/timestamp; duplicate same-type suppressed within the window;
+  different types allowed; same type allowed after the window elapses (time
+  advanced via a mutable `TimeProvider`); zero-window never suppresses.
+- **Manual (Windows, `dotnet run`)** — lock (Win+L) / unlock, sign out, and shut
+  down; observe structured `Session event: Lock/Unlock/Logoff/Shutdown …` log
+  lines. Rapidly locking twice should log one Lock (dedup).
+
+### Definition of done
+
+Session transitions are detected via native notifications (no polling),
+de-duplicated, thread-safe, structured-logged, and published internally; core
+logic unit-tested. No API calls. ✅
+
+---
+
+*Next: M4 — idle-time calculation (Win32 GetLastInputInfo) + 60s heartbeat. Not
+started until M3 is confirmed.*

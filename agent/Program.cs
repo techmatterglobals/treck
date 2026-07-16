@@ -9,6 +9,7 @@ using Treck.Agent.Api;
 using Treck.Agent.Configuration;
 using Treck.Agent.Security;
 using Treck.Agent.Services;
+using Treck.Agent.Sessions;
 using Treck.Agent.Storage;
 
 // Bootstrap logger: captures anything that fails before the host is built.
@@ -34,6 +35,14 @@ try
         .Bind(builder.Configuration.GetSection(AgentOptions.SectionName))
         .ValidateDataAnnotations()
         .ValidateOnStart();
+
+    builder.Services.AddOptions<SessionMonitorOptions>()
+        .Bind(builder.Configuration.GetSection(SessionMonitorOptions.SectionName))
+        .ValidateDataAnnotations();
+
+    // --- Session detection (event-driven, no polling) ---
+    builder.Services.AddSingleton(TimeProvider.System);
+    builder.Services.AddSingleton<ISessionMonitor, WindowsSessionMonitor>();
 
     // --- Storage / security ---
     builder.Services.AddSingleton<IStoragePathProvider, StoragePathProvider>();
