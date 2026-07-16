@@ -13,9 +13,14 @@ return [
             'provider' => 'users',
         ],
 
+        // Tokens are issued to more than one model (User + Computer/device),
+        // so the guard must not be pinned to a single provider's model.
+        // A null provider lets Sanctum authenticate any HasApiTokens tokenable
+        // (Sanctum's Guard::hasValidProvider() short-circuits to true); tokens
+        // are still validated and abilities/permissions are still enforced.
         'sanctum' => [
             'driver' => 'sanctum',
-            'provider' => 'users',
+            'provider' => null,
         ],
     ],
 

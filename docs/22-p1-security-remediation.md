@@ -46,7 +46,13 @@ Files: `bootstrap/app.php`, `routes/api.php`, `routes/auth.php`,
   server-side. (No new endpoints added.)
 - **Middleware protection:** every non-public route is behind `auth:sanctum`
   (API) / `auth` (web) + `active`, plus `ability`/`role`/`permission` as
-  appropriate. Added the `sanctum` guard to `config/auth.php`.
+  appropriate. Added the `sanctum` guard to `config/auth.php` with
+  **`provider => null`** — tokens are issued to two models (`User` and
+  `Computer`), and pinning the guard to a single provider makes Sanctum's
+  `Guard::hasValidProvider()` reject the other model's tokens with 401. A null
+  provider accepts any `HasApiTokens` tokenable; tokens are still validated and
+  abilities/permissions still enforced. (This was the cause of the initial
+  agent-token 401s; fixed.)
 
 ## 22.4 Scheduler verification
 
@@ -75,3 +81,7 @@ Files: `bootstrap/app.php`, `routes/api.php`, `routes/auth.php`,
 - Web email verification not enforced (`verified` is a no-op; BP-4, P3).
 - Tests run against SQLite in CI; MySQL-only SQL (report `DATE_FORMAT`) isn't
   exercised there — cover with a MySQL CI job (P2).
+- Token-audience separation (device tokens must not reach user endpoints and
+  vice-versa) currently relies on ability gating on agent routes and the
+  `active` middleware rejecting non-`User` tokenables on user routes. A
+  dedicated tokenable-type guard would make this explicit (P2 hardening).
