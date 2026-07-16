@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\ResetAuthGuards;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -22,6 +23,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Reset resolved auth guards after each API request so token identity
+        // never leaks between requests under Octane / the test harness.
+        $middleware->api(append: [
+            ResetAuthGuards::class,
+        ]);
+
         // Route-level middleware aliases used by the auth/authz layer.
         $middleware->alias([
             'role' => RoleMiddleware::class,
