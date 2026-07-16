@@ -19,7 +19,8 @@ Design rationale: [`docs/17-windows-agent.md`](../docs/17-windows-agent.md).
 
 ```
 agent/
-├── Treck.Agent.csproj        # net8.0-windows Worker Service
+├── Treck.Agent.sln           # solution (Treck.Agent + Treck.Agent.Tests)
+├── Treck.Agent.csproj        # net8.0-windows Worker Service (excludes tests/**)
 ├── Program.cs                # Host, Serilog, options validation, DI, HttpClient + Polly
 ├── Worker.cs                 # BackgroundService (ensures registration on start)
 ├── Api/                      # ITreckApiClient + TreckApiClient + ApiException
@@ -37,12 +38,13 @@ agent/
 
 - .NET 8 SDK, on Windows (targets `net8.0-windows`).
 
-## Run (development)
+## Build, run & test
 
 ```powershell
 cd agent
-dotnet restore
-dotnet run
+dotnet build Treck.Agent.sln     # builds both projects
+dotnet test  Treck.Agent.sln     # runs the unit tests
+dotnet run   --project Treck.Agent.csproj
 ```
 
 You should see a structured startup banner, then a `Debug` "alive tick" every

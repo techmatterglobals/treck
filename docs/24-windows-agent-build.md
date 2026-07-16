@@ -112,6 +112,8 @@ The token is resolved by the Laravel side from the device's registration
 
 ```
 agent/
+├── Treck.Agent.sln                  # solution: Treck.Agent + Treck.Agent.Tests
+├── Treck.Agent.csproj               # excludes tests/** from its compile items
 ├── Program.cs                       # DI, IHttpClientFactory, Polly, TLS handler
 ├── Worker.cs                        # ensures registration on start (retries per tick)
 ├── Api/
@@ -133,8 +135,15 @@ agent/
 │   ├── IStoragePathProvider.cs / StoragePathProvider.cs
 │   ├── IDeviceIdStore.cs / FileDeviceIdStore.cs
 │   └── ITokenStore.cs / DpapiTokenStore.cs
-└── tests/Treck.Agent.Tests/         # xUnit + Moq
+└── tests/Treck.Agent.Tests/         # xUnit + Moq + coverlet.collector
+    ├── Treck.Agent.Tests.csproj     # ProjectReference → ../../Treck.Agent.csproj
+    └── *Tests.cs
 ```
+
+**Build system.** The test project is nested under `agent/`, so the main
+`Treck.Agent.csproj` sets `DefaultItemExcludes` to skip `tests/**` — it never
+compiles test files or takes a dependency on test packages. `Treck.Agent.sln`
+ties both projects together for `dotnet build` / `dotnet test`.
 
 ### Registration sequence
 
