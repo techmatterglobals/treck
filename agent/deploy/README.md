@@ -4,11 +4,11 @@ Deployment assets for running the Treck desktop agent as a Windows Service
 (Milestone 6). The agent hosts fine as a console app for development
 (`dotnet run`); these scripts package it for unattended production use.
 
-| Script                  | Purpose                                                        |
-| ----------------------- | ------------------------------------------------------------- |
-| `publish.ps1`           | Produce a self-contained `win-x64` build (no runtime needed). |
-| `install-service.ps1`   | Register + start the service (automatic startup).             |
-| `uninstall-service.ps1` | Stop + remove the service (data preserved unless `-PurgeData`).|
+| Script                  | Purpose                                                                    |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `publish.ps1`           | Build a `win-x64` release. Framework-dependent by default; `-SelfContained` bundles the runtime. |
+| `install-service.ps1`   | Register + start the service (automatic startup).                          |
+| `uninstall-service.ps1` | Stop + remove the service (data preserved unless `-PurgeData`).            |
 
 ## Service identity
 
@@ -25,8 +25,17 @@ Deployment assets for running the Treck desktop agent as a Windows Service
 
 - Windows 10/11 or Windows Server (x64).
 - Administrator PowerShell for install/uninstall.
-- .NET 8 SDK **only if building** (`publish.ps1` / `-Publish`). Self-contained
-  output means target machines do **not** need the .NET runtime.
+- .NET 8 SDK **only if building** (`publish.ps1` / `-Publish`).
+- **.NET 8 Desktop Runtime (x64)** on each target machine for the default
+  framework-dependent build. Install it once with
+  `winget install Microsoft.DotNet.DesktopRuntime.8` (or download the
+  "Desktop Runtime" installer from dotnet.microsoft.com). The **Desktop**
+  runtime is required — not just the base runtime — because the agent's session
+  detection uses `Microsoft.Win32.SystemEvents`, which lives in the Windows
+  Desktop shared framework.
+  - Skip this only if you publish with `-SelfContained` (the runtime is then
+    bundled into the build, at the cost of downloading the ~130 MB win-x64
+    runtime packs on the build host).
 
 ## 1. Configure (no secrets in source control)
 
@@ -43,7 +52,8 @@ top of `appsettings.json`.
 
 ## 2. Publish + install
 
-One step (build then install):
+One step (build then install) — framework-dependent (needs the Desktop Runtime
+on this machine):
 
 ```powershell
 # From an elevated PowerShell in this folder:
@@ -55,6 +65,23 @@ Or publish once and install the output:
 ```powershell
 ./publish.ps1
 ./install-service.ps1 -PublishDir ..\publish
+```
+
+Air-gapped target with no runtime installed? Bundle it (larger; downloads the
+runtime packs on the build host):
+
+```powershell
+./install-service.ps1 -Publish -SelfContained
+```
+
+Plain `dotnet` equivalents:
+
+```powershell
+# Framework-dependent (default; small restore, needs Desktop Runtime on target):
+dotnet publish ..\Treck.Agent.csproj -c Release -r win-x64 --self-contained false -o ..\publish
+
+# Self-contained (no runtime needed on target; downloads ~130 MB of runtime packs):
+dotnet publish ..\Treck.Agent.csproj -c Release -r win-x64 --self-contained true -o ..\publish
 ```
 
 ## 3. Verify

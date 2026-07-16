@@ -526,7 +526,7 @@ are unchanged.
 ```
 agent/
 ├── deploy/
-│   ├── publish.ps1                 # self-contained win-x64 publish
+│   ├── publish.ps1                 # win-x64 publish (framework-dependent default; -SelfContained opt-in)
 │   ├── install-service.ps1         # register + start (Automatic startup, recovery)
 │   ├── uninstall-service.ps1       # stop + remove (data preserved unless -PurgeData)
 │   └── README.md                   # deployment quick reference
@@ -610,19 +610,42 @@ upload path unit-tested; server ingestion feature-tested. ✅
 | Description | Treck employee productivity & PC activity monitoring agent… |
 | Startup | Automatic · Log-on: `LocalSystem` · Recovery: restart 5s/10s/30s |
 
+### Deployment model & runtime
+
+The publish is **framework-dependent by default** (`<SelfContained>false</SelfContained>`
+in `Treck.Agent.csproj`). This keeps `dotnet restore -r win-x64` small — it pulls
+only the apphost pack, not the ~130 MB win-x64 runtime packs — which matters on
+locked-down/slow networks. Each **target machine needs the .NET 8 Desktop Runtime
+(x64)** installed:
+
+```powershell
+winget install Microsoft.DotNet.DesktopRuntime.8   # or download from dotnet.microsoft.com
+```
+
+The **Desktop** runtime (not just the base runtime) is required because session
+detection uses `Microsoft.Win32.SystemEvents`, which lives in the Windows Desktop
+shared framework — the same reason a *self-contained* build must download the
+`Microsoft.WindowsDesktop.App.Runtime.win-x64` pack. Self-contained is optional
+(`-SelfContained`) for air-gapped targets with no runtime; build it on a host
+with connectivity.
+
 ### Build & install (target machine, elevated PowerShell)
 
 ```powershell
 cd agent\deploy
 Copy-Item ..\appsettings.Production.json.example ..\appsettings.Production.json
 notepad ..\appsettings.Production.json      # BaseUrl, ProvisioningKey, EmployeeCode
-./install-service.ps1 -Publish              # publish self-contained + install + start
+./install-service.ps1 -Publish              # framework-dependent publish + install + start
+# ./install-service.ps1 -Publish -SelfContained   # bundle the runtime instead
 ```
 
 Plain `dotnet` equivalents:
 
 ```powershell
-dotnet restore agent\Treck.Agent.csproj
+dotnet restore agent\Treck.Agent.csproj -r win-x64
+# Framework-dependent (default; needs Desktop Runtime on target):
+dotnet publish agent\Treck.Agent.csproj -c Release -r win-x64 --self-contained false -o agent\publish
+# Self-contained (no runtime on target; downloads ~130 MB of runtime packs):
 dotnet publish agent\Treck.Agent.csproj -c Release -r win-x64 --self-contained true -o agent\publish
 ```
 

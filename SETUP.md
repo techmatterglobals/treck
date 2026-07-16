@@ -191,15 +191,20 @@ milestone build/install runbook). Bootstrap flow:
 ### Install as a Windows Service (production)
 
 The agent runs as a console app for development (`dotnet run`) and as a Windows
-Service in production. From an **elevated PowerShell** on the target machine:
+Service in production. The default build is framework-dependent, so install the
+**.NET 8 Desktop Runtime (x64)** on the target first
+(`winget install Microsoft.DotNet.DesktopRuntime.8`) — the Desktop runtime is
+required because session detection uses `Microsoft.Win32.SystemEvents`. Then,
+from an **elevated PowerShell** on the target machine:
 
 ```powershell
 cd agent\deploy
 # 1. Per-deployment config (git-ignored; no secrets in source control):
 Copy-Item ..\appsettings.Production.json.example ..\appsettings.Production.json
 notepad ..\appsettings.Production.json     # BaseUrl, ProvisioningKey, EmployeeCode
-# 2. Publish a self-contained build and install + start the service:
+# 2. Publish (framework-dependent) and install + start the service:
 ./install-service.ps1 -Publish             # Service "TreckAgent" (display: "Treck Agent")
+# Air-gapped target with no runtime? Bundle it: ./install-service.ps1 -Publish -SelfContained
 ```
 
 Verify / manage:

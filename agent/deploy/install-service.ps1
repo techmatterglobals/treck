@@ -14,7 +14,12 @@
     a self-contained release first (requires the .NET SDK).
 
 .PARAMETER Publish
-    Build a self-contained release (via publish.ps1) before installing.
+    Build a release (via publish.ps1) before installing. Framework-dependent by
+    default (requires the .NET 8 Desktop Runtime on this machine).
+
+.PARAMETER SelfContained
+    With -Publish, bundle the .NET runtime so no runtime install is needed
+    (larger; downloads the win-x64 runtime packs on this build host).
 
 .PARAMETER PublishDir
     Directory containing the published build (must contain TreckAgent.exe).
@@ -38,6 +43,7 @@
 [CmdletBinding()]
 param(
     [switch] $Publish,
+    [switch] $SelfContained,
     [string] $PublishDir = (Join-Path $PSScriptRoot '..\publish'),
     [string] $InstallDir = (Join-Path $env:ProgramFiles 'TreckAgent'),
     [string] $ServiceName = 'TreckAgent',
@@ -49,9 +55,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# --- 1. Optionally publish a self-contained build ---------------------------
+# --- 1. Optionally publish a build ------------------------------------------
 if ($Publish) {
-    & (Join-Path $PSScriptRoot 'publish.ps1') -OutputDir $PublishDir
+    & (Join-Path $PSScriptRoot 'publish.ps1') -OutputDir $PublishDir -SelfContained:$SelfContained
 }
 
 $exeSource = Join-Path $PublishDir 'TreckAgent.exe'
@@ -118,5 +124,8 @@ Write-Host "  Service : $($svc.Name) ($($svc.DisplayName))"
 Write-Host "  Status  : $($svc.Status)"
 Write-Host "  Binary  : $exePath"
 Write-Host "  Logs    : $logDir"
+if (-not $SelfContained) {
+    Write-Host "  Runtime : framework-dependent — requires the .NET 8 Desktop Runtime (x64) on this machine"
+}
 Write-Host ""
 Write-Host "Manage with:  sc.exe query $ServiceName  |  Start-Service $ServiceName  |  Stop-Service $ServiceName"
