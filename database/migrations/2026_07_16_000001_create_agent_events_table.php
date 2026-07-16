@@ -44,8 +44,14 @@ return new class extends Migration
 
             $table->json('payload');
 
-            $table->timestamp('occurred_at');
-            $table->timestamp('received_at');
+            // Both are NOT NULL and always written explicitly by the ingest
+            // service. The DEFAULT CURRENT_TIMESTAMP is only there so MySQL does
+            // not invent an implicit '0000-00-00' default for a second TIMESTAMP
+            // column when explicit_defaults_for_timestamp is OFF (which strict
+            // mode rejects with error 1067). It is a harmless valid fallback and
+            // does not weaken the schema.
+            $table->timestamp('occurred_at')->useCurrent();
+            $table->timestamp('received_at')->useCurrent();
 
             $table->timestamps();
 
