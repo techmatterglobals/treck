@@ -5,6 +5,7 @@ using Polly;
 using Polly.Extensions.Http;
 using Serilog;
 using Treck.Agent;
+using Treck.Agent.Activity;
 using Treck.Agent.Api;
 using Treck.Agent.Configuration;
 using Treck.Agent.Security;
@@ -43,6 +44,10 @@ try
     // --- Session detection (event-driven, no polling) ---
     builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddSingleton<ISessionMonitor, WindowsSessionMonitor>();
+
+    // --- Idle detection + heartbeat scheduler (no API involvement) ---
+    builder.Services.AddSingleton<IIdleDetector, WindowsIdleDetector>();
+    builder.Services.AddSingleton<IHeartbeatScheduler, HeartbeatScheduler>();
 
     // --- Storage / security ---
     builder.Services.AddSingleton<IStoragePathProvider, StoragePathProvider>();

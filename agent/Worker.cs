@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.Extensions.Options;
+using Treck.Agent.Activity;
 using Treck.Agent.Configuration;
 using Treck.Agent.Services;
 using Treck.Agent.Sessions;
@@ -7,12 +8,13 @@ using Treck.Agent.Sessions;
 namespace Treck.Agent;
 
 /// <summary>
-/// The agent's long-running background service.
+/// The agent's long-running background service / orchestrator.
 ///
-/// Through Milestone 3: ensures the device is registered (M2) and starts the
-/// session monitor (M3), logging every detected session event. Session events
-/// are only observed internally here — they are NOT yet sent to the API. Idle
-/// time + heartbeat payloads (M4) and offline caching (M5) are still deferred.
+/// Through Milestone 4: ensures the device is registered (M2), starts the
+/// session monitor (M3) and the heartbeat scheduler (M4), and logs the events
+/// each produces. Session and heartbeat events are observed internally ONLY —
+/// nothing is sent to the API yet (that begins in M5). Screenshots and
+/// application-usage tracking are not implemented.
 /// </summary>
 public sealed class Worker : BackgroundService
 {
@@ -23,17 +25,20 @@ public sealed class Worker : BackgroundService
     private readonly AgentOptions _options;
     private readonly IDeviceRegistrationService _registration;
     private readonly ISessionMonitor _sessionMonitor;
+    private readonly IHeartbeatScheduler _heartbeatScheduler;
 
     public Worker(
         ILogger<Worker> logger,
         IOptions<AgentOptions> options,
         IDeviceRegistrationService registration,
-        ISessionMonitor sessionMonitor)
+        ISessionMonitor sessionMonitor,
+        IHeartbeatScheduler heartbeatScheduler)
     {
         _logger = logger;
         _options = options.Value;
         _registration = registration;
         _sessionMonitor = sessionMonitor;
+        _heartbeatScheduler = heartbeatScheduler;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -43,12 +48,15 @@ public sealed class Worker : BackgroundService
             AgentVersion, _options.BaseUrl, _options.EmployeeCode, _options.HeartbeatIntervalSeconds);
 
         _sessionMonitor.SessionChanged += OnSessionChanged;
+        _heartbeatScheduler.HeartbeatProduced += OnHeartbeatProduced;
         _sessionMonitor.Start();
+        _heartbeatScheduler.Start();
 
         try
         {
             await TryEnsureRegisteredAsync(stoppingToken);
 
+            // Registration-retry loop (the heartbeat cadence is owned by the scheduler).
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(_options.HeartbeatIntervalSeconds));
 
             while (await timer.WaitForNextTickAsync(stoppingToken))
@@ -56,10 +64,6 @@ public sealed class Worker : BackgroundService
                 if (!_registration.IsRegistered)
                 {
                     await TryEnsureRegisteredAsync(stoppingToken);
-                }
-                else
-                {
-                    _logger.LogDebug("Agent alive tick at {Timestamp:o} (registered)", DateTimeOffset.Now);
                 }
             }
         }
@@ -70,6 +74,8 @@ public sealed class Worker : BackgroundService
         finally
         {
             _sessionMonitor.SessionChanged -= OnSessionChanged;
+            _heartbeatScheduler.HeartbeatProduced -= OnHeartbeatProduced;
+            _heartbeatScheduler.Stop();
             _sessionMonitor.Stop();
         }
 
@@ -78,10 +84,18 @@ public sealed class Worker : BackgroundService
 
     private void OnSessionChanged(object? sender, SessionEvent sessionEvent)
     {
-        // Milestone 3: observe only — no API calls. Sending happens from M4.
+        // M3/M4: observe only — no API calls.
         _logger.LogDebug(
             "Worker observed session event {Type} at {Timestamp:o}",
             sessionEvent.Type, sessionEvent.TimestampUtc);
+    }
+
+    private void OnHeartbeatProduced(object? sender, HeartbeatEvent heartbeat)
+    {
+        // M4: observe only — sending to the API begins in M5.
+        _logger.LogDebug(
+            "Worker observed heartbeat active={ActiveSeconds}s idle={IdleSeconds}s isIdle={IsIdle}",
+            heartbeat.ActiveSeconds, heartbeat.IdleSeconds, heartbeat.IsIdle);
     }
 
     private async Task TryEnsureRegisteredAsync(CancellationToken cancellationToken)

@@ -12,7 +12,7 @@ rationale in [doc 17](17-windows-agent.md) still applies).
 | **M1** | Skeleton, configuration, structured logging, service lifecycle | 9, 10 | ✅ Complete |
 | **M2** | API client + device registration + token storage | 1, 2, 3, 4, 5, 6, 7, 8, 12, 13, 14 | ✅ Complete |
 | **M3** | Windows session detection (logon/logoff/lock/unlock/shutdown) | — | ✅ Complete |
-| M4 | Idle-time calculation (Win32) + 60s heartbeat | 5, 6 | Planned |
+| **M4** | Idle-time calculation (Win32) + 60s heartbeat | 5, 6 | ✅ Complete |
 | M5 | Reconnect on network failure + SQLite offline cache | 7, 8 | Planned |
 | M6 | Windows Service packaging & install | — | Planned |
 
@@ -290,5 +290,86 @@ logic unit-tested. No API calls. ✅
 
 ---
 
-*Next: M4 — idle-time calculation (Win32 GetLastInputInfo) + 60s heartbeat. Not
-started until M3 is confirmed.*
+---
+
+## M4 — Idle detection & heartbeat ✅
+
+### Architecture
+
+Idle detection and heartbeat scheduling are fully separate from API
+communication (the heartbeat path has no reference to `ITreckApiClient` or the
+registration service):
+
+- **`IIdleDetector` / `WindowsIdleDetector`** — Win32 `GetLastInputInfo` only;
+  returns the idle `TimeSpan`. `[SupportedOSPlatform("windows")]`.
+- **`HeartbeatCalculator`** (pure, static) — given `elapsed`, observed
+  `idleTime`, and the configured threshold, classifies the interval into
+  active vs. idle seconds. No I/O → fully unit-tested.
+- **`HeartbeatEvent`** — the internal model (timestamp, elapsed, observed idle,
+  `IsIdle`, active/idle seconds). Not sent anywhere in M4.
+- **`IHeartbeatScheduler` / `HeartbeatScheduler`** — owns a `PeriodicTimer`
+  (constructed with the injected `TimeProvider` for testable timing) at
+  `HeartbeatIntervalSeconds` (default 60). Each tick reads the idle detector,
+  builds a `HeartbeatEvent`, logs it, and raises `HeartbeatProduced`. The
+  per-tick logic is factored into `CaptureHeartbeat()` (public) so it can be
+  unit-tested without real time.
+
+The idle **threshold** and heartbeat **interval** come from `AgentOptions`
+(`IdleThresholdSeconds`, `HeartbeatIntervalSeconds`) — both configurable. The
+`Worker` starts the scheduler alongside the session monitor and logs each
+heartbeat; it does **not** send anything.
+
+### Folders added
+
+```
+agent/Activity/
+├── IIdleDetector.cs
+├── WindowsIdleDetector.cs        # GetLastInputInfo (Windows-only)
+├── HeartbeatEvent.cs             # internal event model
+├── HeartbeatCalculator.cs        # pure active/idle classification (testable)
+├── IHeartbeatScheduler.cs
+└── HeartbeatScheduler.cs         # 60s PeriodicTimer → HeartbeatProduced
+```
+
+### Sequence
+
+```mermaid
+sequenceDiagram
+    participant T as PeriodicTimer (60s)
+    participant S as HeartbeatScheduler
+    participant I as WindowsIdleDetector
+    participant W as Worker
+
+    W->>S: Start()
+    loop every 60s
+        T-->>S: tick
+        S->>I: GetIdleTime()
+        I-->>S: idle TimeSpan (GetLastInputInfo)
+        S->>S: HeartbeatCalculator.Create(elapsed, idle, threshold)
+        S-->>W: HeartbeatProduced(active/idle seconds)  (logged; no API)
+    end
+```
+
+### How to test
+
+- **Unit (`dotnet test`)** — `HeartbeatCalculatorTests` (active below threshold,
+  idle at/above threshold, boundary counts as idle, negative elapsed clamped) and
+  `HeartbeatSchedulerTests` (active vs. idle event raised via a mocked
+  `IIdleDetector`; elapsed measured between captures using a mutable
+  `TimeProvider`).
+- **Manual (Windows, `dotnet run`)** — with `HeartbeatIntervalSeconds` lowered
+  (e.g. 10) and `IdleThresholdSeconds` small (e.g. 15): type/move the mouse →
+  `Heartbeat: active=…s idle=0s isIdle=False`; stop touching input past the
+  threshold → `isIdle=True idle=…s`.
+
+### Definition of done
+
+Idle time is read from a native API, the interval is classified against a
+configurable threshold, a 60-second scheduler publishes internal heartbeat
+events (no polling of the API, no API calls at all), and the calculation +
+scheduler are unit-tested. No screenshots, no application tracking. ✅
+
+---
+
+*Next: M5 — reconnect on network failure + SQLite offline cache. Not started
+until M4 is confirmed.*
