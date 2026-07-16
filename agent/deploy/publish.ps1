@@ -13,7 +13,7 @@
 
     Pass -SelfContained for a release build that bundles the runtime (no runtime
     needed on the target). Only this path specifies a RID and therefore downloads
-    the ~130 MB win-x64 runtime packs — run it on a build host with connectivity.
+    the ~130 MB win-x64 runtime packs - run it on a build host with connectivity.
 
     Output goes to agent/publish by default. Run install-service.ps1 afterwards
     (or pass -Publish to install-service.ps1 to do both in one step).
@@ -43,7 +43,7 @@ if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
 }
 
 if ($SelfContained) {
-    Write-Host "Publishing Treck Agent ($Configuration, $RuntimeIdentifier, self-contained) → $OutputDir" -ForegroundColor Cyan
+    Write-Host "Publishing Treck Agent ($Configuration, $RuntimeIdentifier, self-contained) -> $OutputDir" -ForegroundColor Cyan
     # Only this path pins a RID and pulls the runtime packs.
     dotnet publish $projectPath `
         --configuration $Configuration `
@@ -53,7 +53,7 @@ if ($SelfContained) {
         --output $OutputDir
 }
 else {
-    Write-Host "Publishing Treck Agent ($Configuration, framework-dependent, RID-less) → $OutputDir" -ForegroundColor Cyan
+    Write-Host "Publishing Treck Agent ($Configuration, framework-dependent, RID-less) -> $OutputDir" -ForegroundColor Cyan
     # No --runtime: uses the SDK apphost + the installed shared runtime; no downloads.
     dotnet publish $projectPath `
         --configuration $Configuration `
@@ -71,5 +71,5 @@ if (-not (Test-Path $exePath)) {
 
 Write-Host "Published: $exePath" -ForegroundColor Green
 if (-not $SelfContained) {
-    Write-Host "Framework-dependent build — ensure the .NET 8 Desktop Runtime (x64) is installed on the target." -ForegroundColor Yellow
+    Write-Host "Framework-dependent build - ensure the .NET 8 Desktop Runtime (x64) is installed on the target." -ForegroundColor Yellow
 }
