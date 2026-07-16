@@ -1,17 +1,17 @@
 using System.Reflection;
 using Microsoft.Extensions.Options;
 using Treck.Agent.Configuration;
+using Treck.Agent.Services;
 
 namespace Treck.Agent;
 
 /// <summary>
 /// The agent's long-running background service.
 ///
-/// Milestone 1 scope: prove out the service lifecycle, configuration binding,
-/// and structured logging. It logs a startup banner and a periodic "alive" tick
-/// at the configured heartbeat interval. Real behaviour arrives in later
-/// milestones — device registration (M2), session detection (M3), idle +
-/// heartbeat payloads (M4), and offline caching (M5).
+/// Milestone 2 scope: on startup, ensure the device is registered (decrypting a
+/// stored token or registering to obtain one), retrying each interval until it
+/// succeeds. Session detection (M3), idle + heartbeat payloads (M4), and offline
+/// caching (M5) are still deferred — the periodic tick is a placeholder.
 /// </summary>
 public sealed class Worker : BackgroundService
 {
@@ -20,22 +20,25 @@ public sealed class Worker : BackgroundService
 
     private readonly ILogger<Worker> _logger;
     private readonly AgentOptions _options;
+    private readonly IDeviceRegistrationService _registration;
 
-    public Worker(ILogger<Worker> logger, IOptions<AgentOptions> options)
+    public Worker(
+        ILogger<Worker> logger,
+        IOptions<AgentOptions> options,
+        IDeviceRegistrationService registration)
     {
         _logger = logger;
         _options = options.Value;
+        _registration = registration;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation(
-            "Treck Agent started. Version={Version} Server={BaseUrl} EmployeeCode={EmployeeCode} Heartbeat={HeartbeatSeconds}s IdleThreshold={IdleSeconds}s",
-            AgentVersion,
-            _options.BaseUrl,
-            _options.EmployeeCode,
-            _options.HeartbeatIntervalSeconds,
-            _options.IdleThresholdSeconds);
+            "Treck Agent started. Version={Version} Server={BaseUrl} EmployeeCode={EmployeeCode} Heartbeat={HeartbeatSeconds}s",
+            AgentVersion, _options.BaseUrl, _options.EmployeeCode, _options.HeartbeatIntervalSeconds);
+
+        await TryEnsureRegisteredAsync(stoppingToken);
 
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(_options.HeartbeatIntervalSeconds));
 
@@ -43,7 +46,14 @@ public sealed class Worker : BackgroundService
         {
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
-                _logger.LogDebug("Agent alive tick at {Timestamp:o}", DateTimeOffset.Now);
+                if (!_registration.IsRegistered)
+                {
+                    await TryEnsureRegisteredAsync(stoppingToken);
+                }
+                else
+                {
+                    _logger.LogDebug("Agent alive tick at {Timestamp:o} (registered)", DateTimeOffset.Now);
+                }
             }
         }
         catch (OperationCanceledException)
@@ -52,5 +62,19 @@ public sealed class Worker : BackgroundService
         }
 
         _logger.LogInformation("Treck Agent stopped.");
+    }
+
+    private async Task TryEnsureRegisteredAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _registration.EnsureRegisteredAsync(cancellationToken);
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Full network-outage handling (offline cache/reconnect) is M5; for now
+            // we log and retry on the next tick.
+            _logger.LogWarning("Device not registered yet; will retry next interval. Reason: {Reason}", ex.Message);
+        }
     }
 }

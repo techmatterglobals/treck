@@ -9,24 +9,28 @@ Design rationale: [`docs/17-windows-agent.md`](../docs/17-windows-agent.md).
 | # | Scope | Status |
 | - | ----- | ------ |
 | M1 | Skeleton, configuration, structured logging | ✅ Complete |
-| M2 | API client, device registration, token storage | ⏳ Planned |
+| M2 | API client, device registration, token storage | ✅ Complete |
 | M3 | Windows login/logout detection | ⏳ Planned |
 | M4 | Idle-time (Win32) + 60s heartbeat | ⏳ Planned |
 | M5 | Reconnect + SQLite offline cache | ⏳ Planned |
 | M6 | Windows Service packaging & install | ⏳ Planned |
 
-## Layout (M1)
+## Layout (through M2)
 
 ```
 agent/
 ├── Treck.Agent.csproj        # net8.0-windows Worker Service
-├── Program.cs                # Host builder, Serilog, options validation, DI
-├── Worker.cs                 # BackgroundService (lifecycle + heartbeat tick)
-├── Configuration/
-│   └── AgentOptions.cs       # validated config (BaseUrl, keys, intervals)
-├── appsettings.json          # Agent + Serilog config
-├── appsettings.Development.json
-└── .gitignore
+├── Program.cs                # Host, Serilog, options validation, DI, HttpClient + Polly
+├── Worker.cs                 # BackgroundService (ensures registration on start)
+├── Api/                      # ITreckApiClient + TreckApiClient + ApiException
+├── Configuration/            # AgentOptions (validated)
+├── Models/                   # request/response DTOs + ApiEnvelope
+├── Security/                 # ITokenProtector + DpapiTokenProtector (DPAPI)
+├── Storage/                  # device-id + encrypted token stores, path provider
+├── Services/                 # IDeviceRegistrationService + impl
+├── appsettings.json / appsettings.Development.json
+├── .gitignore
+└── tests/Treck.Agent.Tests/  # xUnit + Moq
 ```
 
 ## Requirements
@@ -52,3 +56,14 @@ $env:Agent__HeartbeatIntervalSeconds = "10"; dotnet run
 ```
 
 Invalid config fails fast at startup (e.g. blank `BaseUrl` → validation error).
+
+## Tests
+
+```powershell
+dotnet test
+```
+
+Covers DPAPI encryption (Windows), device-id persistence, the registration
+client, and registration orchestration. See
+[`docs/24-windows-agent-build.md`](../docs/24-windows-agent-build.md) for the
+full M2 walkthrough and sequence diagram.

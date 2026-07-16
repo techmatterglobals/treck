@@ -31,7 +31,13 @@ public sealed class AgentOptions
     [Range(30, 86400)]
     public int IdleThresholdSeconds { get; set; } = 300;
 
-    /// <summary>Max retry attempts per API call (used from M2 onward).</summary>
+    /// <summary>Max retry attempts per API call (Polly exponential backoff).</summary>
     [Range(0, 10)]
     public int MaxRetries { get; set; } = 4;
+
+    /// <summary>
+    /// Local directory for persisted state (device id + encrypted token).
+    /// Null → %ProgramData%\TreckAgent. Overridable for tests / portable installs.
+    /// </summary>
+    public string? StoragePath { get; set; }
 }
