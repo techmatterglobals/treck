@@ -77,10 +77,10 @@ runtime packs on the build host):
 Plain `dotnet` equivalents:
 
 ```powershell
-# Framework-dependent (default; small restore, needs Desktop Runtime on target):
-dotnet publish ..\Treck.Agent.csproj -c Release -r win-x64 --self-contained false -o ..\publish
+# Framework-dependent, RID-less (default; no downloads, needs Desktop Runtime on target):
+dotnet publish ..\Treck.Agent.csproj -c Release -o ..\publish
 
-# Self-contained (no runtime needed on target; downloads ~130 MB of runtime packs):
+# Self-contained (no runtime needed on target; pins the RID, downloads ~130 MB of runtime packs):
 dotnet publish ..\Treck.Agent.csproj -c Release -r win-x64 --self-contained true -o ..\publish
 ```
 

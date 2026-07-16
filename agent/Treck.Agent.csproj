@@ -11,20 +11,14 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <InvariantGlobalization>true</InvariantGlobalization>
 
-    <!-- Publish target RID. Declared here so `dotnet restore -r win-x64` and
-         `dotnet publish -r win-x64` are recognized without extra flags. -->
-    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
-
-    <!-- Framework-dependent by default: a `-r win-x64` restore/publish then pulls
-         only the small apphost pack, NOT the ~130 MB win-x64 runtime packs
-         (Microsoft.NETCore.App.Runtime + Microsoft.WindowsDesktop.App.Runtime —
-         the latter is required because Microsoft.Win32.SystemEvents lives in the
-         Windows Desktop shared framework). Target machines need the .NET 8
-         Desktop Runtime installed. Opt into a self-contained build only when that
-         is not acceptable (see agent/deploy/publish.ps1 -SelfContained), which
-         requires downloading the runtime packs once on a connected build host.
-         A command-line `--self-contained true` overrides this default. -->
-    <SelfContained>false</SelfContained>
+    <!-- Deliberately RID-agnostic. Development (restore / build / test / run) and
+         the default framework-dependent publish use the installed shared runtime,
+         so nothing has to download win-x64 runtime packs. A self-contained
+         release is an explicit opt-in that specifies the RID on the command line
+         (agent/deploy/publish.ps1 -SelfContained), which is the only build that
+         fetches Microsoft.NETCore.App.Runtime / Microsoft.WindowsDesktop.App.Runtime.
+         Do NOT add <RuntimeIdentifier(s)> here: it forces RID restore into every
+         `dotnet restore`, pulling those packs even for framework-dependent dev. -->
 
     <!-- The test project lives under tests/; never compile it into this project. -->
     <DefaultItemExcludes>$(DefaultItemExcludes);tests/**</DefaultItemExcludes>

@@ -612,11 +612,14 @@ upload path unit-tested; server ingestion feature-tested. ✅
 
 ### Deployment model & runtime
 
-The publish is **framework-dependent by default** (`<SelfContained>false</SelfContained>`
-in `Treck.Agent.csproj`). This keeps `dotnet restore -r win-x64` small — it pulls
-only the apphost pack, not the ~130 MB win-x64 runtime packs — which matters on
-locked-down/slow networks. Each **target machine needs the .NET 8 Desktop Runtime
-(x64)** installed:
+The project is **RID-agnostic**. Development (`dotnet restore` / `build` / `test`
+/ `run`) and the **default framework-dependent publish are RID-less**, so they use
+the installed shared runtime and download **no** win-x64 runtime packs — which
+matters on locked-down/slow networks. (Do not add `<RuntimeIdentifier(s)>` to the
+csproj: it forces RID restore into every `dotnet restore` and pulls the runtime
+pack even for framework-dependent dev.)
+
+Each **target machine needs the .NET 8 Desktop Runtime (x64)** installed:
 
 ```powershell
 winget install Microsoft.DotNet.DesktopRuntime.8   # or download from dotnet.microsoft.com
@@ -625,9 +628,9 @@ winget install Microsoft.DotNet.DesktopRuntime.8   # or download from dotnet.mic
 The **Desktop** runtime (not just the base runtime) is required because session
 detection uses `Microsoft.Win32.SystemEvents`, which lives in the Windows Desktop
 shared framework — the same reason a *self-contained* build must download the
-`Microsoft.WindowsDesktop.App.Runtime.win-x64` pack. Self-contained is optional
-(`-SelfContained`) for air-gapped targets with no runtime; build it on a host
-with connectivity.
+`Microsoft.WindowsDesktop.App.Runtime.win-x64` pack. Self-contained is an optional
+release build (`-SelfContained`) for air-gapped targets with no runtime; it is the
+only build that pins `-r win-x64`, so build it on a host with connectivity.
 
 ### Build & install (target machine, elevated PowerShell)
 
@@ -635,17 +638,18 @@ with connectivity.
 cd agent\deploy
 Copy-Item ..\appsettings.Production.json.example ..\appsettings.Production.json
 notepad ..\appsettings.Production.json      # BaseUrl, ProvisioningKey, EmployeeCode
-./install-service.ps1 -Publish              # framework-dependent publish + install + start
-# ./install-service.ps1 -Publish -SelfContained   # bundle the runtime instead
+./install-service.ps1 -Publish              # framework-dependent (RID-less) publish + install + start
+# ./install-service.ps1 -Publish -SelfContained   # optional release: bundle the runtime
 ```
 
 Plain `dotnet` equivalents:
 
 ```powershell
-dotnet restore agent\Treck.Agent.csproj -r win-x64
-# Framework-dependent (default; needs Desktop Runtime on target):
-dotnet publish agent\Treck.Agent.csproj -c Release -r win-x64 --self-contained false -o agent\publish
-# Self-contained (no runtime on target; downloads ~130 MB of runtime packs):
+# Development / default publish — RID-less, framework-dependent, no downloads:
+dotnet restore agent\Treck.Agent.csproj
+dotnet publish agent\Treck.Agent.csproj -c Release -o agent\publish
+
+# Optional self-contained release — pins the RID; downloads ~130 MB of runtime packs:
 dotnet publish agent\Treck.Agent.csproj -c Release -r win-x64 --self-contained true -o agent\publish
 ```
 
