@@ -1,35 +1,54 @@
-# Treck Windows Agent (reference)
+# Treck Windows Agent (.NET 8 Worker Service)
 
-.NET 8 Windows Service that reports workstation activity to the Treck Laravel
-API. Design and rationale: [`docs/17-windows-agent.md`](../docs/17-windows-agent.md).
+Desktop agent that reports workstation activity to the Treck Laravel API. Built
+incrementally in milestones (see [`docs/24-windows-agent-build.md`](../docs/24-windows-agent-build.md)).
+Design rationale: [`docs/17-windows-agent.md`](../docs/17-windows-agent.md).
 
-> Reference implementation. It targets `net8.0-windows` and uses Win32 APIs, so
-> it builds on a Windows/.NET toolchain — not in this Linux repo. Treat it as a
-> correct-by-inspection starting point.
+## Milestones
 
-## Layout
+| # | Scope | Status |
+| - | ----- | ------ |
+| M1 | Skeleton, configuration, structured logging | ✅ Complete |
+| M2 | API client, device registration, token storage | ⏳ Planned |
+| M3 | Windows login/logout detection | ⏳ Planned |
+| M4 | Idle-time (Win32) + 60s heartbeat | ⏳ Planned |
+| M5 | Reconnect + SQLite offline cache | ⏳ Planned |
+| M6 | Windows Service packaging & install | ⏳ Planned |
 
-| File | Role |
-| ---- | ---- |
-| `Program.cs` | Host builder, Windows Service registration, DI |
-| `Worker.cs` | Lifecycle: register → login → tick → logout |
-| `Configuration/AgentOptions.cs` | Typed config |
-| `Services/ApiClient.cs` | Typed HttpClient (Bearer, snake_case, retry) |
-| `Services/IdleDetector.cs` | `GetLastInputInfo` idle time |
-| `Services/SessionMonitor.cs` | Lock/unlock/logoff events |
-| `Services/ActivityTracker.cs` | Active/idle/status classification (pure) |
-| `Services/TokenStore.cs` | DPAPI-encrypted token + device id |
-| `Models/ApiModels.cs` | Request/response DTOs |
+## Layout (M1)
 
-## Build & install (Windows, elevated)
-
-```powershell
-dotnet publish -c Release -r win-x64 --self-contained -o C:\Program Files\Treck
-sc.exe create TreckAgent binPath= "C:\Program Files\Treck\TreckAgent.exe" start= auto
-sc.exe failure TreckAgent reset= 86400 actions= restart/5000/restart/5000/restart/5000
-sc.exe start TreckAgent
+```
+agent/
+├── Treck.Agent.csproj        # net8.0-windows Worker Service
+├── Program.cs                # Host builder, Serilog, options validation, DI
+├── Worker.cs                 # BackgroundService (lifecycle + heartbeat tick)
+├── Configuration/
+│   └── AgentOptions.cs       # validated config (BaseUrl, keys, intervals)
+├── appsettings.json          # Agent + Serilog config
+├── appsettings.Development.json
+└── .gitignore
 ```
 
-Configure `appsettings.json` (or MDM-deployed config) with your `BaseUrl`,
-`ProvisioningKey`, and `EmployeeCode` before first run. The provisioning key is
-used once to obtain a device token and can be removed afterward.
+## Requirements
+
+- .NET 8 SDK, on Windows (targets `net8.0-windows`).
+
+## Run (development)
+
+```powershell
+cd agent
+dotnet restore
+dotnet run
+```
+
+You should see a structured startup banner, then a `Debug` "alive tick" every
+`HeartbeatIntervalSeconds`. A rolling compact-JSON log is written to
+`agent/logs/treck-agent-<date>.jsonl`. Press Ctrl+C for graceful shutdown.
+
+Override config via environment for a quick test:
+
+```powershell
+$env:Agent__HeartbeatIntervalSeconds = "10"; dotnet run
+```
+
+Invalid config fails fast at startup (e.g. blank `BaseUrl` → validation error).
