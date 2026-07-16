@@ -53,6 +53,10 @@ Files: `bootstrap/app.php`, `routes/api.php`, `routes/auth.php`,
   provider accepts any `HasApiTokens` tokenable; tokens are still validated and
   abilities/permissions still enforced. (This was the cause of the initial
   agent-token 401s; fixed.)
+- **Computer is `Authenticatable`:** since the device token's tokenable is the
+  `Computer` model, `Computer` implements `Illuminate\Contracts\Auth\Authenticatable`
+  (via the `Illuminate\Auth\Authenticatable` trait) so the resolved token
+  identity exposes `getAuthIdentifier()` etc. to the guard and rate limiters.
 
 ## 22.4 Scheduler verification
 

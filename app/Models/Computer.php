@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\ComputerStatus;
+use Illuminate\Auth\Authenticatable as AuthenticatableTrait;
+use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,11 +14,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Laravel\Sanctum\HasApiTokens;
 
-class Computer extends Model
+/**
+ * A computer is a token holder: the desktop agent authenticates as its Computer
+ * via a Sanctum device token (tokenable_type = Computer). It implements the
+ * Authenticatable contract so the auth guard / rate limiters can treat the
+ * resolved tokenable like any authenticated identity (getAuthIdentifier, etc.).
+ */
+class Computer extends Model implements AuthenticatableContract
 {
-    // A computer is a token holder: the desktop agent authenticates as its
-    // Computer via a Sanctum device token (tokenable_type = Computer).
-    use HasApiTokens, HasFactory, SoftDeletes;
+    use AuthenticatableTrait, HasApiTokens, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'employee_id',
