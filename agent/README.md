@@ -12,7 +12,7 @@ Design rationale: [`docs/17-windows-agent.md`](../docs/17-windows-agent.md).
 | M2 | API client, device registration, token storage | ✅ Complete |
 | M3 | Windows session detection (logon/logoff/lock/unlock/shutdown) | ✅ Complete |
 | M4 | Idle-time (Win32) + 60s heartbeat | ✅ Complete |
-| M5 | Reconnect + SQLite offline cache | ⏳ Planned |
+| M5 | Reconnect + SQLite offline cache | ✅ Complete |
 | M6 | Windows Service packaging & install | ⏳ Planned |
 
 ## Layout (through M2)
@@ -31,6 +31,8 @@ agent/
 ├── Services/                 # IDeviceRegistrationService + impl
 ├── Sessions/                 # ISessionMonitor + WindowsSessionMonitor (+ base, events)
 ├── Activity/                 # IIdleDetector + heartbeat scheduler/calculator/event
+├── Offline/                  # IOfflineEventStore + SqliteEventStore (durable queue)
+├── Sync/                     # ISyncService + SyncWorker + IEventUploader
 ├── appsettings.json / appsettings.Development.json
 ├── .gitignore
 └── tests/Treck.Agent.Tests/  # xUnit + Moq

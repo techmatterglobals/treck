@@ -13,7 +13,7 @@ rationale in [doc 17](17-windows-agent.md) still applies).
 | **M2** | API client + device registration + token storage | 1, 2, 3, 4, 5, 6, 7, 8, 12, 13, 14 | ✅ Complete |
 | **M3** | Windows session detection (logon/logoff/lock/unlock/shutdown) | — | ✅ Complete |
 | **M4** | Idle-time calculation (Win32) + 60s heartbeat | 5, 6 | ✅ Complete |
-| M5 | Reconnect on network failure + SQLite offline cache | 7, 8 | Planned |
+| **M5** | Reconnect on network failure + SQLite offline cache | 7, 8 | ✅ Complete |
 | M6 | Windows Service packaging & install | — | Planned |
 
 ---
@@ -371,5 +371,109 @@ scheduler are unit-tested. No screenshots, no application tracking. ✅
 
 ---
 
-*Next: M5 — reconnect on network failure + SQLite offline cache. Not started
-until M4 is confirmed.*
+---
+
+## M5 — Offline queue & sync ✅
+
+### Architecture
+
+Storage and API communication are deliberately isolated:
+
+- **`IOfflineEventStore` / `SqliteEventStore`** — durable, ordered queue in
+  `offline.db`. Pure persistence (no API references). Enqueue (dedup by unique
+  idempotency key), ordered `GetPending`, `MarkSynced`, `RecordFailure`,
+  `Prune`. Thread-safe (lock over a single connection); survives restarts.
+- **`IEventUploader` / `AgentEventUploader`** — the *only* API touchpoint on the
+  sync path. Gets the device token from the registration service and POSTs one
+  event; re-registers on 401.
+- **`ISyncService` / `SyncService`** — one pass: pull an ordered batch, upload
+  each, **mark synced only on ack**, stop at the first failure (preserving
+  order), then prune. Composes the store + uploader; touches neither directly.
+- **`SyncWorker`** — hosted loop running every `SyncIntervalSeconds`, with
+  **exponential backoff** up to `MaxBackoffSeconds` when a cycle makes no
+  progress, resetting on success.
+
+Producers changed: the `Worker` now **enqueues** heartbeat (M4) and session (M3)
+events into the store instead of logging — so nothing is lost during a network
+interruption; the `SyncWorker` drains the queue independently.
+
+Requirement mapping: SQLite ✅(1) · stores heartbeat/session ✅(2) · ordering by
+autoincrement id ✅(3) · dedup via unique idempotency key ✅(4) · mark synced
+only after ack ✅(5) · exponential backoff ✅(6) · restart-safe (durable file)
+✅(7) · `MaxRows` size cap ✅(8) · retention cleanup of synced rows ✅(9) · no
+loss during outages (bounded by the cap) ✅(10).
+
+### Folders added
+
+```
+agent/Offline/
+├── OfflineEvent.cs            # queued event + kind
+├── OfflineStoreOptions.cs     # interval/backoff/batch/maxRows/retention
+├── IOfflineEventStore.cs
+└── SqliteEventStore.cs        # Microsoft.Data.Sqlite; ordered, dedup, capped
+agent/Sync/
+├── IEventUploader.cs          # API seam (isolated from storage)
+├── AgentEventUploader.cs      # device-token upload + 401 re-register
+├── ISyncService.cs            # SyncResult
+├── SyncService.cs             # pull → upload → mark/keep → prune
+└── SyncWorker.cs              # hosted loop + exponential backoff
+```
+
+### Sequence
+
+```mermaid
+sequenceDiagram
+    participant P as Producers (heartbeat/session)
+    participant St as SqliteEventStore
+    participant SW as SyncWorker
+    participant Sv as SyncService
+    participant U as AgentEventUploader → API
+
+    P->>St: Enqueue(event)   (durable, ordered, dedup)
+    loop every SyncIntervalSeconds (backoff on failure)
+        SW->>Sv: SyncPendingAsync()
+        Sv->>St: GetPending(batch)
+        Sv->>U: TryUploadAsync(event)
+        alt acknowledged
+            U-->>Sv: true
+            Sv->>St: MarkSynced(id)
+        else failure / offline
+            U-->>Sv: false / throws
+            Sv->>St: RecordFailure(id)  (kept; retried later)
+        end
+        Sv->>St: Prune (retention + max-size cap)
+    end
+```
+
+### How to test
+
+- **Unit (`dotnet test`)** — `OfflineStoreTests`: save; retrieve pending in
+  order; duplicate idempotency key ignored; `MarkSynced` clears pending;
+  `RecordFailure` keeps + counts attempts; **restart recovery** (new store
+  instance over the same file sees the rows). `SyncServiceTests`: successful sync
+  marks all; failed sync keeps everything; stops at first failure preserving
+  order; empty queue is a no-op (uses a fake uploader).
+- **Manual (Windows, `dotnet run`)** — point `BaseUrl` at an unreachable host:
+  heartbeats accumulate in `%ProgramData%\TreckAgent\offline.db` and the sync
+  worker logs backing-off cycles; restore connectivity (once the M6 server
+  endpoint exists) and the queue drains.
+
+### Note on the upload endpoint
+
+`AgentEventUploader` POSTs to `POST /api/agent/events` — the **batch ingest +
+session correlation endpoint is delivered in M6**. Until then uploads simply
+fail and events remain safely queued, which is exactly the resilience this
+milestone provides. The store/sync logic is fully unit-tested independent of the
+server.
+
+### Definition of done
+
+Events are persisted to SQLite, ordered, de-duplicated, retained until acked,
+size-capped, and survive restarts; the sync worker retries with exponential
+backoff; storage stays isolated from the API. Unit-tested. ✅
+
+---
+
+*Next: M6 — Windows Service packaging & install (and the server-side
+`/api/agent/events` endpoint + session correlation). Not started until M5 is
+confirmed.*

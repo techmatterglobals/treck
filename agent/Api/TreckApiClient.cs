@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -47,5 +49,23 @@ public sealed class TreckApiClient : ITreckApiClient
 
         return envelope?.Data
             ?? throw new ApiException("Registration succeeded but the response body was empty.");
+    }
+
+    public async Task<bool> UploadEventAsync(string bearerToken, OfflineEventPayload payload, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "api/agent/events")
+        {
+            Content = JsonContent.Create(payload, options: JsonOptions),
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+
+        using var response = await _http.SendAsync(request, cancellationToken);
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            throw new UnauthorizedApiException();
+        }
+
+        return response.IsSuccessStatusCode;
     }
 }

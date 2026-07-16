@@ -8,10 +8,12 @@ using Treck.Agent;
 using Treck.Agent.Activity;
 using Treck.Agent.Api;
 using Treck.Agent.Configuration;
+using Treck.Agent.Offline;
 using Treck.Agent.Security;
 using Treck.Agent.Services;
 using Treck.Agent.Sessions;
 using Treck.Agent.Storage;
+using Treck.Agent.Sync;
 
 // Bootstrap logger: captures anything that fails before the host is built.
 Log.Logger = new LoggerConfiguration()
@@ -39,6 +41,10 @@ try
 
     builder.Services.AddOptions<SessionMonitorOptions>()
         .Bind(builder.Configuration.GetSection(SessionMonitorOptions.SectionName))
+        .ValidateDataAnnotations();
+
+    builder.Services.AddOptions<OfflineStoreOptions>()
+        .Bind(builder.Configuration.GetSection(OfflineStoreOptions.SectionName))
         .ValidateDataAnnotations();
 
     // --- Session detection (event-driven, no polling) ---
@@ -76,6 +82,12 @@ try
 
     // --- Registration orchestration ---
     builder.Services.AddSingleton<IDeviceRegistrationService, DeviceRegistrationService>();
+
+    // --- Offline queue + sync (storage isolated from API via IEventUploader) ---
+    builder.Services.AddSingleton<IOfflineEventStore, SqliteEventStore>();
+    builder.Services.AddSingleton<IEventUploader, AgentEventUploader>();
+    builder.Services.AddSingleton<ISyncService, SyncService>();
+    builder.Services.AddHostedService<SyncWorker>();
 
     builder.Services.AddHostedService<Worker>();
 
