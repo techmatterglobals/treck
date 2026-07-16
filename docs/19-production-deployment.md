@@ -159,6 +159,8 @@ defense in depth and to shed abusive traffic before PHP.
 - [ ] `curl https://…/up` returns healthy
 - [ ] Log in to the dashboard; cards/charts render
 - [ ] Agent `register` → `login` → `activity` → `logout` round-trips (staging device)
+- [ ] Agent offline queue drains: `POST /api/agent/events` accepts heartbeat/session events and duplicates are idempotent (see [`docs/24-windows-agent-build.md`](24-windows-agent-build.md))
+- [ ] Windows agent installed as a service on a staging PC (`agent/deploy/install-service.ps1`); logs appear under `%ProgramData%\TreckAgent\logs`
 - [ ] Queue workers processing; scheduler running (`schedule:list`)
 - [ ] A backup has run and is retrievable
 - [ ] Error tracking receiving events; uptime monitor green

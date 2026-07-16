@@ -14,7 +14,7 @@ rationale in [doc 17](17-windows-agent.md) still applies).
 | **M3** | Windows session detection (logon/logoff/lock/unlock/shutdown) | — | ✅ Complete |
 | **M4** | Idle-time calculation (Win32) + 60s heartbeat | 5, 6 | ✅ Complete |
 | **M5** | Reconnect on network failure + SQLite offline cache | 7, 8 | ✅ Complete |
-| M6 | Windows Service packaging & install | — | Planned |
+| **M6** | Windows Service packaging, production runtime & server-side `/api/agent/events` | — | ✅ Complete |
 
 ---
 
@@ -460,11 +460,11 @@ sequenceDiagram
 
 ### Note on the upload endpoint
 
-`AgentEventUploader` POSTs to `POST /api/agent/events` — the **batch ingest +
-session correlation endpoint is delivered in M6**. Until then uploads simply
-fail and events remain safely queued, which is exactly the resilience this
-milestone provides. The store/sync logic is fully unit-tested independent of the
-server.
+`AgentEventUploader` POSTs to `POST /api/agent/events` — the **server-side
+ingestion endpoint is delivered in M6** (see the M6 section below). At M5 the
+endpoint did not yet exist, so uploads simply failed and events remained safely
+queued, which is exactly the resilience this milestone provides. The store/sync
+logic is fully unit-tested independent of the server.
 
 ### Definition of done
 
@@ -474,6 +474,191 @@ backoff; storage stays isolated from the API. Unit-tested. ✅
 
 ---
 
-*Next: M6 — Windows Service packaging & install (and the server-side
-`/api/agent/events` endpoint + session correlation). Not started until M5 is
-confirmed.*
+## M6 — Windows Service packaging & production runtime integration ✅
+
+Packages the agent as a production Windows Service and closes the ingestion loop
+so the M5 offline queue drains end-to-end. No previous milestone is redesigned;
+the existing SOLID seams (`IEventUploader`, `ITreckApiClient`, `IOfflineEventStore`)
+are unchanged.
+
+### Architecture
+
+**Client (`agent/`)**
+
+- **Windows Service hosting.** `Program.cs` keeps
+  `AddWindowsService(o => o.ServiceName = "TreckAgent")` and adds a graceful
+  `HostOptions.ShutdownTimeout` (30s) so `Worker` and `SyncWorker` observe the
+  stop signal and finish a final cycle. `AddWindowsService` is a no-op off the
+  SCM, so `dotnet run` (console/dev) is unchanged. Cancellation is already
+  cooperative: both hosted services loop on the `stoppingToken` and exit cleanly
+  on `OperationCanceledException`.
+- **Service-mode logging.** Under the SCM the process CWD is `System32`, so the
+  relative Serilog file path would be unwritable. `Program.cs` detects
+  `WindowsServiceHelpers.IsWindowsService()` and redirects the file sink to
+  `%ProgramData%\TreckAgent\logs` (writable by `LocalSystem`), pre-created by the
+  installer. Console/dev keeps the relative `logs/` path.
+- **Production configuration.** `appsettings.Production.json` (git-ignored) layers
+  over `appsettings.json` when `DOTNET_ENVIRONMENT=Production` (set by the
+  installer in the service registry). Only the `.example` template is committed —
+  **no secrets in source control**. Required settings are still validated at
+  startup (`ValidateDataAnnotations().ValidateOnStart()` on `AgentOptions`).
+- **Sync completion.** `AgentEventUploader` already POSTs to `/api/agent/events`,
+  treats any 2xx as an acknowledgement (only then is the event dropped), keeps
+  non-acked events in SQLite, and re-registers on 401 — **no change required**
+  beyond documenting it and adding upload tests.
+
+**Server (Laravel)**
+
+- **`POST /api/agent/events`** — device-token authenticated (`ability:agent:report`,
+  `throttle:agent`). `EventIngestionController` → `AgentEventIngestionService`
+  persists one event inside a **DB transaction** via
+  `firstOrCreate((computer_id, idempotency_key), …)`, returning **201** on first
+  store and **200** on an idempotent duplicate (both 2xx = ack). A concurrent
+  duplicate that trips the unique index is caught and resolved to the stored row.
+- **Identity binding (SEC-1).** The owning employee is taken from the resolved
+  `Computer`, never the request body.
+- **Storage.** `agent_events` keeps the event verbatim (`payload` JSON, plus
+  `occurred_at`/`received_at`) for later projection; a unique
+  `(computer_id, idempotency_key)` index enforces idempotency.
+
+### Folders / files added
+
+```
+agent/
+├── deploy/
+│   ├── publish.ps1                 # self-contained win-x64 publish
+│   ├── install-service.ps1         # register + start (Automatic startup, recovery)
+│   ├── uninstall-service.ps1       # stop + remove (data preserved unless -PurgeData)
+│   └── README.md                   # deployment quick reference
+├── appsettings.Production.json.example   # committed template (no secrets)
+├── Program.cs                      # + ShutdownTimeout, service-mode log path
+└── .gitignore                      # ignores appsettings.Production.json, publish/
+
+app/
+├── Enums/AgentEventKind.php
+├── Models/AgentEvent.php
+├── Http/Requests/Agent/StoreAgentEventRequest.php
+├── Http/Controllers/Api/Agent/EventIngestionController.php
+└── Services/Agent/AgentEventIngestionService.php
+database/
+├── migrations/2026_07_16_000001_create_agent_events_table.php
+└── factories/AgentEventFactory.php
+routes/modules/agent.php            # + POST agent/events
+tests/Feature/Agent/EventIngestionTest.php
+agent/tests/Treck.Agent.Tests/TreckApiClientTests.cs   # + UploadEventAsync tests
+```
+
+### Sequence (queue drain, end-to-end)
+
+```mermaid
+sequenceDiagram
+    participant St as SqliteEventStore
+    participant U as AgentEventUploader
+    participant C as TreckApiClient
+    participant L as POST /api/agent/events
+    participant Db as agent_events
+
+    U->>St: GetPending(batch)
+    U->>C: UploadEventAsync(token, payload)
+    C->>L: POST (Bearer device token, snake_case body)
+    L->>Db: firstOrCreate (transaction)
+    alt stored / duplicate
+        Db-->>L: row (created | existing)
+        L-->>C: 201 / 200
+        C-->>U: true
+        U->>St: MarkSynced(id)
+    else 401
+        L-->>C: 401
+        C-->>U: throw Unauthorized → ReRegister
+    else 5xx / offline
+        L-->>C: error
+        C-->>U: false → event kept, retried with backoff
+    end
+```
+
+### How to test
+
+- **.NET (`dotnet restore && dotnet build && dotnet test`, on Windows):** M6 adds
+  `TreckApiClientTests.UploadEventAsync_*` — endpoint path, Bearer header,
+  snake_case body, 201/200 = ack, 401 throws, 5xx returns false (kept queued).
+- **Laravel (`php artisan test`):** `EventIngestionTest` — heartbeat + session
+  storage, identity binding, idempotent duplicate (200, single row), per-device
+  key isolation, auth/ability gates, and validation (`kind`, missing fields,
+  non-JSON `payload`).
+- **Manual E2E:** install the service; confirm logs; generate heartbeat/session
+  events; drop the network and watch the SQLite queue grow; restore and confirm
+  the queue drains and `AgentEvent::count()` rises. Full runbook in §24.6 below.
+
+### Definition of done
+
+Agent runs as an auto-start Windows Service with clean start/stop and
+service-safe logging; production config is environment-specific with no secrets
+in git and validated at startup; the server exposes an authenticated, idempotent,
+transactional `/api/agent/events`; the offline queue drains end-to-end. Client
+upload path unit-tested; server ingestion feature-tested. ✅
+
+---
+
+## 24.x Deployment & verification runbook
+
+### Service identity
+
+| Property | Value |
+| -------- | ----- |
+| Service name (SCM key) | `TreckAgent` (matches `Program.cs`) |
+| Display name | `Treck Agent` |
+| Description | Treck employee productivity & PC activity monitoring agent… |
+| Startup | Automatic · Log-on: `LocalSystem` · Recovery: restart 5s/10s/30s |
+
+### Build & install (target machine, elevated PowerShell)
+
+```powershell
+cd agent\deploy
+Copy-Item ..\appsettings.Production.json.example ..\appsettings.Production.json
+notepad ..\appsettings.Production.json      # BaseUrl, ProvisioningKey, EmployeeCode
+./install-service.ps1 -Publish              # publish self-contained + install + start
+```
+
+Plain `dotnet` equivalents:
+
+```powershell
+dotnet restore agent\Treck.Agent.csproj
+dotnet publish agent\Treck.Agent.csproj -c Release -r win-x64 --self-contained true -o agent\publish
+```
+
+### §24.6 Manual end-to-end verification
+
+1. **Install & start** — `./install-service.ps1 -Publish`; `Get-Service TreckAgent`
+   (Running); `sc.exe qc TreckAgent` (START_TYPE = AUTO_START).
+2. **Confirm logs** —
+   `Get-Content "$env:ProgramData\TreckAgent\logs\treck-agent-*.jsonl" -Tail 20 -Wait`
+   → startup banner, registration, periodic heartbeats.
+3. **Generate events** — lock/unlock/sign-out (session events); wait a few
+   heartbeat intervals. Server: `php artisan tinker --execute="echo App\Models\AgentEvent::count();"`.
+4. **Stop the network** — offline queue (`%ProgramData%\TreckAgent\offline\*.db`)
+   grows; logs show ret/backoff. Nothing lost.
+5. **Restore the network** — within a sync interval logs show
+   `Sync cycle: uploaded=N …` and `AgentEvent::count()` rises to match.
+6. **Lifecycle** — `Stop-Service TreckAgent` (graceful stop, no crash) then
+   `Start-Service TreckAgent`.
+
+### Uninstall
+
+```powershell
+./uninstall-service.ps1              # remove service + binaries; keep identity/queue
+./uninstall-service.ps1 -PurgeData  # also wipe %ProgramData%\TreckAgent
+```
+
+### Limitations & follow-ups
+
+- `agent_events` is a raw landing table; projecting events into
+  attendance/activity aggregates is a later milestone.
+- No server-side retention job for `agent_events` yet (agent prunes its local
+  queue).
+- Install scripts target `win-x64`; add `win-arm64` if required.
+- Service runs as `LocalSystem`; a least-privileged account is a hardening
+  follow-up (grant write on `%ProgramData%\TreckAgent`).
+
+---
+
+*M6 complete. Stop here pending confirmation before starting new features.*

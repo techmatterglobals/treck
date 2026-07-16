@@ -12,9 +12,44 @@ tokenable is the `Computer` model.
 | POST | `/api/agent/login` | Bearer (device) | Open a PC session (login time) |
 | POST | `/api/activity` | Bearer (device) | Report active/idle seconds |
 | POST | `/api/agent/logout` | Bearer (device) | Close the session (logout time) |
+| POST | `/api/agent/events` | Bearer (device) | Drain a queued heartbeat/session event (M6) |
 
-The three authenticated routes require the token's `agent:report` ability
+The authenticated routes require the token's `agent:report` ability
 (`ability:agent:report` middleware).
+
+### 13.1.1 `POST /api/agent/events` (M6)
+
+The landing endpoint for the agent's **offline queue**. The agent batches
+heartbeat and session events into a local SQLite queue and drains them here; the
+server stores each event transactionally and only then acknowledges, which is
+the signal the agent uses to delete its local copy.
+
+Request body (snake_case, matching `Treck.Agent.Models.OfflineEventPayload`):
+
+```json
+{
+  "kind": "heartbeat",              // or "session"
+  "idempotency_key": "a1b2c3…",     // agent-generated, unique per device
+  "created_at": "2026-07-16T09:00:00Z",
+  "payload": "{\"ElapsedSeconds\":60,\"ActiveSeconds\":50,\"IdleSeconds\":10}"
+}
+```
+
+`payload` is the opaque event body as a JSON **string**; it is stored verbatim
+(decoded into a JSON column) for later projection into the domain tables.
+
+Responses (both are success → the agent clears the event):
+
+| Status | Meaning |
+| ------ | ------- |
+| `201 Created` | Stored for the first time (`data.duplicate = false`) |
+| `200 OK` | Idempotent re-submission; already stored (`data.duplicate = true`) |
+| `422` | Validation error (bad `kind`, missing field, non-JSON `payload`) |
+| `401` / `403` | Missing/invalid token, or token lacks `agent:report` |
+
+Idempotency is enforced per device by a unique `(computer_id, idempotency_key)`
+index, so retries after a lost acknowledgement are safe. The owning employee is
+resolved from the authenticated `Computer`, never from the body (SEC-1).
 
 ## 13.2 Delivered files
 
@@ -24,6 +59,9 @@ The three authenticated routes require the token's `agent:report` ability
 | `app/Http/Controllers/Api/Agent/DeviceRegistrationController.php` | `register` |
 | `app/Http/Controllers/Api/Agent/WorkSessionController.php` | `login`, `logout` |
 | `app/Http/Controllers/Api/Agent/ActivityController.php` | `activity` |
+| `app/Http/Controllers/Api/Agent/EventIngestionController.php` | `events` (M6) |
+| `app/Services/Agent/AgentEventIngestionService.php` | Transactional, idempotent ingest (M6) |
+| `app/Models/AgentEvent.php` | Stored event row (M6) |
 | `app/Http/Requests/Agent/*.php` | Validation for each endpoint |
 | `app/Models/Computer.php` | Gains `HasApiTokens` (device is the tokenable) |
 | `bootstrap/app.php` | Registers Sanctum `ability`/`abilities` aliases |

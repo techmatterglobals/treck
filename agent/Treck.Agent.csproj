@@ -34,6 +34,9 @@
   <ItemGroup>
     <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
     <None Update="appsettings.Development.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Production config is created per-deployment (gitignored); copy it to the
+         publish output only when it exists so `dotnet publish` never fails. -->
+    <None Update="appsettings.Production.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('appsettings.Production.json')" />
   </ItemGroup>
 
 </Project>

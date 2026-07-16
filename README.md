@@ -68,6 +68,7 @@ The full technical design lives in [`docs/`](docs/):
 21. [P0 Remediation — Application Skeleton](docs/21-p0-remediation.md)
 22. [P1 Security Remediation](docs/22-p1-security-remediation.md)
 23. [Requirements Review](docs/23-requirements-review.md)
+24. [Windows Agent — Milestone Build & Service Packaging](docs/24-windows-agent-build.md) — deploy scripts in [`agent/deploy/`](agent/deploy/)
 
 ## Setup
 

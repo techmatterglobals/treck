@@ -176,12 +176,44 @@ php artisan treck:daily-rollup        # manual run for today
 ## 7. Windows desktop agent
 
 Reference .NET 8 project in [`agent/`](agent/) (see
-[`docs/17-windows-agent.md`](docs/17-windows-agent.md)). Bootstrap flow:
+[`docs/17-windows-agent.md`](docs/17-windows-agent.md) for design and
+[`docs/24-windows-agent-build.md`](docs/24-windows-agent-build.md) for the
+milestone build/install runbook). Bootstrap flow:
 
 1. Set `TRECK_AGENT_PROVISIONING_KEY` in `.env` and configure the agent's
    `appsettings.json` (`BaseUrl`, `ProvisioningKey`, `EmployeeCode`).
 2. The agent calls `POST /api/agent/register` once to obtain a device token,
-   then `login` → `activity` (every ~60s) → `logout`.
+   then `login` → `activity` (every ~60s) → `logout`. Heartbeat and session
+   events are queued locally (SQLite) and drained to
+   `POST /api/agent/events` (idempotent), so nothing is lost during a network
+   outage.
+
+### Install as a Windows Service (production)
+
+The agent runs as a console app for development (`dotnet run`) and as a Windows
+Service in production. From an **elevated PowerShell** on the target machine:
+
+```powershell
+cd agent\deploy
+# 1. Per-deployment config (git-ignored; no secrets in source control):
+Copy-Item ..\appsettings.Production.json.example ..\appsettings.Production.json
+notepad ..\appsettings.Production.json     # BaseUrl, ProvisioningKey, EmployeeCode
+# 2. Publish a self-contained build and install + start the service:
+./install-service.ps1 -Publish             # Service "TreckAgent" (display: "Treck Agent")
+```
+
+Verify / manage:
+
+```powershell
+Get-Service TreckAgent                      # Status: Running
+Get-Content "$env:ProgramData\TreckAgent\logs\treck-agent-*.jsonl" -Tail 20
+Stop-Service TreckAgent ; Start-Service TreckAgent
+```
+
+Uninstall with `agent\deploy\uninstall-service.ps1` (add `-PurgeData` to also
+remove the local identity, token, and offline queue). Full runbook and
+end-to-end verification: [`agent/deploy/README.md`](agent/deploy/README.md) and
+[`docs/24-windows-agent-build.md`](docs/24-windows-agent-build.md).
 
 Quick server-side smoke test with curl:
 

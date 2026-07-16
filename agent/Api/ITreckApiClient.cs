@@ -12,9 +12,10 @@ public interface ITreckApiClient
     Task<RegisterDeviceResponse> RegisterDeviceAsync(RegisterDeviceRequest request, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Uploads one queued event using the device bearer token. Returns true on a
-    /// success response; throws <see cref="UnauthorizedApiException"/> on 401 so
-    /// the caller can re-register. (Server endpoint: M6.)
+    /// Uploads one queued event to <c>/api/agent/events</c> using the device
+    /// bearer token. Returns true on any 2xx (stored or idempotent duplicate);
+    /// throws <see cref="UnauthorizedApiException"/> on 401 so the caller can
+    /// re-register. Non-success leaves the event queued for retry.
     /// </summary>
     Task<bool> UploadEventAsync(string bearerToken, OfflineEventPayload payload, CancellationToken cancellationToken);
 }

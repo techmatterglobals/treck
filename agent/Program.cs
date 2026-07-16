@@ -1,5 +1,6 @@
 using System.Net.Security;
 using System.Security.Authentication;
+using Microsoft.Extensions.Hosting.WindowsServices;
 using Microsoft.Extensions.Options;
 using Polly;
 using Polly.Extensions.Http;
@@ -26,7 +27,31 @@ try
 
     var builder = Host.CreateApplicationBuilder(args);
 
+    // --- Windows Service hosting (M6) ---
+    // The service *name* (SCM key) must match what deploy/install-service.ps1
+    // registers. The display name and description are set at install time by
+    // that script (the Windows service lifetime options only carry the name).
+    // Console execution keeps working: AddWindowsService is a no-op when the
+    // process is not launched by the Service Control Manager.
     builder.Services.AddWindowsService(options => options.ServiceName = "TreckAgent");
+
+    // Give the hosted background services (Worker, SyncWorker) time to observe
+    // the stop signal and drain a final sync cycle before the host is torn down.
+    builder.Services.Configure<HostOptions>(options =>
+    {
+        options.ShutdownTimeout = TimeSpan.FromSeconds(30);
+    });
+
+    // Requirement 3: when running as a service the process working directory is
+    // %WINDIR%\System32, so the relative file-sink path in appsettings.json would
+    // point at a directory the service cannot write to. Redirect the file sink to
+    // a stable, writable location (%ProgramData%\TreckAgent\logs) before Serilog
+    // reads the configuration. Console execution keeps the relative "logs/" path.
+    // (WriteTo index 1 is the File sink; see appsettings.json.)
+    if (WindowsServiceHelpers.IsWindowsService())
+    {
+        builder.Configuration["Serilog:WriteTo:1:Args:path"] = ResolveServiceLogFilePath(builder.Configuration);
+    }
 
     builder.Services.AddSerilog((services, loggerConfiguration) => loggerConfiguration
         .ReadFrom.Configuration(builder.Configuration)
@@ -104,6 +129,23 @@ catch (Exception ex)
 finally
 {
     Log.CloseAndFlush();
+}
+
+// Resolves the service-mode log file path under the agent's writable data
+// directory (mirrors StoragePathProvider: %ProgramData%\TreckAgent unless
+// Agent:StoragePath overrides it) and ensures the directory exists.
+static string ResolveServiceLogFilePath(IConfiguration configuration)
+{
+    var configuredStorage = configuration["Agent:StoragePath"];
+
+    var baseDirectory = string.IsNullOrWhiteSpace(configuredStorage)
+        ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "TreckAgent")
+        : configuredStorage;
+
+    var logDirectory = Path.Combine(baseDirectory, "logs");
+    Directory.CreateDirectory(logDirectory);
+
+    return Path.Combine(logDirectory, "treck-agent-.jsonl");
 }
 
 // Requirement 2: Polly retry with exponential backoff on transient failures.

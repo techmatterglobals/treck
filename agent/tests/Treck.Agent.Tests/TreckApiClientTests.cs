@@ -87,4 +87,58 @@ public class TreckApiClientTests
             () => client.RegisterDeviceAsync(SampleRequest(), CancellationToken.None));
         Assert.Equal(500, ex.StatusCode);
     }
+
+    private static OfflineEventPayload SamplePayload() =>
+        new(Kind: "heartbeat",
+            IdempotencyKey: "idem-1",
+            CreatedAt: DateTimeOffset.UnixEpoch,
+            Payload: "{\"ElapsedSeconds\":60}");
+
+    [Fact]
+    public async Task UploadEventAsync_posts_snake_case_body_with_bearer_and_returns_true()
+    {
+        const string json = """{"message":"Event stored.","data":{"id":1,"duplicate":false}}""";
+        var handler = new StubHandler(HttpStatusCode.Created, json);
+        var client = ClientWith(handler);
+
+        var ok = await client.UploadEventAsync("12|token", SamplePayload(), CancellationToken.None);
+
+        Assert.True(ok);
+        Assert.Equal("api/agent/events", handler.LastRequest!.RequestUri!.AbsolutePath.TrimStart('/'));
+        Assert.Equal("Bearer", handler.LastRequest.Headers.Authorization!.Scheme);
+        Assert.Equal("12|token", handler.LastRequest.Headers.Authorization.Parameter);
+        Assert.Contains("idempotency_key", handler.LastBody);
+        Assert.Contains("created_at", handler.LastBody);
+        Assert.DoesNotContain("IdempotencyKey", handler.LastBody); // proves snake_case serialization
+    }
+
+    [Fact]
+    public async Task UploadEventAsync_treats_200_as_acknowledged_duplicate()
+    {
+        const string json = """{"message":"Event already recorded.","data":{"id":1,"duplicate":true}}""";
+        var handler = new StubHandler(HttpStatusCode.OK, json);
+        var client = ClientWith(handler);
+
+        // A 200 (idempotent re-submission) is still success → agent may drop it.
+        Assert.True(await client.UploadEventAsync("t", SamplePayload(), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task UploadEventAsync_throws_Unauthorized_on_401()
+    {
+        var handler = new StubHandler(HttpStatusCode.Unauthorized, "{}");
+        var client = ClientWith(handler);
+
+        await Assert.ThrowsAsync<UnauthorizedApiException>(
+            () => client.UploadEventAsync("t", SamplePayload(), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task UploadEventAsync_returns_false_on_server_error_so_event_stays_queued()
+    {
+        var handler = new StubHandler(HttpStatusCode.InternalServerError, "{}");
+        var client = ClientWith(handler);
+
+        Assert.False(await client.UploadEventAsync("t", SamplePayload(), CancellationToken.None));
+    }
 }
