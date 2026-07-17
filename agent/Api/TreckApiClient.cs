@@ -33,14 +33,32 @@ public sealed class TreckApiClient : ITreckApiClient
         RegisterDeviceRequest request,
         CancellationToken cancellationToken)
     {
+        // Diagnostic: log the outgoing registration request with the provisioning
+        // key masked (never log the secret). This surfaces exactly which
+        // EmployeeCode/DeviceUuid the agent is sending - e.g. a stale
+        // appsettings value - without a server round-trip.
+        _logger.LogInformation(
+            "Registering device: DeviceUuid={DeviceUuid} EmployeeCode={EmployeeCode} ComputerName={ComputerName} Os={Os} AgentVersion={AgentVersion} ProvisioningKey={KeyMask}",
+            request.DeviceUuid,
+            request.EmployeeCode,
+            request.ComputerName,
+            request.Os,
+            request.AgentVersion,
+            Mask(request.ProvisioningKey));
+
         using var response = await _http.PostAsJsonAsync("api/agent/register", request, JsonOptions, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
+            // Log the status AND the response body so validation errors (e.g.
+            // "The selected employee code is invalid.") are visible in the log.
+            var body = await SafeReadBodyAsync(response, cancellationToken);
+
             _logger.LogError(
-                "Device registration HTTP {Status} for device {DeviceUuid}",
+                "Device registration HTTP {Status} for device {DeviceUuid}. Response: {Body}",
                 (int)response.StatusCode,
-                request.DeviceUuid);
+                request.DeviceUuid,
+                body);
 
             throw ApiException.FromStatus((int)response.StatusCode);
         }
@@ -67,5 +85,24 @@ public sealed class TreckApiClient : ITreckApiClient
         }
 
         return response.IsSuccessStatusCode;
+    }
+
+    /// <summary>Reveal only the length of a secret, never its value.</summary>
+    private static string Mask(string? secret)
+        => string.IsNullOrEmpty(secret) ? "(empty)" : $"***({secret.Length} chars)";
+
+    /// <summary>Read a (possibly error) response body for logging; never throws.</summary>
+    private static async Task<string> SafeReadBodyAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            return body.Length > 2000 ? body[..2000] + "…(truncated)" : body;
+        }
+        catch (Exception ex)
+        {
+            return $"(could not read body: {ex.Message})";
+        }
     }
 }

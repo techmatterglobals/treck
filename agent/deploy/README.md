@@ -121,3 +121,27 @@ running under the SCM (the process working directory would otherwise be
 
 See [`docs/24-windows-agent-build.md`](../../docs/24-windows-agent-build.md) for
 the full build, install, and end-to-end verification runbook.
+
+## Troubleshooting registration
+
+The `EmployeeCode` the agent sends comes from **config** (`Agent:EmployeeCode` in
+`appsettings.json` / `appsettings.Production.json`, or the `Agent__EmployeeCode`
+environment variable) - not from code. The base `appsettings.json` ships the
+placeholder `REPLACE_WITH_EMPLOYEE_CODE`; set it to a real, existing employee
+code for the deployment.
+
+If registration fails, the agent log now prints the exact request it sent
+(provisioning key masked) and the server's HTTP status **and response body**, e.g.:
+
+```
+Registering device: DeviceUuid=... EmployeeCode=EMP-0001 ... ProvisioningKey=***(17 chars)
+Device registration HTTP 422 ... Response: {"message":"The selected employee code is invalid.", ...}
+```
+
+That immediately shows the cause. Common cases:
+
+| Log shows | Fix |
+| --------- | --- |
+| `422 ... employee code is invalid` | `Agent:EmployeeCode` is not a real employee - set an existing code |
+| `403` | provisioning key mismatch - align `Agent:ProvisioningKey` with the server's `TRECK_AGENT_PROVISIONING_KEY` |
+| the login HTML page | server was redirecting API errors (fixed server-side; ensure the server is up to date) |
