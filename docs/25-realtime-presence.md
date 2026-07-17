@@ -38,6 +38,13 @@ Key properties:
 - **Sweep for absence.** "Missing heartbeat -> Offline" cannot be event-driven
   (there is no event), so `treck:presence-sweep` (scheduled every minute) flips
   quiet rows to Offline and broadcasts.
+- **Legacy liveness mirror.** The agent only calls `/register` and `/events` (it
+  no longer hits the old `/login`, `/activity`, `/logout` endpoints that used to
+  call `Computer::markSeen()`). So on each ingested event the service also mirrors
+  the presence onto `computers.status` / `last_seen_at` / `last_activity_at`,
+  keeping `DeviceStatusService`, the reconcile sweep, and the M6 dashboard
+  accurate. Presence -> ComputerStatus mapping: Active->Online, Idle->Idle,
+  Locked->Locked, LoggedOut/Offline->Offline.
 - **Thin controllers / SOLID.** `PresenceController` only renders views. Logic
   lives in `PresenceProjector` (write) and `PresenceService` (read + sweep);
   broadcasting is a dedicated event.
@@ -51,7 +58,7 @@ Key properties:
 | Projector | `App\Services\Presence\PresenceProjector` | Apply one event to the presence row (tx, ordering guard) |
 | Read model | `App\Services\Presence\PresenceService` | `summary()`, `rows()`, `sweepOffline()` |
 | Event | `App\Events\PresenceUpdated` | `ShouldBroadcast` on private `presence` + `presence.computer.{id}` |
-| Ingest hook | `App\Services\Agent\AgentEventIngestionService` | store -> project -> broadcast (after commit) |
+| Ingest hook | `App\Services\Agent\AgentEventIngestionService` | store -> project -> mirror liveness onto `computers` -> broadcast (after commit) |
 | Sweep | `App\Console\Commands\SweepPresenceOffline` (`treck:presence-sweep`) | timeout -> Offline + broadcast |
 | UI | `App\Livewire\Presence\{PresenceBoard,ComputerPresenceDetail}` | Live board + details, Echo listeners |
 

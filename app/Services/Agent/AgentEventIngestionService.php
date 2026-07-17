@@ -3,9 +3,12 @@
 namespace App\Services\Agent;
 
 use App\Enums\AgentEventKind;
+use App\Enums\ComputerStatus;
+use App\Enums\PresenceStatus;
 use App\Events\PresenceUpdated;
 use App\Models\AgentEvent;
 use App\Models\Computer;
+use App\Models\ComputerPresence;
 use App\Services\Presence\PresenceProjector;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
@@ -25,7 +28,14 @@ use Illuminate\Support\Facades\DB;
  * onto the materialized presence state (M7) inside the same transaction, then
  * broadcasts the change after commit:
  *
- *   store event -> update presence -> broadcast PresenceUpdated
+ *   store event -> update presence -> mirror liveness onto the computer
+ *                -> broadcast PresenceUpdated
+ *
+ * The liveness mirror keeps the legacy `computers.status` / `last_seen_at` /
+ * `last_activity_at` fields in sync with the presence projection, so the
+ * device-status layer (DeviceStatusService, reconcile sweep, M6 dashboard) stays
+ * accurate now that the agent only calls /register and /events (it no longer
+ * hits the old login/activity/logout endpoints that used to call markSeen).
  *
  * It still adds no screenshots, application tracking, or attendance aggregates.
  */
@@ -56,11 +66,16 @@ class AgentEventIngestionService
         ];
 
         try {
-            // Atomic: store the event and, if it is new, advance presence in the
-            // same transaction so state and history never diverge.
-            [$event, $presence] = DB::transaction(function () use ($attributes, $values) {
+            // Atomic: store the event and, if it is new, advance presence and
+            // mirror liveness onto the computer in the same transaction so state
+            // and history never diverge.
+            [$event, $presence] = DB::transaction(function () use ($attributes, $values, $computer) {
                 $event = AgentEvent::firstOrCreate($attributes, $values);
                 $presence = $event->wasRecentlyCreated ? $this->projector->project($event) : null;
+
+                if ($presence !== null) {
+                    $this->mirrorLiveness($computer, $presence);
+                }
 
                 return [$event, $presence];
             });
@@ -78,5 +93,36 @@ class AgentEventIngestionService
         }
 
         return $event;
+    }
+
+    /**
+     * Mirror the projected presence onto the computer's legacy liveness fields.
+     * `last_seen_at` reflects that we just heard from the device (server clock);
+     * `status` is the presence status mapped to the ComputerStatus vocabulary;
+     * `last_activity_at` advances only on genuine activity.
+     */
+    private function mirrorLiveness(Computer $computer, ComputerPresence $presence): void
+    {
+        $attributes = [
+            'status' => $this->toComputerStatus($presence->status),
+            'last_seen_at' => $presence->last_synced_at ?? now(),
+        ];
+
+        if ($presence->last_activity_at !== null) {
+            $attributes['last_activity_at'] = $presence->last_activity_at;
+        }
+
+        $computer->forceFill($attributes)->save();
+    }
+
+    /** Map the presence vocabulary onto the legacy ComputerStatus enum. */
+    private function toComputerStatus(PresenceStatus $status): ComputerStatus
+    {
+        return match ($status) {
+            PresenceStatus::Active => ComputerStatus::Online,
+            PresenceStatus::Idle => ComputerStatus::Idle,
+            PresenceStatus::Locked => ComputerStatus::Locked,
+            PresenceStatus::LoggedOut, PresenceStatus::Offline => ComputerStatus::Offline,
+        };
     }
 }

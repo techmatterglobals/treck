@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Presence;
 
+use App\Enums\ComputerStatus;
 use App\Enums\PresenceStatus;
 use App\Events\PresenceUpdated;
 use App\Models\Computer;
@@ -87,5 +88,31 @@ class PresenceProjectionTest extends TestCase
         $this->sendEvent($token, 'heartbeat', ['IsIdle' => false], 'dup')->assertOk(); // idempotent duplicate
 
         Event::assertDispatchedTimes(PresenceUpdated::class, 1);
+    }
+
+    public function test_event_updates_legacy_computer_liveness_fields(): void
+    {
+        // A freshly registered computer starts offline with no last_seen_at.
+        [$computer, $token] = $this->device();
+        $computer->forceFill(['status' => ComputerStatus::Offline, 'last_seen_at' => null])->save();
+
+        $this->sendEvent($token, 'heartbeat', ['IsIdle' => false], 'live-1')->assertCreated();
+
+        $computer->refresh();
+        $this->assertSame(ComputerStatus::Online, $computer->status, 'active heartbeat -> Online');
+        $this->assertNotNull($computer->last_seen_at, 'last_seen_at must update on event ingest');
+        $this->assertNotNull($computer->last_activity_at, 'active event advances last_activity_at');
+    }
+
+    public function test_idle_and_locked_events_map_to_computer_status(): void
+    {
+        [$computer, $token] = $this->device();
+
+        $this->sendEvent($token, 'heartbeat', ['IsIdle' => true, 'IdleTimeSeconds' => 120], 'idle-1')->assertCreated();
+        $this->assertSame(ComputerStatus::Idle, $computer->refresh()->status);
+
+        $this->sendEvent($token, 'session', ['Type' => 'Lock'], 'lock-1')->assertCreated();
+        $this->assertSame(ComputerStatus::Locked, $computer->refresh()->status);
+        $this->assertNotNull($computer->last_seen_at);
     }
 }
