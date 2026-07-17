@@ -9,3 +9,8 @@ appsettings.*.local.json
 # employee code) — never commit it. Ship appsettings.Production.json.example
 # as the template instead.
 appsettings.Production.json
+
+# Stray local artifacts (service query dumps, restore/publish log redirects)
+query
+restore.log
+*.log

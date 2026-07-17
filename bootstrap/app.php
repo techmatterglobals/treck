@@ -5,6 +5,7 @@ use App\Http\Middleware\ResetAuthGuards;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 use Laravel\Sanctum\Http\Middleware\CheckAbilities;
 use Laravel\Sanctum\Http\Middleware\CheckForAnyAbility;
 use Spatie\Permission\Middleware\PermissionMiddleware;
@@ -45,6 +46,14 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // API requests must always get JSON errors, never an HTML redirect.
+        // Without this, a failed FormRequest/authorization on an /api/* route
+        // that did not send `Accept: application/json` falls back to Laravel's
+        // web behavior: a 302 back to the previous URL (the site root), which
+        // chains root -> dashboard -> /login. A client following redirects then
+        // receives the login HTML with a 200 instead of the real 422/403/401.
+        $exceptions->shouldRenderJsonWhen(
+            fn (Request $request, Throwable $e) => $request->is('api/*') || $request->expectsJson(),
+        );
     })
     ->create();
