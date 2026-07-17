@@ -15,6 +15,7 @@ class SchedulerTest extends TestCase
         $this->artisan('schedule:list')
             ->expectsOutputToContain('treck:reconcile-sessions')
             ->expectsOutputToContain('treck:daily-rollup')
+            ->expectsOutputToContain('treck:presence-sweep')
             ->assertSuccessful();
     }
 
@@ -22,6 +23,11 @@ class SchedulerTest extends TestCase
     public function test_reconcile_sessions_command_runs(): void
     {
         $this->artisan('treck:reconcile-sessions')->assertSuccessful();
+    }
+
+    public function test_presence_sweep_command_runs(): void
+    {
+        $this->artisan('treck:presence-sweep')->assertSuccessful();
     }
 
     public function test_daily_rollup_command_runs(): void

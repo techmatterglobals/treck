@@ -15,6 +15,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Real-time presence (M7)
+    |--------------------------------------------------------------------------
+    | A computer with no agent contact within this window is swept to Offline.
+    | Should be comfortably larger than the heartbeat interval to avoid flapping.
+    */
+    'presence' => [
+        'offline_timeout_seconds' => (int) env('TRECK_PRESENCE_OFFLINE_TIMEOUT', 180),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Attendance
     |--------------------------------------------------------------------------
     */

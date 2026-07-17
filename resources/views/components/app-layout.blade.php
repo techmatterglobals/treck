@@ -14,6 +14,9 @@
             <div class="flex items-center gap-6">
                 <a href="{{ route('dashboard') }}" class="font-bold text-indigo-600">Treck</a>
                 <a href="{{ route('dashboard') }}" class="text-sm hover:underline">Dashboard</a>
+                @role('admin')
+                    <a href="{{ route('presence.index') }}" class="text-sm hover:underline">Live Presence</a>
+                @endrole
                 @can('manage employees')
                     <a href="{{ route('employees.index') }}" class="text-sm hover:underline">Employees</a>
                 @endcan

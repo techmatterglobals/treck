@@ -69,6 +69,7 @@ The full technical design lives in [`docs/`](docs/):
 22. [P1 Security Remediation](docs/22-p1-security-remediation.md)
 23. [Requirements Review](docs/23-requirements-review.md)
 24. [Windows Agent — Milestone Build & Service Packaging](docs/24-windows-agent-build.md) — deploy scripts in [`agent/deploy/`](agent/deploy/)
+25. [Real-Time Presence Dashboard](docs/25-realtime-presence.md) — materialized presence + broadcasting (M7)
 
 ## Setup
 

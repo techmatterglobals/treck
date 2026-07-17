@@ -233,6 +233,42 @@ curl -sX POST http://localhost:8000/api/agent/register -H 'Accept: application/j
 
 ---
 
+## 7a. Real-time presence dashboard (M7)
+
+An admin-only live dashboard at **`/presence`** ("Live Presence" in the nav)
+shows every computer's current status (Active / Idle / Locked / Logged Out /
+Offline) projected from the agent events ingested in M6. It reads a materialized
+`computer_presence` table (never a history scan) and updates over websockets with
+no polling. Full design: [`docs/25-realtime-presence.md`](docs/25-realtime-presence.md).
+
+It works out of the box with `BROADCAST_CONNECTION=log` (correct, but only
+refreshes on navigation). For live push updates, enable **Laravel Reverb**:
+
+```bash
+composer require laravel/reverb
+npm install                        # pulls laravel-echo + pusher-js (already in package.json)
+npm run build
+
+# .env
+BROADCAST_CONNECTION=reverb
+REVERB_APP_ID=treck REVERB_APP_KEY=local-key REVERB_APP_SECRET=local-secret
+REVERB_HOST=127.0.0.1 REVERB_PORT=8080 REVERB_SCHEME=http
+
+php artisan reverb:start           # websocket server (run under Supervisor in prod)
+```
+
+The "missing heartbeat -> Offline" transition is produced by a scheduled sweep
+(already wired in `routes/console.php`); ensure the scheduler is running:
+
+```bash
+php artisan schedule:work          # or the production cron entry (see §6)
+php artisan treck:presence-sweep   # manual one-off
+```
+
+Tune the timeout with `TRECK_PRESENCE_OFFLINE_TIMEOUT` (seconds, default 180).
+
+---
+
 ## 8. Running tests
 
 ```bash

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -72,6 +73,12 @@ class Computer extends Model implements AuthenticatableContract
     public function screenshots(): HasMany
     {
         return $this->hasMany(Screenshot::class);
+    }
+
+    /** The materialized real-time presence for this computer (1:1, M7). */
+    public function presence(): HasOne
+    {
+        return $this->hasOne(ComputerPresence::class);
     }
 
     // ----------------------------------------------------------------

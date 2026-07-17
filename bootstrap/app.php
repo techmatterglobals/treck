@@ -22,6 +22,12 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    // Presence broadcasting (M7): registers /broadcasting/auth (web + auth) and
+    // the admin-only private channels in routes/channels.php.
+    ->withBroadcasting(
+        __DIR__.'/../routes/channels.php',
+        ['middleware' => ['web', 'auth']],
+    )
     ->withMiddleware(function (Middleware $middleware) {
         // Reset resolved auth guards after each API request so token identity
         // never leaks between requests under Octane / the test harness.

@@ -32,6 +32,7 @@ directly to the area you need.
 | 22 | [P1 Security Remediation](22-p1-security-remediation.md) | SEC-1 agent identity binding, SEC-2 rate limiting, auth hardening, scheduler + security tests |
 | 23 | [Requirements Review](23-requirements-review.md) | Module-by-module status (complete/partial/not started), missing features, priority |
 | 24 | [Windows Agent — Milestone Build](24-windows-agent-build.md) | .NET 8 agent built in milestones; M1–M6 complete (M6: Windows Service packaging, production runtime, server-side `/api/agent/events`) |
+| 25 | [Real-Time Presence Dashboard](25-realtime-presence.md) | M7: materialized `computer_presence`, event projection, admin broadcasting, live Livewire dashboard |
 
 ## Deployment artifacts
 

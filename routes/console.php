@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Schedule;
 // Mark stale computers offline + close abandoned sessions (doc 14).
 Schedule::command('treck:reconcile-sessions')->everyMinute()->withoutOverlapping();
 
+// Transition quiet computers to Offline in the real-time presence table (doc 25).
+Schedule::command('treck:presence-sweep')->everyMinute()->withoutOverlapping();
+
 // Keep today's attendance/productivity fresh (doc 18).
 Schedule::command('treck:daily-rollup')->hourly();
 
