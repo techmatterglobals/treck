@@ -28,12 +28,24 @@ param(
     [string] $Configuration = 'Release',
     [switch] $SelfContained,
     [string] $RuntimeIdentifier = 'win-x64',
-    [string] $OutputDir = (Join-Path $PSScriptRoot '..\publish')
+    # Default applied after param() (see below): $PSScriptRoot is not initialized
+    # while param() defaults bind on Windows PowerShell 5.1.
+    [string] $OutputDir
 )
 
 $ErrorActionPreference = 'Stop'
 
-$projectPath = Join-Path $PSScriptRoot '..\Treck.Agent.csproj'
+# Resolve this script's own directory safely ($PSScriptRoot is valid in the body;
+# fall back to $MyInvocation), then apply the OutputDir default.
+$scriptDir = $PSScriptRoot
+if (-not $scriptDir) {
+    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+}
+if (-not $OutputDir) {
+    $OutputDir = Join-Path $scriptDir '..\publish'
+}
+
+$projectPath = Join-Path $scriptDir '..\Treck.Agent.csproj'
 if (-not (Test-Path $projectPath)) {
     throw "Cannot find Treck.Agent.csproj at $projectPath"
 }

@@ -45,8 +45,11 @@
 param(
     [switch] $Publish,
     [switch] $SelfContained,
-    [string] $PublishDir = (Join-Path $PSScriptRoot '..\publish'),
-    [string] $InstallDir = (Join-Path $env:ProgramFiles 'TreckAgent'),
+    # Defaults are applied after the param() block (see below): $PSScriptRoot is
+    # not yet initialized while param() defaults are bound on Windows PowerShell
+    # 5.1, so referencing it here yields an empty path.
+    [string] $PublishDir,
+    [string] $InstallDir,
     [string] $ServiceName = 'TreckAgent',
     [string] $DisplayName = 'Treck Agent',
     [string] $Description = 'Treck employee productivity and PC activity monitoring agent. Captures workstation session and activity telemetry and syncs it to the Treck server.',
@@ -55,6 +58,32 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Resolve this script's own directory safely. $PSScriptRoot is reliable in the
+# script body on both Windows PowerShell 5.1 and PowerShell 7+ (only param()
+# default binding on 5.1 is too early); fall back to $MyInvocation for any edge
+# invocation where it is empty.
+$scriptDir = $PSScriptRoot
+if (-not $scriptDir) {
+    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+}
+
+# Apply directory defaults now that $scriptDir is known. Leaving a parameter
+# unset uses the same default as before; an explicit -PublishDir / -InstallDir
+# still takes precedence.
+if (-not $PublishDir) {
+    $PublishDir = Join-Path $scriptDir '..\publish'
+}
+if (-not $InstallDir) {
+    $InstallDir = Join-Path $env:ProgramFiles 'TreckAgent'
+}
+
+# Resolve PublishDir to an absolute, normalized path (whether it is the default,
+# an absolute path, or a path relative to the current location).
+if (-not [System.IO.Path]::IsPathRooted($PublishDir)) {
+    $PublishDir = Join-Path (Get-Location).Path $PublishDir
+}
+$PublishDir = [System.IO.Path]::GetFullPath($PublishDir)
 
 function Wait-ServiceRemoved {
     param(
@@ -73,7 +102,7 @@ function Wait-ServiceRemoved {
 
 # --- 1. Optionally publish a build ------------------------------------------
 if ($Publish) {
-    & (Join-Path $PSScriptRoot 'publish.ps1') -OutputDir $PublishDir -SelfContained:$SelfContained
+    & (Join-Path $scriptDir 'publish.ps1') -OutputDir $PublishDir -SelfContained:$SelfContained
 }
 
 $exeSource = Join-Path $PublishDir 'TreckAgent.exe'
