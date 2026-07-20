@@ -16,7 +16,7 @@ use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
- * Dashboard read queries, authorization, and Livewire rendering (M7).
+ * Dashboard read queries, authorization, and Livewire rendering (Phase 6).
  */
 class PresenceDashboardTest extends TestCase
 {

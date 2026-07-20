@@ -1,4 +1,4 @@
-# 25. Real-Time Presence Dashboard (M7)
+# 25. Real-Time Presence Dashboard (Phase 6)
 
 A production real-time dashboard that shows the live presence of every computer,
 projected from the agent events already ingested in M6. It adds a materialized
@@ -19,7 +19,7 @@ flowchart LR
     C -->|store, tx| D[(agent_events - audit/history)]
     C -->|project, tx| E[PresenceProjector]
     E --> F[(computer_presence - current state)]
-    C -->|after commit| G[[event PresenceUpdated]]
+    C -->|after commit| G[[event PresenceChanged]]
     G -- ShouldBroadcast --> H[(Reverb / Pusher)]
     H -- private: presence --> I[Livewire PresenceBoard]
     F -- read only --> I
@@ -57,7 +57,7 @@ Key properties:
 | Table/Model | `computer_presence` / `App\Models\ComputerPresence` | Materialized current state (1 row per computer) |
 | Projector | `App\Services\Presence\PresenceProjector` | Apply one event to the presence row (tx, ordering guard) |
 | Read model | `App\Services\Presence\PresenceService` | `summary()`, `rows()`, `sweepOffline()` |
-| Event | `App\Events\PresenceUpdated` | `ShouldBroadcast` on private `presence` + `presence.computer.{id}` |
+| Event | `App\Events\PresenceChanged` | `ShouldBroadcast` on private `presence` + `presence.computer.{id}` |
 | Ingest hook | `App\Services\Agent\AgentEventIngestionService` | store -> project -> mirror liveness onto `computers` -> broadcast (after commit) |
 | Sweep | `App\Console\Commands\SweepPresenceOffline` (`treck:presence-sweep`) | timeout -> Offline + broadcast |
 | UI | `App\Livewire\Presence\{PresenceBoard,ComputerPresenceDetail}` | Live board + details, Echo listeners |
@@ -89,7 +89,7 @@ sequenceDiagram
     participant Ing as AgentEventIngestionService
     participant DB as MySQL
     participant Proj as PresenceProjector
-    participant Bus as PresenceUpdated (broadcast)
+    participant Bus as PresenceChanged (broadcast)
     participant UI as Dashboard (Echo)
 
     Ag->>API: event {kind, idempotency_key, created_at, payload}
@@ -106,7 +106,7 @@ sequenceDiagram
     Ing-->>API: AgentEvent
     deactivate Ing
     opt presence changed
-        Ing->>Bus: event(PresenceUpdated)
+        Ing->>Bus: event(PresenceChanged)
         Bus-->>UI: private presence / presence.computer.{id}
         UI->>DB: re-read computer_presence (materialized)
     end
@@ -126,7 +126,7 @@ sequenceDiagram
     Cmd->>Svc: sweepOffline()
     Svc->>DB: online rows with last_synced_at < now - timeout -> Offline
     Svc-->>Cmd: changed rows
-    Cmd->>UI: PresenceUpdated per row (broadcast)
+    Cmd->>UI: PresenceChanged per row (broadcast)
 ```
 
 ---
@@ -137,7 +137,7 @@ sequenceDiagram
   `active`, and `role:admin`. Livewire components re-check admin in `mount()`.
 - Broadcast channels are **private** and authorized in `routes/channels.php` to
   active administrators only.
-- `PresenceUpdated::broadcastWith()` sends only display fields (computer name,
+- `PresenceChanged::broadcastWith()` sends only display fields (computer name,
   employee, department, status, timestamps, idle seconds). Device tokens,
   provisioning keys, and other credentials are never broadcast or rendered.
 

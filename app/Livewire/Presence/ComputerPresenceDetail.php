@@ -11,7 +11,7 @@ use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 /**
- * Real-time details for a single computer (M7): current presence, current
+ * Real-time details for a single computer (Phase 6): current presence, current
  * session duration, last sync, idle duration, and the most recent session and
  * heartbeat events (bounded reads for audit context - not a full history scan).
  *
@@ -32,11 +32,11 @@ class ComputerPresenceDetail extends Component
     public function getListeners(): array
     {
         return [
-            "echo-private:presence.computer.{$this->computerId},.PresenceUpdated" => 'onPresenceUpdated',
+            "echo-private:presence.computer.{$this->computerId},.PresenceChanged" => 'onPresenceChanged',
         ];
     }
 
-    public function onPresenceUpdated(): void
+    public function onPresenceChanged(): void
     {
         // Arrival re-renders with fresh materialized state + recent events.
     }

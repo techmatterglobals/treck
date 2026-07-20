@@ -75,7 +75,7 @@ class Computer extends Model implements AuthenticatableContract
         return $this->hasMany(Screenshot::class);
     }
 
-    /** The materialized real-time presence for this computer (1:1, M7). */
+    /** The materialized real-time presence for this computer (1:1, Phase 6). */
     public function presence(): HasOne
     {
         return $this->hasOne(ComputerPresence::class);

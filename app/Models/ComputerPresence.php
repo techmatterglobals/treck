@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * The materialized current presence of one computer (M7). Written by
+ * The materialized current presence of one computer (Phase 6). Written by
  * {@see PresenceProjector} and read by the dashboard;
  * never derived by scanning `agent_events`.
  */

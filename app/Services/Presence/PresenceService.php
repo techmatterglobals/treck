@@ -12,7 +12,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Read model + maintenance for the real-time presence dashboard (M7).
+ * Read model + maintenance for the real-time presence dashboard (Phase 6).
  *
  * This is the SINGLE source of truth for displayed presence/status across the
  * whole app (presence board, dashboard KPIs + status table, employees page).

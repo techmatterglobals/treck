@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Broadcast;
 | Presence channels (M7) are private and admin-only. Only an authenticated
 | administrator may subscribe, so no computer/employee telemetry leaks to
 | ordinary users. Device tokens and credentials are never broadcast (see
-| PresenceUpdated::broadcastWith()).
+| PresenceChanged::broadcastWith()).
 */
 
 // The board: every computer's presence.

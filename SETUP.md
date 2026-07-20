@@ -233,7 +233,7 @@ curl -sX POST http://localhost:8000/api/agent/register -H 'Accept: application/j
 
 ---
 
-## 7a. Real-time presence dashboard (M7)
+## 7a. Real-time presence dashboard (Phase 6)
 
 An admin-only live dashboard at **`/presence`** ("Live Presence" in the nav)
 shows every computer's current status (Active / Idle / Locked / Logged Out /

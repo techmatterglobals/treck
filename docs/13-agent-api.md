@@ -51,15 +51,15 @@ Idempotency is enforced per device by a unique `(computer_id, idempotency_key)`
 index, so retries after a lost acknowledgement are safe. The owning employee is
 resolved from the authenticated `Computer`, never from the body (SEC-1).
 
-#### Presence projection (M7)
+#### Presence projection (Phase 6)
 
 For each **newly-stored** event, the ingest transaction also advances the
 computer's materialized presence (`computer_presence`) via
-`PresenceProjector`, and after commit broadcasts `PresenceUpdated` on the
+`PresenceProjector`, and after commit broadcasts `PresenceChanged` on the
 admin-only private channels `presence` and `presence.computer.{id}`:
 
 ```
-store agent_events  ->  update computer_presence  ->  broadcast PresenceUpdated
+store agent_events  ->  update computer_presence  ->  broadcast PresenceChanged
 ```
 
 Duplicate submissions do not re-project or re-broadcast. Heartbeat payloads are

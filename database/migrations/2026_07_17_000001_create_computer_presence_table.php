@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Materialized current-state table for the real-time presence engine (M7).
+ * Materialized current-state table for the real-time presence engine (Phase 6).
  *
  * Exactly one row per computer holds its latest presence, projected forward as
  * each agent event is ingested. The dashboard and details page read only this
@@ -24,6 +24,19 @@ use Illuminate\Support\Facades\Schema;
  *   idle_seconds       - observed idle seconds from the latest heartbeat.
  *   session_started_at - start of the current session (set on Logon, cleared on
  *                        Logoff), for the "current session duration" display.
+ *
+ * Deviations from the Phase 6 "suggested" schema, and why the current shape is
+ * preferable:
+ *   - is_online / is_idle / is_locked: NOT stored. They are pure functions of
+ *     `status` (see PresenceStatus::isOnline()); storing them would denormalize
+ *     derived state that can drift out of sync with `status`.
+ *   - employee_id: NOT stored. It is a stable property of the computer and is
+ *     read via the computer relation, so duplicating it here would risk drift on
+ *     re-assignment.
+ *   - last_seen_at (suggested): represented by `last_synced_at` (server receive
+ *     time). `last_event_at` (agent clock) is additionally kept purely to reject
+ *     out-of-order events - a correctness need the single suggested column lacked.
+ *   - current_session_started_at (suggested): named `session_started_at` here.
  */
 return new class extends Migration
 {

@@ -4,7 +4,7 @@ namespace App\Enums;
 
 /**
  * Live presence of a workstation, as maintained by the real-time presence engine
- * (M7). This is deliberately separate from {@see ComputerStatus} (which models
+ * (Phase 6). This is deliberately separate from {@see ComputerStatus} (which models
  * the self-reported activity-log state) so the presence projection can evolve
  * independently of the M1-M6 session/activity semantics.
  *
@@ -38,12 +38,14 @@ enum PresenceStatus: string
     /** Tailwind-friendly color token for status badges. */
     public function color(): string
     {
+        // Standard dashboard palette: Active=Green, Idle=Yellow, Locked=Blue,
+        // Logged Out=Red, Offline=Gray.
         return match ($this) {
             self::Active => 'green',
-            self::Idle => 'amber',
-            self::Locked => 'slate',
-            self::LoggedOut => 'indigo',
-            self::Offline => 'red',
+            self::Idle => 'yellow',
+            self::Locked => 'blue',
+            self::LoggedOut => 'red',
+            self::Offline => 'gray',
         };
     }
 

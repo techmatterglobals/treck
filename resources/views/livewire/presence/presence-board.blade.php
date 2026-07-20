@@ -5,11 +5,11 @@
             $cards = [
                 ['label' => 'Total',       'value' => $summary['total'],       'dot' => 'bg-gray-400'],
                 ['label' => 'Online',      'value' => $summary['online'],      'dot' => 'bg-green-500'],
-                ['label' => 'Offline',     'value' => $summary['offline'],     'dot' => 'bg-red-500'],
+                ['label' => 'Offline',     'value' => $summary['offline'],     'dot' => 'bg-gray-500'],
                 ['label' => 'Active',      'value' => $summary['active'],      'dot' => 'bg-green-500'],
-                ['label' => 'Idle',        'value' => $summary['idle'],        'dot' => 'bg-amber-500'],
-                ['label' => 'Locked',      'value' => $summary['locked'],      'dot' => 'bg-slate-500'],
-                ['label' => 'Logged Out',  'value' => $summary['logged_out'],  'dot' => 'bg-indigo-500'],
+                ['label' => 'Idle',        'value' => $summary['idle'],        'dot' => 'bg-yellow-500'],
+                ['label' => 'Locked',      'value' => $summary['locked'],      'dot' => 'bg-blue-500'],
+                ['label' => 'Logged Out',  'value' => $summary['logged_out'],  'dot' => 'bg-red-500'],
             ];
         @endphp
         @foreach ($cards as $card)

@@ -13,7 +13,7 @@ use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
- * Unit coverage for the presence projection rules (M7). Exercises the projector
+ * Unit coverage for the presence projection rules (Phase 6). Exercises the projector
  * directly against stored agent events.
  */
 class PresenceProjectorTest extends TestCase

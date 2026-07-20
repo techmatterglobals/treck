@@ -63,7 +63,7 @@
                 @forelse ($recentHeartbeats as $event)
                     @php $idle = data_get($event->payload, 'IsIdle', data_get($event->payload, 'is_idle', false)); @endphp
                     <li class="py-2 flex items-center justify-between">
-                        <span class="font-medium {{ $idle ? 'text-amber-600' : 'text-green-600' }}">
+                        <span class="font-medium {{ $idle ? 'text-yellow-600' : 'text-green-600' }}">
                             {{ $idle ? 'Idle' : 'Active' }}
                         </span>
                         <span class="text-gray-500">{{ $event->occurred_at?->diffForHumans() }}</span>

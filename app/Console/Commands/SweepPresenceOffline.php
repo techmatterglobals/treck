@@ -2,14 +2,14 @@
 
 namespace App\Console\Commands;
 
-use App\Events\PresenceUpdated;
+use App\Services\Presence\PresenceBroadcaster;
 use App\Services\Presence\PresenceService;
 use Illuminate\Console\Command;
 
 /**
  * Transitions computers that have gone quiet (no agent contact within the
  * configured timeout) to Offline in the materialized presence table, and
- * broadcasts each change so the dashboard reflects it live (M7).
+ * broadcasts each change so the dashboard reflects it live (Phase 6).
  *
  * This is the only path that produces the "missing heartbeat -> Offline"
  * transition, since absence of events cannot trigger the event-driven projector.
@@ -23,11 +23,11 @@ class SweepPresenceOffline extends Command
 
     protected $description = 'Mark quiet computers offline in the presence table and broadcast the change';
 
-    public function handle(PresenceService $presence): int
+    public function handle(PresenceService $presence, PresenceBroadcaster $broadcaster): int
     {
         $changed = $presence->sweepOffline();
 
-        $changed->each(fn ($row) => event(new PresenceUpdated($row)));
+        $changed->each(fn ($row) => $broadcaster->changed($row));
 
         $this->info("Swept {$changed->count()} computer(s) to offline.");
 

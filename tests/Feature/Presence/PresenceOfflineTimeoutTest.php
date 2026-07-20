@@ -3,7 +3,7 @@
 namespace Tests\Feature\Presence;
 
 use App\Enums\PresenceStatus;
-use App\Events\PresenceUpdated;
+use App\Events\PresenceChanged;
 use App\Models\Computer;
 use App\Models\ComputerPresence;
 use App\Models\Employee;
@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 /**
- * The "missing heartbeat -> Offline" sweep (M7).
+ * The "missing heartbeat -> Offline" sweep (Phase 6).
  */
 class PresenceOfflineTimeoutTest extends TestCase
 {
@@ -62,11 +62,11 @@ class PresenceOfflineTimeoutTest extends TestCase
 
     public function test_command_broadcasts_each_offline_transition(): void
     {
-        Event::fake([PresenceUpdated::class]);
+        Event::fake([PresenceChanged::class]);
         $this->presence(PresenceStatus::Idle, stale: true);
 
         $this->artisan('treck:presence-sweep')->assertSuccessful();
 
-        Event::assertDispatchedTimes(PresenceUpdated::class, 1);
+        Event::assertDispatchedTimes(PresenceChanged::class, 1);
     }
 }

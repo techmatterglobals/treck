@@ -5,10 +5,10 @@ namespace App\Services\Agent;
 use App\Enums\AgentEventKind;
 use App\Enums\ComputerStatus;
 use App\Enums\PresenceStatus;
-use App\Events\PresenceUpdated;
 use App\Models\AgentEvent;
 use App\Models\Computer;
 use App\Models\ComputerPresence;
+use App\Services\Presence\PresenceBroadcaster;
 use App\Services\Presence\PresenceProjector;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
@@ -25,11 +25,11 @@ use Illuminate\Support\Facades\DB;
  *   - The owning employee is taken from the resolved Computer, never the body.
  *
  * This ingest stores the raw event and, for a newly-stored event, projects it
- * onto the materialized presence state (M7) inside the same transaction, then
+ * onto the materialized presence state (Phase 6) inside the same transaction, then
  * broadcasts the change after commit:
  *
  *   store event -> update presence -> mirror liveness onto the computer
- *                -> broadcast PresenceUpdated
+ *                -> broadcast PresenceChanged
  *
  * The liveness mirror keeps the legacy `computers.status` / `last_seen_at` /
  * `last_activity_at` fields in sync with the presence projection, so the
@@ -41,7 +41,10 @@ use Illuminate\Support\Facades\DB;
  */
 class AgentEventIngestionService
 {
-    public function __construct(private readonly PresenceProjector $projector) {}
+    public function __construct(
+        private readonly PresenceProjector $projector,
+        private readonly PresenceBroadcaster $broadcaster,
+    ) {}
 
     /**
      * Ingest one queued event for the given device.
@@ -89,7 +92,7 @@ class AgentEventIngestionService
         // Broadcast only after the transaction has committed, so subscribers
         // never observe a state that could still roll back.
         if ($presence !== null) {
-            event(new PresenceUpdated($presence));
+            $this->broadcaster->changed($presence);
         }
 
         return $event;

@@ -11,7 +11,7 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Broadcast when a computer's presence changes (M7). Carries a compact,
+ * Broadcast when a computer's presence changes (Phase 6). Carries a compact,
  * secret-free snapshot so the admin dashboard updates live without polling.
  *
  * Broadcast on two private channels (admin-authorized in routes/channels.php):
@@ -20,7 +20,7 @@ use Illuminate\Queue\SerializesModels;
  *
  * Device tokens, provisioning keys and other credentials are never included.
  */
-class PresenceUpdated implements ShouldBroadcast
+class PresenceChanged implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -37,7 +37,7 @@ class PresenceUpdated implements ShouldBroadcast
 
     public function broadcastAs(): string
     {
-        return 'PresenceUpdated';
+        return 'PresenceChanged';
     }
 
     /** @return array<string, mixed> */

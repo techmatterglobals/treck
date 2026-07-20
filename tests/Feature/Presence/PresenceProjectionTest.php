@@ -4,7 +4,7 @@ namespace Tests\Feature\Presence;
 
 use App\Enums\ComputerStatus;
 use App\Enums\PresenceStatus;
-use App\Events\PresenceUpdated;
+use App\Events\PresenceChanged;
 use App\Models\Computer;
 use App\Models\Employee;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -13,7 +13,7 @@ use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
- * End-to-end: POST /api/agent/events -> store -> update presence -> broadcast (M7).
+ * End-to-end: POST /api/agent/events -> store -> update presence -> broadcast (Phase 6).
  */
 class PresenceProjectionTest extends TestCase
 {
@@ -42,7 +42,7 @@ class PresenceProjectionTest extends TestCase
 
     public function test_heartbeat_event_updates_presence_and_broadcasts(): void
     {
-        Event::fake([PresenceUpdated::class]);
+        Event::fake([PresenceChanged::class]);
         [$computer, $token] = $this->device();
 
         $this->sendEvent($token, 'heartbeat', ['IsIdle' => false], 'hb-1')->assertCreated();
@@ -51,7 +51,7 @@ class PresenceProjectionTest extends TestCase
             'computer_id' => $computer->id,
             'status' => PresenceStatus::Active->value,
         ]);
-        Event::assertDispatched(PresenceUpdated::class, fn ($e) => $e->presence->computer_id === $computer->id);
+        Event::assertDispatched(PresenceChanged::class, fn ($e) => $e->presence->computer_id === $computer->id);
     }
 
     public function test_idle_heartbeat_projects_idle(): void
@@ -81,13 +81,13 @@ class PresenceProjectionTest extends TestCase
 
     public function test_duplicate_event_does_not_rebroadcast(): void
     {
-        Event::fake([PresenceUpdated::class]);
+        Event::fake([PresenceChanged::class]);
         [$computer, $token] = $this->device();
 
         $this->sendEvent($token, 'heartbeat', ['IsIdle' => false], 'dup')->assertCreated();
         $this->sendEvent($token, 'heartbeat', ['IsIdle' => false], 'dup')->assertOk(); // idempotent duplicate
 
-        Event::assertDispatchedTimes(PresenceUpdated::class, 1);
+        Event::assertDispatchedTimes(PresenceChanged::class, 1);
     }
 
     public function test_event_updates_legacy_computer_liveness_fields(): void

@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Projects a single agent event onto the materialized {@see ComputerPresence}
- * row for its computer (M7). This is the only writer of presence state on the
+ * row for its computer (Phase 6). This is the only writer of presence state on the
  * ingestion path; it never scans history - it advances the current state.
  *
  * Status rules (from the milestone contract):

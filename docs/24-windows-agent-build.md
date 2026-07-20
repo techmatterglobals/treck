@@ -692,9 +692,9 @@ dotnet publish agent\Treck.Agent.csproj -c Release -r win-x64 --self-contained t
 
 ---
 
-## M7 note - Real-Time Presence (no agent change)
+## Phase 6 note - Real-Time Presence (no agent change)
 
-Milestone 7 adds a real-time presence dashboard built entirely **server-side** on
+Phase 6 adds a real-time presence dashboard built entirely **server-side** on
 top of the events this agent already uploads via `POST /api/agent/events`. The
 Windows agent is **unchanged**: its existing heartbeat (`IsIdle`) and session
 (`Lock`/`Unlock`/`Logon`/`Logoff`) events are projected into a materialized
@@ -706,6 +706,6 @@ the C# `SessionEventType` enum (Unknown=0, Logon=1, Logoff=2, Lock=3, Unlock=4,
 Shutdown=5, Restart=6). The server's `PresenceProjector` accepts both that numeric
 form and the string name, so no agent change was needed. If a future milestone
 wants self-describing session payloads, adding a `JsonStringEnumConverter` to the
-agent's serializer is the minimal change - but it is not required for M7.
+agent's serializer is the minimal change - but it is not required for Phase 6.
 
 Full design: [`docs/25-realtime-presence.md`](25-realtime-presence.md).

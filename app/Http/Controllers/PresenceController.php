@@ -6,7 +6,7 @@ use App\Models\Computer;
 use Illuminate\Contracts\View\View;
 
 /**
- * Admin-only real-time presence dashboard (M7). Thin: it only renders the views;
+ * Admin-only real-time presence dashboard (Phase 6). Thin: it only renders the views;
  * all state and queries live in the Livewire components / presence services.
  * Access is restricted to authenticated administrators by the route middleware.
  */
