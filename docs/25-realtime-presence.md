@@ -234,3 +234,11 @@ These read from the `application_usage` table via `ApplicationUsageService`
 (indexed scopes, never a history scan) and render alongside the existing presence
 panels. The presence projection itself is unchanged — `app_usage` events do not
 affect presence. Full design: [`docs/26-application-usage.md`](26-application-usage.md).
+
+## 25.10 Phase 8 note — Screenshot module (separate dashboard)
+
+Phase 8 adds an admin-only **Screenshots** dashboard (`/screenshots`) and viewer,
+fed by a dedicated multipart upload endpoint (`/api/agent/screenshots`). It is
+independent of presence — screenshots do not flow through the presence projector
+or broadcast — but reuses the same admin auth model and the same agent offline
+queue + sync pipeline. Full design: [`docs/27-screenshot-module.md`](27-screenshot-module.md).

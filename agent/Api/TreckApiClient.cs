@@ -1,9 +1,11 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Treck.Agent.Models;
+using Treck.Agent.Screenshots;
 
 namespace Treck.Agent.Api;
 
@@ -76,6 +78,52 @@ public sealed class TreckApiClient : ITreckApiClient
             Content = JsonContent.Create(payload, options: JsonOptions),
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+
+        using var response = await _http.SendAsync(request, cancellationToken);
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            throw new UnauthorizedApiException();
+        }
+
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> UploadScreenshotAsync(
+        string bearerToken,
+        ScreenshotMetadata metadata,
+        byte[] imageBytes,
+        CancellationToken cancellationToken)
+    {
+        var contentType = metadata.Format == "png" ? "image/png" : "image/jpeg";
+        var fileName = $"{metadata.ImageHash}.{(metadata.Format == "png" ? "png" : "jpg")}";
+
+        using var form = new MultipartFormDataContent();
+
+        var imageContent = new ByteArrayContent(imageBytes);
+        imageContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        form.Add(imageContent, "image", fileName);
+
+        form.Add(new StringContent(metadata.CapturedAt.ToString("o", CultureInfo.InvariantCulture)), "captured_at");
+        form.Add(new StringContent(metadata.MonitorNumber.ToString(CultureInfo.InvariantCulture)), "monitor_number");
+        form.Add(new StringContent(metadata.Width.ToString(CultureInfo.InvariantCulture)), "width");
+        form.Add(new StringContent(metadata.Height.ToString(CultureInfo.InvariantCulture)), "height");
+        form.Add(new StringContent(metadata.ImageHash), "image_hash");
+        form.Add(new StringContent(metadata.SessionId), "session_id");
+
+        if (!string.IsNullOrEmpty(metadata.ActiveProcess))
+        {
+            form.Add(new StringContent(metadata.ActiveProcess), "active_process");
+        }
+
+        if (!string.IsNullOrEmpty(metadata.ActiveWindowTitle))
+        {
+            form.Add(new StringContent(metadata.ActiveWindowTitle), "active_window_title");
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "api/agent/screenshots") { Content = form };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
         using var response = await _http.SendAsync(request, cancellationToken);
 

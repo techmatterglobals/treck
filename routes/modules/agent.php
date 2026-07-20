@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Agent\ActivityController;
 use App\Http\Controllers\Api\Agent\DeviceRegistrationController;
 use App\Http\Controllers\Api\Agent\EventIngestionController;
+use App\Http\Controllers\Api\Agent\ScreenshotUploadController;
 use App\Http\Controllers\Api\Agent\WorkSessionController;
 use Illuminate\Support\Facades\Route;
 
@@ -23,7 +24,8 @@ use Illuminate\Support\Facades\Route;
 |   POST /api/agent/login      → open a PC session
 |   POST /api/activity         → report active/idle seconds
 |   POST /api/agent/logout     → close the PC session
-|   POST /api/agent/events     → drain one queued heartbeat/session event (M6)
+|   POST /api/agent/events     → drain one queued heartbeat/session/app-usage event (M6, Phase 7)
+|   POST /api/agent/screenshots→ drain one queued screenshot (multipart; Phase 8)
 */
 
 // Token bootstrap (guarded by the provisioning key inside the FormRequest).
@@ -36,4 +38,5 @@ Route::middleware(['auth:sanctum', 'ability:agent:report', 'throttle:agent'])->g
     Route::post('activity', [ActivityController::class, 'store'])->name('agent.activity');
     Route::post('agent/logout', [WorkSessionController::class, 'logout'])->name('agent.logout');
     Route::post('agent/events', [EventIngestionController::class, 'store'])->name('agent.events');
+    Route::post('agent/screenshots', [ScreenshotUploadController::class, 'store'])->name('agent.screenshots');
 });

@@ -383,6 +383,13 @@ Agent (on a Windows host):
 - **Build.** The Phase 7 agent code targets `net8.0-windows`; it is delivered
   written and unit-test-designed but is not compiled in this repo's Linux CI.
 
+## 26.14 Related: Screenshot module (Phase 8)
+
+Phase 8 reuses this phase's `IActiveWindowService` to record the foreground
+process/window title with each screenshot, and rides the same agent offline queue
++ sync pipeline (a dedicated `Screenshot` event kind and a multipart upload
+endpoint). See [`docs/27-screenshot-module.md`](27-screenshot-module.md).
+
 ---
 
 *Phase 7 complete.*

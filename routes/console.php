@@ -21,3 +21,6 @@ Schedule::command('treck:daily-rollup')->hourly();
 
 // Finalize yesterday shortly after midnight.
 Schedule::command('treck:daily-rollup '.now()->subDay()->toDateString())->dailyAt('00:30');
+
+// Enforce the screenshot retention policy (Phase 8).
+Schedule::command('treck:prune-screenshots')->dailyAt('01:00')->withoutOverlapping();

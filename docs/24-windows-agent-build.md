@@ -807,3 +807,82 @@ duration); the currently-open session is never transmitted.
 - Session state machine unit-tested.
 
 Full design: [`docs/26-application-usage.md`](26-application-usage.md).
+
+---
+
+## Phase 8 — Screenshot Module ✅ (written; build requires Windows)
+
+The agent captures the interactive desktop on an admin-defined policy and uploads
+**completed captures** through the existing offline queue + sync pipeline. It is
+opt-in (disabled by default) and never blocks the other loops.
+
+> **Build note.** These files target `net8.0-windows` and use Win32
+> (`EnumDisplayMonitors`, `OpenInputDesktop`, GDI `CopyFromScreen`) plus
+> `System.Drawing.Common` for encoding — Windows only. The Linux CI here has no
+> Windows .NET SDK, so the Phase 8 agent code is delivered **written and
+> unit-test-designed but not built here**. The sync step
+> (`ScreenshotSyncServiceTests`) is OS-agnostic and runs anywhere.
+
+### Architecture
+
+- **`WindowsScreenshotCaptureService`** — enumerates monitors, captures each with
+  GDI at native resolution (per-monitor-v2 DPI aware). `CanCapture()` returns
+  false unless the input desktop is "Default", so the secure/lock/login desktop
+  is never captured.
+- **`ScreenshotProcessingService`** — compresses to JPEG (quality) or PNG,
+  SHA-256 hashes, drops frames identical to the previous one per monitor, writes a
+  temp file under `%ProgramData%\TreckAgent\screenshots`.
+- **`ScreenshotWorker`** (hosted) — its own cadence (fixed or jittered); evaluates
+  policy (enabled, interactive desktop, active user, not ignored) then captures →
+  processes → enqueues each as a `Screenshot` offline event.
+- **`ScreenshotSyncService`** — invoked by `AgentEventUploader` for `Screenshot`
+  events: reads the temp file, POSTs it multipart to `/api/agent/screenshots`, and
+  deletes the temp file on success. The `SyncWorker` drain, ordering and backoff
+  are unchanged.
+
+Reuses Phase 7's `IActiveWindowService` to record the foreground process/title
+with each capture.
+
+### Folders added
+
+```
+agent/Screenshots/
+├── ScreenshotOptions.cs               # policy config
+├── ScreenshotMetadata.cs              # queued payload (metadata + temp path)
+├── MonitorCapture.cs                  # per-monitor bitmap holder (IDisposable)
+├── IScreenshotCaptureService.cs
+├── WindowsScreenshotCaptureService.cs # GDI capture; secure-desktop guard; DPI
+├── IScreenshotProcessingService.cs
+├── ScreenshotProcessingService.cs     # compress + SHA-256 + dedup + temp file
+├── IScreenshotSyncService.cs
+├── ScreenshotSyncService.cs           # upload + temp-file cleanup
+└── ScreenshotWorker.cs                # hosted capture cadence + policy
+agent/tests/Treck.Agent.Tests/
+└── ScreenshotSyncServiceTests.cs
+```
+
+Also modified: `Offline/OfflineEvent.cs` (adds `OfflineEventKind.Screenshot`),
+`Api/ITreckApiClient.cs` + `Api/TreckApiClient.cs` (`UploadScreenshotAsync`
+multipart), `Sync/AgentEventUploader.cs` (Screenshot branch), `Program.cs`
+(DI + options + hosted service), `appsettings.json`, `Treck.Agent.csproj`
+(`System.Drawing.Common`).
+
+### How to test
+
+1. On Windows, `Screenshots.Enabled=true`; run the agent and confirm
+   `Screenshot queued: …` log lines and rising
+   `Screenshot::whereNotNull('image_hash')->count()` on the server.
+2. Lock the workstation — nothing is captured.
+3. Go offline, keep working, reconnect — queued screenshots drain and temp files
+   clear.
+4. `dotnet test agent/tests` runs `ScreenshotSyncServiceTests` (OS-agnostic).
+
+### Definition of done
+
+- Native multi-monitor, DPI-correct capture; secure/lock desktop never captured.
+- Configurable policy (interval/jitter/active-only/ignore rules); opt-in.
+- Compress + SHA-256 + duplicate detection; completed captures only.
+- Reuses the offline queue + sync pipeline; temp file deleted after upload.
+- Privacy-preserving (image + metadata only; no input/clipboard/file capture).
+
+Full design: [`docs/27-screenshot-module.md`](27-screenshot-module.md).

@@ -17,6 +17,7 @@
                 @role('admin')
                     <a href="{{ route('presence.index') }}" class="text-sm hover:underline">Live Presence</a>
                     <a href="{{ route('application-usage.index') }}" class="text-sm hover:underline">App Usage</a>
+                    <a href="{{ route('screenshots.index') }}" class="text-sm hover:underline">Screenshots</a>
                 @endrole
                 @can('manage employees')
                     <a href="{{ route('employees.index') }}" class="text-sm hover:underline">Employees</a>

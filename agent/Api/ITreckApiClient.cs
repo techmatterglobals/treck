@@ -1,8 +1,9 @@
 using Treck.Agent.Models;
+using Treck.Agent.Screenshots;
 
 namespace Treck.Agent.Api;
 
-/// <summary>Typed client for the Treck HTTP API (Milestone 2: registration only).</summary>
+/// <summary>Typed client for the Treck HTTP API.</summary>
 public interface ITreckApiClient
 {
     /// <summary>
@@ -18,4 +19,13 @@ public interface ITreckApiClient
     /// re-register. Non-success leaves the event queued for retry.
     /// </summary>
     Task<bool> UploadEventAsync(string bearerToken, OfflineEventPayload payload, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Uploads one screenshot to <c>/api/agent/screenshots</c> as multipart
+    /// (image bytes + metadata fields) using the device bearer token. Returns
+    /// true on any 2xx (stored or idempotent duplicate); throws
+    /// <see cref="UnauthorizedApiException"/> on 401. Non-success leaves the
+    /// screenshot queued for retry (order preserved).
+    /// </summary>
+    Task<bool> UploadScreenshotAsync(string bearerToken, ScreenshotMetadata metadata, byte[] imageBytes, CancellationToken cancellationToken);
 }

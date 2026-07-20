@@ -11,6 +11,7 @@ using Treck.Agent.Api;
 using Treck.Agent.Applications;
 using Treck.Agent.Configuration;
 using Treck.Agent.Offline;
+using Treck.Agent.Screenshots;
 using Treck.Agent.Security;
 using Treck.Agent.Services;
 using Treck.Agent.Sessions;
@@ -77,6 +78,10 @@ try
         .Bind(builder.Configuration.GetSection(ApplicationTrackingOptions.SectionName))
         .ValidateDataAnnotations();
 
+    builder.Services.AddOptions<ScreenshotOptions>()
+        .Bind(builder.Configuration.GetSection(ScreenshotOptions.SectionName))
+        .ValidateDataAnnotations();
+
     // --- Session detection (event-driven, no polling) ---
     builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddSingleton<ISessionMonitor, WindowsSessionMonitor>();
@@ -89,6 +94,11 @@ try
     builder.Services.AddSingleton<IActiveWindowService, WindowsActiveWindowService>();
     builder.Services.AddSingleton<IApplicationSessionManager, ApplicationSessionManager>();
     builder.Services.AddSingleton<IApplicationTracker, WindowsApplicationTracker>();
+
+    // --- Screenshot module (Phase 8; opt-in, own capture cadence) ---
+    builder.Services.AddSingleton<IScreenshotCaptureService, WindowsScreenshotCaptureService>();
+    builder.Services.AddSingleton<IScreenshotProcessingService, ScreenshotProcessingService>();
+    builder.Services.AddSingleton<IScreenshotSyncService, ScreenshotSyncService>();
 
     // --- Storage / security ---
     builder.Services.AddSingleton<IStoragePathProvider, StoragePathProvider>();
@@ -123,6 +133,10 @@ try
     builder.Services.AddSingleton<IEventUploader, AgentEventUploader>();
     builder.Services.AddSingleton<ISyncService, SyncService>();
     builder.Services.AddHostedService<SyncWorker>();
+
+    // Screenshot capture cadence (Phase 8) runs as its own hosted service so it
+    // never blocks the heartbeat / presence / app-tracking loops.
+    builder.Services.AddHostedService<ScreenshotWorker>();
 
     builder.Services.AddHostedService<Worker>();
 

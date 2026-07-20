@@ -37,13 +37,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Screenshots (opt-in)
+    | Screenshots (opt-in) — Phase 8
     |--------------------------------------------------------------------------
+    | Image bytes are stored via Laravel Storage on `disk` (keep it OUTSIDE the
+    | public directory — the default `local` disk resolves to storage/app, which
+    | is not web-accessible). Files are served only through a signed, authorized
+    | route; the filesystem path is never exposed. Set the disk to `s3` (or any
+    | configured driver) for object storage.
     */
     'screenshots' => [
         'enabled' => (bool) env('TRECK_SCREENSHOTS', false),
         'interval_seconds' => (int) env('TRECK_SCREENSHOT_INTERVAL', 600),
         'blur' => (bool) env('TRECK_SCREENSHOT_BLUR', true),
+
+        // Storage disk for image bytes (must not be publicly listable).
+        'disk' => env('TRECK_SCREENSHOT_DISK', 'local'),
+        // Path prefix within the disk.
+        'directory' => env('TRECK_SCREENSHOT_DIR', 'screenshots'),
+        // Max accepted upload size in kilobytes (validation guard).
+        'max_upload_kb' => (int) env('TRECK_SCREENSHOT_MAX_KB', 8192),
+        // Signed view-URL lifetime, in minutes.
+        'url_ttl_minutes' => (int) env('TRECK_SCREENSHOT_URL_TTL', 5),
     ],
 
     /*
@@ -54,6 +68,8 @@ return [
     'retention' => [
         'raw_heartbeat_days' => (int) env('TRECK_RAW_RETENTION', 90),
         'aggregate_days' => (int) env('TRECK_AGG_RETENTION', 730),
+        // Screenshots are pruned (row + file) after this many days (0 = keep).
+        'screenshot_days' => (int) env('TRECK_SCREENSHOT_RETENTION', 30),
     ],
 
     /*

@@ -13,6 +13,7 @@ tokenable is the `Computer` model.
 | POST | `/api/activity` | Bearer (device) | Report active/idle seconds |
 | POST | `/api/agent/logout` | Bearer (device) | Close the session (logout time) |
 | POST | `/api/agent/events` | Bearer (device) | Drain a queued heartbeat/session/app-usage event (M6, Phase 7) |
+| POST | `/api/agent/screenshots` | Bearer (device) | Drain a queued screenshot — multipart (Phase 8) |
 
 The authenticated routes require the token's `agent:report` ability
 (`ability:agent:report` middleware).
@@ -109,6 +110,44 @@ Window titles are sanitized (control characters stripped, length-bounded) on bot
 the agent and the server. See [`docs/26-application-usage.md`](26-application-usage.md)
 for the full design.
 
+### 13.1.2 `POST /api/agent/screenshots` (Phase 8)
+
+Screenshots are binary, so they use a dedicated **multipart** endpoint rather
+than the JSON events pipe — but with the **same** device auth (`agent:report`),
+the **same** offline-queue-first delivery, and the **same** idempotency
+guarantees. The agent drains one queued screenshot per request.
+
+Multipart fields:
+
+| Field | Notes |
+| ----- | ----- |
+| `image` | The compressed JPEG/PNG file (validated: image mime, size-capped). |
+| `captured_at` | ISO-8601 capture time. |
+| `monitor_number` | 0-based monitor index. |
+| `width` / `height` | Reported resolution (server re-derives via `getimagesize`). |
+| `image_hash` | SHA-256 hex (server recomputes from the bytes; client value is advisory). |
+| `active_process` / `active_window_title` | Foreground context (nullable). |
+| `session_id` | Capture-session id tying a multi-monitor set together. |
+
+Responses (both 2xx → the agent clears the queue item and deletes its temp file):
+
+| Status | Meaning |
+| ------ | ------- |
+| `201 Created` | Stored for the first time (`data.duplicate = false`) |
+| `200 OK` | Duplicate — same device + identical image hash (`data.duplicate = true`) |
+| `422` | Validation error (missing/oversize/non-image, bad field) |
+| `401` / `403` | Missing/invalid token, or token lacks `agent:report` |
+
+Duplicate detection is by a unique `(computer_id, image_hash)`; the SHA-256 is
+computed **server-side** from the actual bytes, so identical or replayed captures
+are stored once and the image file is written only for new content. The owning
+employee is resolved from the `Computer`, never the body (SEC-1).
+
+Image bytes are stored via Laravel Storage on a configurable, **non-public**
+disk and are served only through a short-lived **signed** route
+(`screenshots.image`) after an admin policy check — a filesystem path is never
+exposed. Full design: [`docs/27-screenshot-module.md`](27-screenshot-module.md).
+
 ## 13.2 Delivered files
 
 | File | Purpose |
@@ -120,6 +159,9 @@ for the full design.
 | `app/Http/Controllers/Api/Agent/EventIngestionController.php` | `events` (M6) |
 | `app/Services/Agent/AgentEventIngestionService.php` | Transactional, idempotent ingest (M6); routes `app_usage` to its projector (Phase 7) |
 | `app/Services/Presence/ApplicationUsageProjector.php` | Projects `app_usage` events into `application_usage` (Phase 7) |
+| `app/Http/Controllers/Api/Agent/ScreenshotUploadController.php` | `screenshots` (Phase 8) |
+| `app/Services/Screenshots/ScreenshotService.php` | Screenshot ingest (dedup) + read model (Phase 8) |
+| `app/Services/Screenshots/ScreenshotStorageService.php` | Disk I/O + signed view URLs (Phase 8) |
 | `app/Models/AgentEvent.php` | Stored event row (M6) |
 | `app/Http/Requests/Agent/*.php` | Validation for each endpoint |
 | `app/Models/Computer.php` | Gains `HasApiTokens` (device is the tokenable) |

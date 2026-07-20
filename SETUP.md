@@ -294,6 +294,42 @@ design: [`docs/26-application-usage.md`](docs/26-application-usage.md).
 
 ---
 
+## 7c. Screenshot module (Phase 8, opt-in)
+
+An admin-only **Screenshots** dashboard (`/screenshots`, "Screenshots" in the
+nav) shows a filterable, paginated grid of captures with a dedicated viewer
+(prev/next, zoom, full-screen, download). The Windows agent captures the desktop
+on a configurable policy (interval/jitter, active-only, per-monitor) and uploads
+completed captures through the same offline queue used for events — a dedicated
+multipart endpoint (`POST /api/agent/screenshots`) with duplicate detection by
+image hash.
+
+The feature is **disabled by default** on both sides. Enable and configure it:
+
+```bash
+# .env (server)
+TRECK_SCREENSHOTS=true
+TRECK_SCREENSHOT_DISK=local        # any non-public disk; use s3 for object storage
+TRECK_SCREENSHOT_RETENTION=30      # days to keep (0 = keep forever)
+TRECK_SCREENSHOT_URL_TTL=5         # signed view-URL lifetime (minutes)
+```
+
+Agent side: set `Screenshots.Enabled = true` (and interval/quality/ignore rules)
+in the agent's `appsettings.json`.
+
+**Storage & security:** image bytes are stored via Laravel Storage on a
+**non-public** disk (never under `public/`) and are served only through
+short-lived **signed** URLs behind an admin policy — a filesystem path is never
+exposed. Only administrators may view or download screenshots. Retention is
+enforced by `treck:prune-screenshots` (scheduled daily; deletes row + file).
+
+**Privacy:** the module captures the visible desktop image and metadata only —
+never keyboard input, mouse, clipboard or file contents — and never captures the
+Windows secure desktop (UAC / Ctrl+Alt+Del / login / lock screen). Full design:
+[`docs/27-screenshot-module.md`](docs/27-screenshot-module.md).
+
+---
+
 ## 8. Running tests
 
 ```bash
