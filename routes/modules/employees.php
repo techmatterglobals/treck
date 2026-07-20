@@ -18,10 +18,14 @@ use Illuminate\Support\Facades\Route;
 | here too if you prefer gating at the route layer.
 */
 
-Route::resource('employees', EmployeeController::class);
+// Authenticated + active users only; per-action authorization is handled by
+// EmployeePolicy via the controller's HasMiddleware `can:` gates.
+Route::middleware(['auth', 'active'])->group(function () {
+    Route::resource('employees', EmployeeController::class);
 
-Route::post('employees/{employee}/computers', [EmployeeController::class, 'assignComputer'])
-    ->name('employees.computers.assign');
+    Route::post('employees/{employee}/computers', [EmployeeController::class, 'assignComputer'])
+        ->name('employees.computers.assign');
 
-Route::delete('employees/{employee}/computers/{computer}', [EmployeeController::class, 'unassignComputer'])
-    ->name('employees.computers.unassign');
+    Route::delete('employees/{employee}/computers/{computer}', [EmployeeController::class, 'unassignComputer'])
+        ->name('employees.computers.unassign');
+});

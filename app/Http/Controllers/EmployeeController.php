@@ -12,20 +12,36 @@ use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 
-class EmployeeController extends Controller
+class EmployeeController extends Controller implements HasMiddleware
 {
     use AuthorizesRequests;
 
-    public function __construct()
+    /**
+     * Resource authorization via EmployeePolicy. Laravel 11's base controller no
+     * longer exposes an instance middleware() method (so authorizeResource() in
+     * the constructor throws "Call to undefined method ...::middleware()"); the
+     * idiomatic replacement is HasMiddleware, which registers the same per-method
+     * `can:` gates declaratively (index→viewAny, show→view, create/store→create,
+     * edit/update→update, destroy→delete). assignComputer/unassignComputer
+     * authorize in-method.
+     *
+     * @return array<int, Middleware>
+     */
+    public static function middleware(): array
     {
-        // Maps resource methods to EmployeePolicy abilities automatically
-        // (index→viewAny, show→view, create/store→create, edit/update→update,
-        // destroy→delete).
-        $this->authorizeResource(Employee::class, 'employee');
+        return [
+            new Middleware('can:viewAny,'.Employee::class, only: ['index']),
+            new Middleware('can:view,employee', only: ['show']),
+            new Middleware('can:create,'.Employee::class, only: ['create', 'store']),
+            new Middleware('can:update,employee', only: ['edit', 'update']),
+            new Middleware('can:delete,employee', only: ['destroy']),
+        ];
     }
 
     /** Listing is rendered by the Livewire table (search + pagination). */
@@ -37,7 +53,7 @@ class EmployeeController extends Controller
     public function create(): View
     {
         return view('employees.create', [
-            'employee' => new Employee(),
+            'employee' => new Employee,
             'departments' => Department::orderBy('name')->get(),
             'roles' => UserRole::cases(),
             'isCreate' => true,
