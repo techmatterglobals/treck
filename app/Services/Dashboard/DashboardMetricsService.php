@@ -2,12 +2,10 @@
 
 namespace App\Services\Dashboard;
 
-use App\Enums\ComputerStatus;
 use App\Models\ActivityLog;
-use App\Models\Computer;
 use App\Models\Department;
 use App\Models\Employee;
-use App\Services\Device\DeviceStatusService;
+use App\Services\Presence\PresenceService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -16,15 +14,14 @@ use Illuminate\Support\Facades\DB;
  * Central source for all admin-dashboard metrics. Keeps query logic out of the
  * Livewire components so they stay thin and the numbers are computed one way.
  *
- * Productivity here uses the "active ratio" proxy (active / active+idle) from
- * activity_logs; once the productivity_reports rollup lands it can read those
- * pre-aggregated rows instead without changing the component contracts.
+ * Live status/online/last-activity come from {@see PresenceService} - the single
+ * source of truth shared with the presence board and employees page - so the
+ * dashboard can never disagree with the presence page. Productivity/attendance
+ * still aggregate activity_logs.
  */
 class DashboardMetricsService
 {
-    public function __construct(private readonly DeviceStatusService $deviceStatus)
-    {
-    }
+    public function __construct(private readonly PresenceService $presence) {}
 
     // ---- Cards -------------------------------------------------------------
 
@@ -33,17 +30,13 @@ class DashboardMetricsService
         return Employee::count();
     }
 
-    /** Distinct employees with at least one currently-connected computer. */
+    /**
+     * Distinct employees with at least one online computer (Active/Idle/Locked),
+     * from the shared presence source - identical rule to the presence board.
+     */
     public function onlineEmployees(): int
     {
-        $cutoff = now()->subSeconds($this->graceSeconds());
-
-        return (int) Computer::query()
-            ->whereNotNull('employee_id')
-            ->where('status', '!=', ComputerStatus::Offline->value)
-            ->where('last_seen_at', '>=', $cutoff)
-            ->distinct()
-            ->count('employee_id');
+        return $this->presence->onlineEmployeeCount();
     }
 
     /** Present today = distinct employees with a session today. */
@@ -76,38 +69,15 @@ class DashboardMetricsService
 
     // ---- Tables ------------------------------------------------------------
 
-    /** Per-employee status + today's active/idle time. */
+    /**
+     * Per-employee live status + today's active/idle time. Delegated to the
+     * shared presence read model so status/last-activity match the presence
+     * board, and active/idle time is summed from today's heartbeat events
+     * (the agent no longer writes activity_logs).
+     */
     public function employeeStatusRows(): Collection
     {
-        return Employee::query()
-            ->with(['user', 'department', 'computers'])
-            ->withSum(
-                ['activityLogs as today_active' => fn ($q) => $q->whereDate('work_date', today())],
-                'active_seconds',
-            )
-            ->withSum(
-                ['activityLogs as today_idle' => fn ($q) => $q->whereDate('work_date', today())],
-                'idle_seconds',
-            )
-            ->orderBy('id')
-            ->get()
-            ->map(function (Employee $employee) {
-                $active = (int) ($employee->today_active ?? 0);
-                $idle = (int) ($employee->today_idle ?? 0);
-
-                return [
-                    'id' => $employee->id,
-                    'name' => $employee->name,
-                    'department' => $employee->department?->name,
-                    'status' => $this->deviceStatus->employeeStatus($employee),
-                    'active_seconds' => $active,
-                    'idle_seconds' => $idle,
-                    'active_label' => $this->hoursMinutes($active),
-                    'idle_label' => $this->hoursMinutes($idle),
-                    'active_ratio' => $this->ratio($active, $idle),
-                    'last_activity_at' => $this->deviceStatus->lastActivityAt($employee),
-                ];
-            });
+        return $this->presence->employeeRows();
     }
 
     // ---- Charts ------------------------------------------------------------
@@ -166,15 +136,5 @@ class DashboardMetricsService
         $total = $active + $idle;
 
         return $total > 0 ? round($active / $total * 100, 1) : 0.0;
-    }
-
-    private function hoursMinutes(int $seconds): string
-    {
-        return sprintf('%dh %02dm', intdiv($seconds, 3600), intdiv($seconds % 3600, 60));
-    }
-
-    private function graceSeconds(): int
-    {
-        return (int) config('treck.activity.offline_grace_seconds', 180);
     }
 }

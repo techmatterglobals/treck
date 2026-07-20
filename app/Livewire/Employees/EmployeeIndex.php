@@ -4,6 +4,7 @@ namespace App\Livewire\Employees;
 
 use App\Models\Department;
 use App\Models\Employee;
+use App\Services\Presence\PresenceService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Url;
@@ -46,12 +47,12 @@ class EmployeeIndex extends Component
         session()->flash('status', 'Employee deleted.');
     }
 
-    public function render(): View
+    public function render(PresenceService $presence): View
     {
         $this->authorize('viewAny', Employee::class);
 
         $employees = Employee::query()
-            ->with(['user', 'department'])
+            ->with(['user', 'department', 'computers.presence'])
             ->search($this->search)
             ->when($this->department, fn ($q) => $q->inDepartment($this->department))
             ->orderByDesc('id')
@@ -59,6 +60,8 @@ class EmployeeIndex extends Component
 
         return view('livewire.employees.employee-index', [
             'employees' => $employees,
+            // Shared presence source, so the badge matches the presence board.
+            'statuses' => $presence->employeeStatusMap($employees->getCollection()),
             'departments' => Department::orderBy('name')->get(),
         ]);
     }

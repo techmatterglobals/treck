@@ -134,6 +134,12 @@
                 </table>
             </div>
 
+            @if ($rows->hasPages())
+                <div class="mt-4">
+                    {{ $rows->onEachSide(1)->links() }}
+                </div>
+            @endif
+
         </div>
     </div>
 </x-app-layout>

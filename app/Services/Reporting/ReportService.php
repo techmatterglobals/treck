@@ -4,6 +4,8 @@ namespace App\Services\Reporting;
 
 use App\DataObjects\ReportFilter;
 use App\Enums\ReportPeriod;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +20,30 @@ use Illuminate\Support\Facades\DB;
  */
 class ReportService
 {
+    /** Full result set (used by exports). */
     public function build(ReportFilter $filter): Collection
+    {
+        return $this->reportQuery($filter)
+            ->get()
+            ->map(fn ($row) => $this->transform($row, $filter->period));
+    }
+
+    /**
+     * Paginated result set for the index page (default 50/page). Filters and the
+     * fixed sort are preserved: the query carries the where/order clauses and
+     * withQueryString() appends the current filters to the page links.
+     */
+    public function paginate(ReportFilter $filter, int $perPage = 50): LengthAwarePaginator
+    {
+        $paginator = $this->reportQuery($filter)->paginate($perPage)->withQueryString();
+
+        $paginator->getCollection()->transform(fn ($row) => $this->transform($row, $filter->period));
+
+        return $paginator;
+    }
+
+    /** The grouped/ordered report query, shared by build() and paginate(). */
+    private function reportQuery(ReportFilter $filter): Builder
     {
         $bucket = $this->bucketExpression($filter->period);
 
@@ -26,9 +51,11 @@ class ReportService
             ->join('employees', 'employees.id', '=', 'activity_logs.employee_id')
             ->join('users', 'users.id', '=', 'employees.user_id')
             ->leftJoin('departments', 'departments.id', '=', 'employees.department_id')
+            // Day-bounded datetimes so the range is inclusive whether work_date is
+            // stored as a pure date (MySQL DATE) or a datetime (SQLite).
             ->whereBetween('activity_logs.work_date', [
-                $filter->from->toDateString(),
-                $filter->to->toDateString(),
+                $filter->from->startOfDay()->toDateTimeString(),
+                $filter->to->endOfDay()->toDateTimeString(),
             ])
             ->when($filter->employeeId, fn ($q) => $q->where('activity_logs.employee_id', $filter->employeeId))
             ->when($filter->departmentId, fn ($q) => $q->where('employees.department_id', $filter->departmentId))
@@ -52,9 +79,37 @@ class ReportService
                 SUM(activity_logs.idle_seconds) as idle_seconds,
                 COUNT(*) as sessions,
                 COUNT(DISTINCT activity_logs.work_date) as days_present
-            ")
-            ->get()
-            ->map(fn ($row) => $this->transform($row, $filter->period));
+            ");
+    }
+
+    /**
+     * Totals across the FULL filtered range (not just the current page), for the
+     * summary line on the paginated index. `$rowCount` is the paginator total.
+     */
+    public function totalsFor(ReportFilter $filter, int $rowCount): array
+    {
+        $agg = DB::table('activity_logs')
+            ->join('employees', 'employees.id', '=', 'activity_logs.employee_id')
+            ->whereBetween('activity_logs.work_date', [
+                $filter->from->startOfDay()->toDateTimeString(),
+                $filter->to->endOfDay()->toDateTimeString(),
+            ])
+            ->when($filter->employeeId, fn ($q) => $q->where('activity_logs.employee_id', $filter->employeeId))
+            ->when($filter->departmentId, fn ($q) => $q->where('employees.department_id', $filter->departmentId))
+            ->selectRaw('COALESCE(SUM(active_seconds),0) a, COALESCE(SUM(idle_seconds),0) i')
+            ->first();
+
+        $active = (int) $agg->a;
+        $idle = (int) $agg->i;
+
+        return [
+            'active_seconds' => $active,
+            'idle_seconds' => $idle,
+            'active_hours' => round($active / 3600, 2),
+            'idle_hours' => round($idle / 3600, 2),
+            'active_ratio' => ($active + $idle) > 0 ? round($active / ($active + $idle) * 100, 1) : 0.0,
+            'rows' => $rowCount,
+        ];
     }
 
     /** Totals across all report rows, for the summary line. */
@@ -75,10 +130,22 @@ class ReportService
 
     private function bucketExpression(ReportPeriod $period): string
     {
+        $col = 'activity_logs.work_date';
+
+        // Driver-aware: MySQL uses DATE_FORMAT, SQLite uses strftime. Each format
+        // is internally consistent for grouping within its own database.
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            return match ($period) {
+                ReportPeriod::Daily => "strftime('%Y-%m-%d', {$col})",
+                ReportPeriod::Weekly => "strftime('%Y-W%W', {$col})",
+                ReportPeriod::Monthly => "strftime('%Y-%m', {$col})",
+            };
+        }
+
         return match ($period) {
-            ReportPeriod::Daily => "DATE_FORMAT(activity_logs.work_date, '%Y-%m-%d')",
-            ReportPeriod::Weekly => "DATE_FORMAT(activity_logs.work_date, '%x-W%v')",
-            ReportPeriod::Monthly => "DATE_FORMAT(activity_logs.work_date, '%Y-%m')",
+            ReportPeriod::Daily => "DATE_FORMAT({$col}, '%Y-%m-%d')",
+            ReportPeriod::Weekly => "DATE_FORMAT({$col}, '%x-W%v')",
+            ReportPeriod::Monthly => "DATE_FORMAT({$col}, '%Y-%m')",
         };
     }
 

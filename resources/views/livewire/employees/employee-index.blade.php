@@ -34,6 +34,7 @@
                     <th class="px-3 py-2">Email</th>
                     <th class="px-3 py-2">Department</th>
                     <th class="px-3 py-2">Status</th>
+                    <th class="px-3 py-2">Last seen</th>
                     <th class="px-3 py-2 text-right">Actions</th>
                 </tr>
             </thead>
@@ -45,11 +46,11 @@
                         <td class="px-3 py-2">{{ $employee->email }}</td>
                         <td class="px-3 py-2">{{ $employee->department?->name ?? '—' }}</td>
                         <td class="px-3 py-2">
-                            @if ($employee->isOnline())
-                                <span class="inline-flex items-center rounded-full bg-green-100 text-green-800 px-2 py-0.5 text-xs">Online</span>
-                            @else
-                                <span class="inline-flex items-center rounded-full bg-gray-100 text-gray-600 px-2 py-0.5 text-xs">Offline</span>
-                            @endif
+                            <x-presence-badge :status="$statuses[$employee->id]" />
+                        </td>
+                        <td class="px-3 py-2 text-gray-500">
+                            @php($lastSeen = $employee->computers->map(fn ($c) => $c->presence?->last_synced_at)->filter()->max())
+                            {{ $lastSeen?->diffForHumans() ?? '—' }}
                         </td>
                         <td class="px-3 py-2">
                             <div class="flex items-center justify-end gap-3">
@@ -66,7 +67,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-3 py-6 text-center text-gray-500">No employees found.</td>
+                        <td colspan="7" class="px-3 py-6 text-center text-gray-500">No employees found.</td>
                     </tr>
                 @endforelse
             </tbody>

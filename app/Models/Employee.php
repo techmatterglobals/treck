@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Enums\ComputerStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -141,15 +140,15 @@ class Employee extends Model
             ->first();
     }
 
-    /** Whether any of the employee's computers is currently connected. */
+    /**
+     * Whether any of the employee's computers is currently online, read from the
+     * shared presence source (Active/Idle/Locked) so it matches the presence
+     * board and dashboard exactly.
+     */
     public function isOnline(): bool
     {
         return $this->computers()
-            ->whereIn('status', [
-                ComputerStatus::Online->value,
-                ComputerStatus::Idle->value,
-                ComputerStatus::Locked->value,
-            ])
+            ->whereHas('presence', fn (Builder $q) => $q->online())
             ->exists();
     }
 }

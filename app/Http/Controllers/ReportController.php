@@ -26,12 +26,12 @@ class ReportController extends Controller
     public function index(ReportFilterRequest $request, ReportService $service): View
     {
         $filter = ReportFilter::fromArray($request->validated());
-        $rows = $service->build($filter);
+        $rows = $service->paginate($filter, 50);
 
         return view('reports.index', [
             'filter' => $filter,
             'rows' => $rows,
-            'totals' => $service->totals($rows),
+            'totals' => $service->totalsFor($filter, $rows->total()),
             'periods' => ReportPeriod::cases(),
             'employees' => Employee::with('user')->get(),
             'departments' => Department::orderBy('name')->get(),

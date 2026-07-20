@@ -49,10 +49,14 @@ class ComputerPresence extends Model
         return $this->belongsTo(Computer::class);
     }
 
-    /** Rows currently counted as "online" (Active / Idle / Locked). */
+    /**
+     * Rows currently counted as "online" (Active / Idle / Locked). The column is
+     * table-qualified so the scope is safe when joined to `computers` (which also
+     * has a `status` column).
+     */
     public function scopeOnline(Builder $query): Builder
     {
-        return $query->whereIn('status', [
+        return $query->whereIn('computer_presence.status', [
             PresenceStatus::Active->value,
             PresenceStatus::Idle->value,
             PresenceStatus::Locked->value,
