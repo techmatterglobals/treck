@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Treck.Agent.Activity;
+using Treck.Agent.Applications;
 using Treck.Agent.Configuration;
 using Treck.Agent.Offline;
 using Treck.Agent.Services;
@@ -12,11 +13,16 @@ namespace Treck.Agent;
 /// <summary>
 /// The agent's long-running background service / orchestrator.
 ///
-/// Through Milestone 4: ensures the device is registered (M2), starts the
-/// session monitor (M3) and the heartbeat scheduler (M4), and logs the events
-/// each produces. Session and heartbeat events are observed internally ONLY —
-/// nothing is sent to the API yet (that begins in M5). Screenshots and
-/// application-usage tracking are not implemented.
+/// Ensures the device is registered (M2), starts the session monitor (M3), the
+/// heartbeat scheduler (M4) and the application tracker (Phase 7), and enqueues
+/// the events each produces onto the offline queue for the SyncWorker to ship.
+/// The Worker never calls the API directly.
+///
+/// Application usage: the tracker raises ApplicationChanged (WinEvent-driven, no
+/// polling); the session manager turns that stream into completed sessions and
+/// raises SessionCompleted, which is enqueued as an app_usage event. A lock,
+/// logoff or shutdown flushes the open session so it is not lost. Screenshots and
+/// any form of input capture remain out of scope.
 /// </summary>
 public sealed class Worker : BackgroundService
 {
@@ -28,6 +34,9 @@ public sealed class Worker : BackgroundService
     private readonly IDeviceRegistrationService _registration;
     private readonly ISessionMonitor _sessionMonitor;
     private readonly IHeartbeatScheduler _heartbeatScheduler;
+    private readonly IApplicationTracker _applicationTracker;
+    private readonly IApplicationSessionManager _applicationSessions;
+    private readonly ApplicationTrackingOptions _appTrackingOptions;
     private readonly IOfflineEventStore _eventStore;
 
     public Worker(
@@ -36,6 +45,9 @@ public sealed class Worker : BackgroundService
         IDeviceRegistrationService registration,
         ISessionMonitor sessionMonitor,
         IHeartbeatScheduler heartbeatScheduler,
+        IApplicationTracker applicationTracker,
+        IApplicationSessionManager applicationSessions,
+        IOptions<ApplicationTrackingOptions> appTrackingOptions,
         IOfflineEventStore eventStore)
     {
         _logger = logger;
@@ -43,6 +55,9 @@ public sealed class Worker : BackgroundService
         _registration = registration;
         _sessionMonitor = sessionMonitor;
         _heartbeatScheduler = heartbeatScheduler;
+        _applicationTracker = applicationTracker;
+        _applicationSessions = applicationSessions;
+        _appTrackingOptions = appTrackingOptions.Value;
         _eventStore = eventStore;
     }
 
@@ -57,6 +72,17 @@ public sealed class Worker : BackgroundService
         _heartbeatScheduler.HeartbeatProduced += OnHeartbeatProduced;
         _sessionMonitor.Start();
         _heartbeatScheduler.Start();
+
+        if (_appTrackingOptions.Enabled)
+        {
+            _applicationSessions.SessionCompleted += OnApplicationSessionCompleted;
+            _applicationTracker.ApplicationChanged += OnApplicationChanged;
+            _applicationTracker.Start();
+        }
+        else
+        {
+            _logger.LogInformation("Application tracking is disabled by configuration.");
+        }
 
         try
         {
@@ -79,6 +105,15 @@ public sealed class Worker : BackgroundService
         }
         finally
         {
+            if (_appTrackingOptions.Enabled)
+            {
+                _applicationTracker.Stop();
+                _applicationTracker.ApplicationChanged -= OnApplicationChanged;
+                // Ship the session that was open when we stopped.
+                _applicationSessions.Flush(DateTimeOffset.UtcNow);
+                _applicationSessions.SessionCompleted -= OnApplicationSessionCompleted;
+            }
+
             _sessionMonitor.SessionChanged -= OnSessionChanged;
             _heartbeatScheduler.HeartbeatProduced -= OnHeartbeatProduced;
             _heartbeatScheduler.Stop();
@@ -93,11 +128,32 @@ public sealed class Worker : BackgroundService
         // M5: persist to the offline queue; the SyncWorker ships it. The Worker
         // never calls the API directly.
         Enqueue(OfflineEventKind.Session, sessionEvent, sessionEvent.TimestampUtc);
+
+        // When the desktop is no longer interactive, close the open app session
+        // so its duration stops accruing against a screen the user cannot see.
+        if (_appTrackingOptions.Enabled && sessionEvent.Type is
+            SessionEventType.Lock or SessionEventType.Logoff or SessionEventType.Shutdown)
+        {
+            _applicationSessions.Flush(sessionEvent.TimestampUtc);
+        }
     }
 
     private void OnHeartbeatProduced(object? sender, HeartbeatEvent heartbeat)
     {
         Enqueue(OfflineEventKind.Heartbeat, heartbeat, heartbeat.TimestampUtc);
+    }
+
+    private void OnApplicationChanged(object? sender, ApplicationChangedEventArgs change)
+    {
+        // Feed the foreground snapshot to the state machine; it decides whether
+        // this closes a session and/or opens a new one.
+        _applicationSessions.Track(change.Application, change.TimestampUtc);
+    }
+
+    private void OnApplicationSessionCompleted(object? sender, ApplicationUsageEvent session)
+    {
+        // Only completed sessions are transmitted.
+        Enqueue(OfflineEventKind.AppUsage, session, session.EndedAt);
     }
 
     private void Enqueue(OfflineEventKind kind, object payload, DateTimeOffset createdAtUtc)

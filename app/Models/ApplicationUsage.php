@@ -26,13 +26,16 @@ class ApplicationUsage extends Model
         'category',
         'productivity',
         'used_at',
+        'ended_at',
         'duration_seconds',
+        'session_id',
     ];
 
     protected function casts(): array
     {
         return [
             'used_at' => 'datetime',
+            'ended_at' => 'datetime',
             'productivity' => ProductivityRating::class,
         ];
     }
@@ -103,5 +106,42 @@ class ApplicationUsage extends Model
     public function scopeForEmployee(Builder $query, int $employeeId): Builder
     {
         return $query->where('employee_id', $employeeId);
+    }
+
+    /** Usage on a specific computer. */
+    public function scopeForComputer(Builder $query, int $computerId): Builder
+    {
+        return $query->where('computer_id', $computerId);
+    }
+
+    /** Usage whose start falls in an inclusive [from, to] range. */
+    public function scopeBetween(Builder $query, $from, $to): Builder
+    {
+        return $query->whereBetween('used_at', [$from, $to]);
+    }
+
+    /** Match an application/window-title search term. */
+    public function scopeMatchingApplication(Builder $query, ?string $term): Builder
+    {
+        if (blank($term)) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $q) use ($term) {
+            $q->where('application_name', 'like', "%{$term}%")
+                ->orWhere('window_title', 'like', "%{$term}%");
+        });
+    }
+
+    // ----------------------------------------------------------------
+    // Accessors
+    // ----------------------------------------------------------------
+
+    /** Session end (stored, else derived from start + duration). */
+    protected function endedAtOrDerived(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->ended_at ?? $this->used_at?->copy()->addSeconds($this->duration_seconds),
+        );
     }
 }

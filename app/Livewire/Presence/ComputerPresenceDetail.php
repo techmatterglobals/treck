@@ -7,6 +7,7 @@ use App\Enums\PresenceStatus;
 use App\Models\AgentEvent;
 use App\Models\Computer;
 use App\Services\Presence\PresenceService;
+use App\Services\Reporting\ApplicationUsageService;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
@@ -47,11 +48,17 @@ class ComputerPresenceDetail extends Component
         return app(PresenceService::class)->duration($seconds);
     }
 
-    public function render(): View
+    public function render(ApplicationUsageService $appUsage): View
     {
         $computer = Computer::query()
             ->with(['employee.department', 'presence'])
             ->findOrFail($this->computerId);
+
+        // Application usage (Phase 7): the most recent completed session is the
+        // "current" application, plus recent history and today's per-app summary.
+        $currentApp = $appUsage->currentApplication($computer);
+        $recentApps = $appUsage->recentForComputer($computer);
+        $dailyApps = $appUsage->dailySummaryForComputer($computer);
 
         $recentSessions = AgentEvent::query()
             ->where('computer_id', $computer->id)
@@ -81,6 +88,9 @@ class ComputerPresenceDetail extends Component
             'recentSessions' => $recentSessions,
             'recentHeartbeats' => $recentHeartbeats,
             'sessionSeconds' => $sessionSeconds,
+            'currentApp' => $currentApp,
+            'recentApps' => $recentApps,
+            'dailyApps' => $dailyApps,
         ]);
     }
 }

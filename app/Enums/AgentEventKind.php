@@ -4,14 +4,15 @@ namespace App\Enums;
 
 /**
  * The kinds of events the desktop agent drains from its offline queue into
- * `agent_events` (M6). Deliberately narrow: only the telemetry the agent
- * currently produces — periodic activity heartbeats and Windows session
- * transitions. Screenshots / application-usage are out of scope for M6.
+ * `agent_events`. Periodic activity heartbeats and Windows session transitions
+ * (M6), plus completed application-usage sessions (Phase 7). Screenshots remain
+ * out of scope.
  */
 enum AgentEventKind: string
 {
     case Heartbeat = 'heartbeat';
     case Session = 'session';
+    case AppUsage = 'app_usage';
 
     /** All values — handy for validation rules. */
     public static function values(): array

@@ -269,6 +269,31 @@ Tune the timeout with `TRECK_PRESENCE_OFFLINE_TIMEOUT` (seconds, default 180).
 
 ---
 
+## 7b. Application usage dashboard (Phase 7)
+
+An admin-only dashboard at **`/application-usage`** ("App Usage" in the nav)
+reports which applications employees use and for how long: summary totals, top
+applications, a daily timeline, per-employee and per-department breakdowns, and a
+searchable recent-sessions table (filter by employee / computer / department /
+application / date range). The computer details page (`/presence/computers/{id}`)
+also shows the current application, window title, current app duration, recent app
+history and today's top applications.
+
+The Windows agent tracks the foreground application with WinEvent hooks (no
+polling) and uploads **completed usage sessions** through the same offline queue
+and `POST /api/agent/events` endpoint used for heartbeats — a new `app_usage`
+event kind projected into the `application_usage` table (idempotent per session).
+No configuration is required for the dashboard; agent tracking is toggled by the
+`ApplicationTracking` section of the agent's `appsettings.json` (enabled by
+default, with configurable ignore rules).
+
+**Privacy:** only usage *metadata* (process, executable, sanitized window title,
+timestamps, duration) is ever collected — never keystrokes, mouse input,
+clipboard, screen contents, file contents, browser history or typed text. Full
+design: [`docs/26-application-usage.md`](docs/26-application-usage.md).
+
+---
+
 ## 8. Running tests
 
 ```bash

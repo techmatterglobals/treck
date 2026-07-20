@@ -709,3 +709,101 @@ wants self-describing session payloads, adding a `JsonStringEnumConverter` to th
 agent's serializer is the minimal change - but it is not required for Phase 6.
 
 Full design: [`docs/25-realtime-presence.md`](25-realtime-presence.md).
+
+---
+
+## Phase 7 — Application Usage Tracking ✅ (written; build requires Windows)
+
+The agent now tracks which foreground application is in use and uploads
+**completed usage sessions** through the existing offline queue + `/api/agent/events`
+pipeline (a new `app_usage` event kind). No new sync infrastructure was added.
+
+> **Build note.** These files target `net8.0-windows` and use Win32 APIs
+> (`SetWinEventHook`, `GetForegroundWindow`, …). They compile and run on Windows
+> only; this repository's Linux CI environment has no Windows .NET SDK, so the
+> Phase 7 agent code is delivered **written and unit-test-designed but not built
+> here**. The platform-agnostic state machine (`ApplicationSessionManager`) is
+> covered by xUnit tests that run on any OS.
+
+### Architecture
+
+- **`WindowsActiveWindowService`** (`IActiveWindowService`) reads the foreground
+  window on demand: `GetForegroundWindow` → `GetWindowThreadProcessId` →
+  `GetWindowText`, plus the managed `Process` for the friendly name/executable.
+  It reads window/process **identity only** and sanitizes the title.
+- **`WindowsApplicationTracker`** (`IApplicationTracker`) installs two
+  `SetWinEventHook` hooks — `EVENT_SYSTEM_FOREGROUND` and `EVENT_OBJECT_NAMECHANGE`
+  — on a dedicated message-pump thread. Both fire the instant focus or the window
+  title changes, so there is **no polling** and idle CPU is negligible. Each
+  notification raises `ApplicationChanged`.
+- **`ApplicationSessionManager`** (`IApplicationSessionManager`) is the
+  platform-agnostic state machine. It keeps at most one open session and turns
+  the change stream into completed sessions: a different process **or** a
+  different window title closes the open session and opens a new one; a null or
+  ignored app closes the open session and opens nothing.
+- **`Worker`** wires them together: `ApplicationChanged → Track(...)`,
+  `SessionCompleted → enqueue(app_usage)`. A `Lock`/`Logoff`/`Shutdown` session
+  event (and agent stop) **flushes** the open session so nothing is lost.
+
+Configurable ignore rules (`ApplicationTracking` section) exclude shell/system
+surfaces (`explorer.exe`, `SearchHost.exe`, `LockApp.exe`,
+`ShellExperienceHost.exe`, `System`, `Idle`, …). A minimum-duration filter drops
+rapid Alt-Tab flicker.
+
+### Folders added
+
+```
+agent/Applications/
+├── ApplicationInfo.cs               # foreground snapshot (metadata only)
+├── ApplicationChangedEventArgs.cs   # Events/ApplicationChanged
+├── ApplicationUsageEvent.cs         # completed session (uploaded payload)
+├── IActiveWindowService.cs
+├── WindowsActiveWindowService.cs    # Win32 foreground reader
+├── IApplicationTracker.cs
+├── WindowsApplicationTracker.cs     # WinEvent hooks + message pump (no polling)
+├── IApplicationSessionManager.cs
+├── ApplicationSessionManager.cs     # session state machine (unit-tested)
+└── ApplicationTrackingOptions.cs    # ignore rules, minimums, limits
+agent/tests/Treck.Agent.Tests/
+└── ApplicationSessionManagerTests.cs
+```
+
+Also modified: `Offline/OfflineEvent.cs` (adds `OfflineEventKind.AppUsage`),
+`Sync/AgentEventUploader.cs` (maps `AppUsage → "app_usage"`), `Worker.cs`,
+`Program.cs` (DI + options), `appsettings.json`.
+
+### Session lifecycle (state machine)
+
+```
+                  foreground change / title change
+   ┌─────────┐   ───────────────────────────────▶   ┌──────────────┐
+   │  none   │                                       │ open session │
+   └─────────┘   ◀───────────────────────────────   └──────────────┘
+        ▲          null / ignored app / flush            │
+        │            (emit completed session)            │ same app+title
+        └────────────────────────────────────────────────┘  (no-op)
+```
+
+Only a **completed** session is emitted (and only if it meets the minimum
+duration); the currently-open session is never transmitted.
+
+### How to test (on Windows)
+
+1. Run the agent as a console app; switch between a few applications and browser
+   tabs. Logs show `App session: <process> "<title>" for <n>s.` each time you
+   move on.
+2. Server: `php artisan tinker --execute="echo App\Models\ApplicationUsage::whereNotNull('session_id')->count();"`
+   rises as sessions arrive.
+3. Go offline, keep switching apps, come back — sessions queue locally and drain
+   with the next sync cycle; none are lost.
+4. `dotnet test agent/tests` runs `ApplicationSessionManagerTests` (OS-agnostic).
+
+### Definition of done
+
+- Event-driven detection (WinEvent hooks), **no busy polling**.
+- Completed **sessions** only; window-title change starts a new session.
+- Reuses the offline queue + `/api/agent/events`; idempotent per session.
+- Configurable ignore rules; privacy-preserving (metadata only).
+- Session state machine unit-tested.
+
+Full design: [`docs/26-application-usage.md`](26-application-usage.md).

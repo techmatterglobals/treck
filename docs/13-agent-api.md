@@ -12,7 +12,7 @@ tokenable is the `Computer` model.
 | POST | `/api/agent/login` | Bearer (device) | Open a PC session (login time) |
 | POST | `/api/activity` | Bearer (device) | Report active/idle seconds |
 | POST | `/api/agent/logout` | Bearer (device) | Close the session (logout time) |
-| POST | `/api/agent/events` | Bearer (device) | Drain a queued heartbeat/session event (M6) |
+| POST | `/api/agent/events` | Bearer (device) | Drain a queued heartbeat/session/app-usage event (M6, Phase 7) |
 
 The authenticated routes require the token's `agent:report` ability
 (`ability:agent:report` middleware).
@@ -20,20 +20,27 @@ The authenticated routes require the token's `agent:report` ability
 ### 13.1.1 `POST /api/agent/events` (M6)
 
 The landing endpoint for the agent's **offline queue**. The agent batches
-heartbeat and session events into a local SQLite queue and drains them here; the
-server stores each event transactionally and only then acknowledges, which is
-the signal the agent uses to delete its local copy.
+heartbeat, session and application-usage events into a local SQLite queue and
+drains them here; the server stores each event transactionally and only then
+acknowledges, which is the signal the agent uses to delete its local copy.
 
 Request body (snake_case, matching `Treck.Agent.Models.OfflineEventPayload`):
 
 ```json
 {
-  "kind": "heartbeat",              // or "session"
+  "kind": "heartbeat",              // or "session" or "app_usage"
   "idempotency_key": "a1b2c3…",     // agent-generated, unique per device
   "created_at": "2026-07-16T09:00:00Z",
   "payload": "{\"ElapsedSeconds\":60,\"ActiveSeconds\":50,\"IdleSeconds\":10}"
 }
 ```
+
+The valid `kind` values are the single source of truth in
+`App\Enums\AgentEventKind` (`heartbeat`, `session`, `app_usage`) and are
+validated on every request; an unknown kind is rejected with `422` before
+anything is written. (The `agent_events.kind` column is a plain string — see
+migration `2026_07_18_000002_relax_agent_events_kind_to_string` — so new kinds
+need no schema change.)
 
 `payload` is the opaque event body as a JSON **string**; it is stored verbatim
 (decoded into a JSON column) for later projection into the domain tables.
@@ -68,6 +75,40 @@ read for `IsIdle` (Active/Idle) and idle seconds; session payloads for `Type`
 `SessionEventType` ordinal so the agent needs no change. See
 [`docs/25-realtime-presence.md`](25-realtime-presence.md) for the full design.
 
+#### Application-usage projection (Phase 7)
+
+`app_usage` events carry a **completed** foreground session (never per-second
+samples). They do **not** affect presence and are not broadcast; instead they are
+routed to `ApplicationUsageProjector`, which writes one `application_usage` row
+per `(computer_id, SessionId)` — idempotent on top of the `agent_events` dedup.
+
+```
+store agent_events  ->  project into application_usage  (one row per session)
+```
+
+The payload uses PascalCase keys (read case-tolerantly):
+
+```json
+{
+  "SessionId": "9f2c…",            // GUID; the per-session idempotency key
+  "ProcessName": "Visual Studio Code",
+  "ExecutableName": "Code.exe",
+  "WindowTitle": "ApplicationUsage.php — treck",
+  "ProcessId": 4321,
+  "StartedAt": "2026-07-20T09:00:00Z",
+  "EndedAt": "2026-07-20T09:05:00Z",
+  "DurationSeconds": 300,
+  "UserSession": 1,
+  "IsSystemProcess": false
+}
+```
+
+Only usage **metadata** is ever accepted or stored — never keystrokes, mouse
+input, clipboard, screen contents, file contents, browser history or typed text.
+Window titles are sanitized (control characters stripped, length-bounded) on both
+the agent and the server. See [`docs/26-application-usage.md`](26-application-usage.md)
+for the full design.
+
 ## 13.2 Delivered files
 
 | File | Purpose |
@@ -77,7 +118,8 @@ read for `IsIdle` (Active/Idle) and idle seconds; session payloads for `Type`
 | `app/Http/Controllers/Api/Agent/WorkSessionController.php` | `login`, `logout` |
 | `app/Http/Controllers/Api/Agent/ActivityController.php` | `activity` |
 | `app/Http/Controllers/Api/Agent/EventIngestionController.php` | `events` (M6) |
-| `app/Services/Agent/AgentEventIngestionService.php` | Transactional, idempotent ingest (M6) |
+| `app/Services/Agent/AgentEventIngestionService.php` | Transactional, idempotent ingest (M6); routes `app_usage` to its projector (Phase 7) |
+| `app/Services/Presence/ApplicationUsageProjector.php` | Projects `app_usage` events into `application_usage` (Phase 7) |
 | `app/Models/AgentEvent.php` | Stored event row (M6) |
 | `app/Http/Requests/Agent/*.php` | Validation for each endpoint |
 | `app/Models/Computer.php` | Gains `HasApiTokens` (device is the tokenable) |

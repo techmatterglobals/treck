@@ -27,6 +27,9 @@ class ApplicationUsageFactory extends Factory
     {
         [$name, $exe, $category, $rating] = fake()->randomElement(self::APPS);
 
+        $usedAt = fake()->dateTimeBetween('-14 days', 'now');
+        $duration = fake()->numberBetween(300, 3600);
+
         return [
             'employee_id' => Employee::factory(),
             'computer_id' => Computer::factory(),
@@ -36,8 +39,10 @@ class ApplicationUsageFactory extends Factory
             'window_title' => fake()->sentence(4),
             'category' => $category,
             'productivity' => $rating,
-            'used_at' => fake()->dateTimeBetween('-14 days', 'now'),
-            'duration_seconds' => fake()->numberBetween(300, 3600),
+            'used_at' => $usedAt,
+            'ended_at' => (clone $usedAt)->modify("+{$duration} seconds"),
+            'duration_seconds' => $duration,
+            'session_id' => (string) fake()->uuid(),
         ];
     }
 }

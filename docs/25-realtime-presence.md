@@ -224,3 +224,13 @@ php artisan test tests/Unit/Presence tests/Feature/Presence
   are already handled.
 - Presence is per-computer. An employee-level roll-up (most-active across their
   machines) already exists in `DeviceStatusService` and is not duplicated here.
+
+## 25.9 Phase 7 extension — application usage on the details page
+
+The computer details page (`ComputerPresenceDetail`) gained an **Application
+usage** section in Phase 7: the current application, current window title,
+current app duration, recent application history, and today's top applications.
+These read from the `application_usage` table via `ApplicationUsageService`
+(indexed scopes, never a history scan) and render alongside the existing presence
+panels. The presence projection itself is unchanged — `app_usage` events do not
+affect presence. Full design: [`docs/26-application-usage.md`](26-application-usage.md).

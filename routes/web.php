@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\UserRoleController;
+use App\Http\Controllers\ApplicationUsageController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PresenceController;
 use Illuminate\Support\Facades\Route;
@@ -19,6 +20,9 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::middleware('role:admin')->group(function () {
         Route::get('/presence', [PresenceController::class, 'index'])->name('presence.index');
         Route::get('/presence/computers/{computer}', [PresenceController::class, 'show'])->name('presence.show');
+
+        // Admin-only application usage dashboard (Phase 7).
+        Route::get('/application-usage', [ApplicationUsageController::class, 'index'])->name('application-usage.index');
     });
 });
 

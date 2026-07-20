@@ -4,6 +4,7 @@ public enum OfflineEventKind
 {
     Heartbeat,
     Session,
+    AppUsage,
 }
 
 /// <summary>

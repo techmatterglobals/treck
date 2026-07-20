@@ -32,7 +32,7 @@ public sealed class AgentEventUploader : IEventUploader
         var token = await _registration.EnsureRegisteredAsync(cancellationToken);
 
         var payload = new OfflineEventPayload(
-            Kind: offlineEvent.Kind.ToString().ToLowerInvariant(),
+            Kind: ToWireKind(offlineEvent.Kind),
             IdempotencyKey: offlineEvent.IdempotencyKey,
             CreatedAt: offlineEvent.CreatedAtUtc,
             Payload: offlineEvent.PayloadJson);
@@ -48,4 +48,17 @@ public sealed class AgentEventUploader : IEventUploader
             return false; // retried next cycle with the fresh token
         }
     }
+
+    /// <summary>
+    /// Map the offline kind to the server's wire vocabulary
+    /// (<see cref="Treck.Agent.Offline.OfflineEventKind"/> → AgentEventKind).
+    /// AppUsage needs an explicit mapping because its wire value is snake_case.
+    /// </summary>
+    private static string ToWireKind(OfflineEventKind kind) => kind switch
+    {
+        OfflineEventKind.Heartbeat => "heartbeat",
+        OfflineEventKind.Session => "session",
+        OfflineEventKind.AppUsage => "app_usage",
+        _ => kind.ToString().ToLowerInvariant(),
+    };
 }

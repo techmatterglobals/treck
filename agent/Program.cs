@@ -8,6 +8,7 @@ using Serilog;
 using Treck.Agent;
 using Treck.Agent.Activity;
 using Treck.Agent.Api;
+using Treck.Agent.Applications;
 using Treck.Agent.Configuration;
 using Treck.Agent.Offline;
 using Treck.Agent.Security;
@@ -72,6 +73,10 @@ try
         .Bind(builder.Configuration.GetSection(OfflineStoreOptions.SectionName))
         .ValidateDataAnnotations();
 
+    builder.Services.AddOptions<ApplicationTrackingOptions>()
+        .Bind(builder.Configuration.GetSection(ApplicationTrackingOptions.SectionName))
+        .ValidateDataAnnotations();
+
     // --- Session detection (event-driven, no polling) ---
     builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddSingleton<ISessionMonitor, WindowsSessionMonitor>();
@@ -79,6 +84,11 @@ try
     // --- Idle detection + heartbeat scheduler (no API involvement) ---
     builder.Services.AddSingleton<IIdleDetector, WindowsIdleDetector>();
     builder.Services.AddSingleton<IHeartbeatScheduler, HeartbeatScheduler>();
+
+    // --- Application usage tracking (Phase 7; WinEvent-driven, no polling) ---
+    builder.Services.AddSingleton<IActiveWindowService, WindowsActiveWindowService>();
+    builder.Services.AddSingleton<IApplicationSessionManager, ApplicationSessionManager>();
+    builder.Services.AddSingleton<IApplicationTracker, WindowsApplicationTracker>();
 
     // --- Storage / security ---
     builder.Services.AddSingleton<IStoragePathProvider, StoragePathProvider>();

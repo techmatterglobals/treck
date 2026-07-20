@@ -8,6 +8,7 @@ use App\Enums\PresenceStatus;
 use App\Models\AgentEvent;
 use App\Models\Computer;
 use App\Models\ComputerPresence;
+use App\Services\Presence\ApplicationUsageProjector;
 use App\Services\Presence\PresenceBroadcaster;
 use App\Services\Presence\PresenceProjector;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -37,13 +38,16 @@ use Illuminate\Support\Facades\DB;
  * accurate now that the agent only calls /register and /events (it no longer
  * hits the old login/activity/logout endpoints that used to call markSeen).
  *
- * It still adds no screenshots, application tracking, or attendance aggregates.
+ * `app_usage` events (Phase 7) are routed to the ApplicationUsageProjector
+ * instead of the presence projector (they do not change presence and are not
+ * broadcast). No screenshots or attendance aggregates are produced here.
  */
 class AgentEventIngestionService
 {
     public function __construct(
         private readonly PresenceProjector $projector,
         private readonly PresenceBroadcaster $broadcaster,
+        private readonly ApplicationUsageProjector $appUsageProjector,
     ) {}
 
     /**
@@ -74,10 +78,20 @@ class AgentEventIngestionService
             // and history never diverge.
             [$event, $presence] = DB::transaction(function () use ($attributes, $values, $computer) {
                 $event = AgentEvent::firstOrCreate($attributes, $values);
-                $presence = $event->wasRecentlyCreated ? $this->projector->project($event) : null;
+                $presence = null;
 
-                if ($presence !== null) {
-                    $this->mirrorLiveness($computer, $presence);
+                if ($event->wasRecentlyCreated) {
+                    if ($event->kind === AgentEventKind::AppUsage) {
+                        // Application usage does not affect presence; project it
+                        // into application_usage only (Phase 7).
+                        $this->appUsageProjector->project($event);
+                    } else {
+                        $presence = $this->projector->project($event);
+
+                        if ($presence !== null) {
+                            $this->mirrorLiveness($computer, $presence);
+                        }
+                    }
                 }
 
                 return [$event, $presence];
