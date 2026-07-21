@@ -84,7 +84,12 @@ public sealed class WindowsScreenshotCaptureService : IScreenshotCaptureService
     [DllImport("user32.dll", SetLastError = true)]
     private static extern IntPtr OpenInputDesktop(uint dwFlags, bool fInherit, uint dwDesiredAccess);
 
-    [DllImport("user32.dll", SetLastError = true)]
+    // Must be the Unicode (W) variant: ReadDesktopName decodes the returned bytes
+    // as UTF-16. Without CharSet.Unicode the default (Ansi) binds to
+    // GetUserObjectInformationA, whose ANSI bytes decode to garbage — so the
+    // desktop name never equals "Default" and capture is wrongly reported
+    // UNAVAILABLE even in the interactive session.
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "GetUserObjectInformationW")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetUserObjectInformation(IntPtr hObj, int nIndex, byte[]? pvInfo, uint nLength, out uint lpnLengthNeeded);
 
