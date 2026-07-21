@@ -171,6 +171,7 @@ try
             Environment.UserName, System.Diagnostics.Process.GetCurrentProcess().SessionId, Environment.ProcessId);
 
         builder.Services.AddSingleton(new AgentRuntime { CollectInteractiveInProcess = false });
+        builder.Services.AddSingleton(EventSource.Current(EventSource.InteractiveHelper, "TreckAgent(helper)"));
         builder.Services.AddSingleton<IAgentEventSpool, FileAgentEventSpool>();
         builder.Services.AddSingleton<IScreenshotSink, SpoolScreenshotSink>();
         builder.Services.AddHostedService<ScreenshotWorker>();
@@ -183,6 +184,7 @@ try
         // interactive collection (screenshots + foreground + idle) to a helper it
         // launches into the active session, and ingest the helper's spool.
         builder.Services.AddSingleton(new AgentRuntime { CollectInteractiveInProcess = false });
+        builder.Services.AddSingleton(EventSource.Current(EventSource.Service, "TreckAgent(service)"));
         builder.Services.AddHostedService<SyncWorker>();
         builder.Services.AddHostedService<Worker>();
         builder.Services.AddHostedService<ScreenshotHelperSupervisor>();
@@ -192,6 +194,7 @@ try
     {
         // Console/dev: already interactive → collect + capture in-process.
         builder.Services.AddSingleton(new AgentRuntime { CollectInteractiveInProcess = true });
+        builder.Services.AddSingleton(EventSource.Current(EventSource.Service, "TreckAgent(console)"));
         builder.Services.AddSingleton<IScreenshotSink, OfflineQueueScreenshotSink>();
         builder.Services.AddHostedService<SyncWorker>();
         builder.Services.AddHostedService<Worker>();

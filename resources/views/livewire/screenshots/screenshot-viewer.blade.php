@@ -71,6 +71,17 @@
                     <dt class="text-gray-500 dark:text-gray-400">File size</dt>
                     <dd class="font-medium tabular-nums">{{ number_format($screenshot->file_size / 1024, 1) }} KB</dd>
                 </div>
+                @if ($screenshot->collection_mode)
+                    <div>
+                        <dt class="text-gray-500 dark:text-gray-400">Collected via</dt>
+                        <dd class="font-medium">
+                            {{ $screenshot->collection_mode }}
+                            <span class="text-gray-500">
+                                (session {{ $screenshot->source_session_id ?? '—' }}{{ $screenshot->source_user ? ', '.$screenshot->source_user : '' }})
+                            </span>
+                        </dd>
+                    </div>
+                @endif
             </dl>
 
             <a href="{{ route('screenshots.download', $screenshot) }}"

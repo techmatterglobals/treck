@@ -7,6 +7,8 @@ using Treck.Agent.Configuration;
 
 namespace Treck.Agent.Screenshots;
 
+// Phase 8 #3: captures are stamped with the collecting EventSource before submit.
+
 /// <summary>
 /// Hosted background service that drives screenshot capture (Phase 8) on its own
 /// cadence, independent of the heartbeat/presence/app-tracking loops so it never
@@ -37,6 +39,7 @@ public sealed class ScreenshotWorker : BackgroundService
     private readonly IActiveWindowService _activeWindow;
     private readonly IIdleDetector _idleDetector;
     private readonly IScreenshotSink _sink;
+    private readonly EventSource _source;
 
     public ScreenshotWorker(
         ILogger<ScreenshotWorker> logger,
@@ -46,7 +49,8 @@ public sealed class ScreenshotWorker : BackgroundService
         IScreenshotProcessingService processing,
         IActiveWindowService activeWindow,
         IIdleDetector idleDetector,
-        IScreenshotSink sink)
+        IScreenshotSink sink,
+        EventSource source)
     {
         _logger = logger;
         _options = options.Value;
@@ -56,6 +60,7 @@ public sealed class ScreenshotWorker : BackgroundService
         _activeWindow = activeWindow;
         _idleDetector = idleDetector;
         _sink = sink;
+        _source = source;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -146,6 +151,14 @@ public sealed class ScreenshotWorker : BackgroundService
 
                 if (metadata is not null)
                 {
+                    // Stamp where this capture was collected (Phase 8 #3).
+                    metadata = metadata with
+                    {
+                        SourceSessionId = _source.SessionId,
+                        SourceUser = _source.User,
+                        SourceProcess = _source.Process,
+                        CollectionMode = _source.CollectionMode,
+                    };
                     Submit(metadata);
                     queued++;
                 }

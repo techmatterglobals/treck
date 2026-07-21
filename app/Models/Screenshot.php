@@ -39,6 +39,10 @@ class Screenshot extends Model
         'active_process',
         'active_window_title',
         'session_id',
+        'source_session_id',
+        'source_user',
+        'source_process',
+        'collection_mode',
     ];
 
     protected function casts(): array
@@ -49,6 +53,7 @@ class Screenshot extends Model
             'width' => 'integer',
             'height' => 'integer',
             'file_size' => 'integer',
+            'source_session_id' => 'integer',
         ];
     }
 

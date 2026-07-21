@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Treck.Agent.Activity;
+using Treck.Agent.Configuration;
 using Treck.Agent.Offline;
 
 namespace Treck.Agent.Spooling;
@@ -22,15 +23,18 @@ public sealed class HeartbeatSpoolForwarder : IHostedService
     private readonly ILogger<HeartbeatSpoolForwarder> _logger;
     private readonly IHeartbeatScheduler _scheduler;
     private readonly IAgentEventSpool _spool;
+    private readonly EventSource _source;
 
     public HeartbeatSpoolForwarder(
         ILogger<HeartbeatSpoolForwarder> logger,
         IHeartbeatScheduler scheduler,
-        IAgentEventSpool spool)
+        IAgentEventSpool spool,
+        EventSource source)
     {
         _logger = logger;
         _scheduler = scheduler;
         _spool = spool;
+        _source = source;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -52,7 +56,7 @@ public sealed class HeartbeatSpoolForwarder : IHostedService
     {
         try
         {
-            var json = JsonSerializer.Serialize(heartbeat);
+            var json = SourceStamp.Apply(JsonSerializer.Serialize(heartbeat), _source);
             _spool.Submit(OfflineEvent.Create(OfflineEventKind.Heartbeat, json, heartbeat.TimestampUtc));
         }
         catch (Exception ex)

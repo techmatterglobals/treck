@@ -239,6 +239,10 @@ Capture ─▶ Compress ─▶ Queue ─▶ Synchronize ─▶ Delete local temp
 | `file_size` | big uint | Compressed byte size. |
 | `active_process` / `active_window_title` | string, nullable | Foreground context. |
 | `session_id` | string(64), nullable | Capture-session id. |
+| `source_session_id` | uint, nullable | Windows session the capture was collected in (#3). |
+| `source_user` | string, nullable | User the collector ran as. |
+| `source_process` | string, nullable | Collector label (e.g. `TreckAgent(helper)`). |
+| `collection_mode` | string(32), nullable | `InteractiveHelper` or `Service`. |
 | `timestamps` | | |
 
 Constraints added (`2026_07_19_000001_add_capture_columns_to_screenshots`):
@@ -422,6 +426,150 @@ test coverage. The agent follows the established architecture (interfaces, DI,
 options, hosted service) and reuses the proven offline/sync path; it requires a
 **Windows build + on-device smoke test** before rollout — the one step this
 environment cannot perform.
+
+## 27.14 Event source metadata (debugging)
+
+Every forwarded event is stamped with WHERE it was collected, so the backend can
+confirm it came from the interactive helper and not session 0:
+
+| Field | Meaning |
+| ----- | ------- |
+| `SourceSessionId` | Windows session the collector ran in (0 = service). |
+| `SourceUser` | User the collector ran as. |
+| `SourceProcess` | Collector label, e.g. `TreckAgent(helper)`. |
+| `CollectionMode` | `InteractiveHelper` or `Service`. |
+
+- **Screenshots** carry these as multipart fields → stored on `screenshots`
+  columns (`source_session_id`, `source_user`, `source_process`,
+  `collection_mode`) and shown in the viewer ("Collected via …").
+- **Heartbeat / app_usage / session** events carry them folded into the event
+  payload JSON (via `SourceStamp`), visible in `agent_events.payload` — e.g.
+  `App\Models\AgentEvent::latest()->first()->payload['CollectionMode']`.
+
+A healthy deployment shows `CollectionMode = InteractiveHelper` and a non-zero
+`SourceSessionId` for screenshots, app-usage and heartbeats.
+
+## 27.15 No duplicate collection (single-collector guarantee)
+
+When the agent runs as a Windows service, interactive collection happens **only**
+in the helper — never twice. This is structural, not conventional:
+
+- The service registers `AgentRuntime { CollectInteractiveInProcess = false }`, so
+  the `Worker` skips the heartbeat scheduler and the application tracker entirely
+  (it starts only the session monitor + registration + sync). It logs
+  *"Interactive collection delegated to the capture helper (session-0 service)."*
+- `ScreenshotWorker` is **not** hosted in service mode (only
+  `ScreenshotHelperSupervisor` + `AgentEventSpoolWorker` are), so the service
+  never captures.
+- The helper process registers the collectors (`ScreenshotWorker`,
+  `HeartbeatSpoolForwarder`, `ApplicationUsageSpoolForwarder`) and never runs
+  `SyncWorker`/registration.
+
+So in service mode: **ScreenshotWorker does not capture, ApplicationSessionManager
+does not track, the idle/heartbeat collector does not run** — the service only
+ingests the helper's spool and syncs. `CollectionMode` in the data confirms this
+at a glance.
+
+## 27.16 Build verification (Windows)
+
+The agent targets `net8.0-windows` and cannot be built in the Linux CI here, so
+build verification is a manual gate on a Windows host with the .NET 8 SDK:
+
+```powershell
+cd agent
+dotnet restore
+dotnet build -c Release            # must compile clean (TreatWarningsAsErrors=true)
+dotnet test  tests                 # ScreenshotSyncServiceTests + AgentEventSpoolTests (OS-agnostic)
+dotnet publish -c Release -r win-x64 --self-contained false -o publish
+```
+
+Confirm:
+
+- [ ] Solution compiles under `net8.0-windows` with no warnings (warnings are errors).
+- [ ] The new P/Invokes resolve and marshal — `WTSGetActiveConsoleSessionId`,
+      `WTSQueryUserToken`, `WTSQuerySessionInformation`, `DuplicateTokenEx`,
+      `CreateEnvironmentBlock`, `CreateProcessAsUser`, plus the capture/DPI
+      imports — i.e. the build has no `DllImport`/marshalling errors.
+- [ ] `publish\TreckAgent.exe` is produced and runs as a service (`--capture-helper`
+      / `--capture-helper-test` modes are the same executable).
+
+## 27.17 Deployment verification checklist
+
+- [ ] Service starts as `LocalSystem` (`Get-Service TreckAgent` → Running).
+- [ ] Service detects the active console session (log: *"Capture helper launched:
+      session=… user=… pid=…"*).
+- [ ] Service launches `--capture-helper` into the interactive session (a
+      `TreckAgent` process appears in session 1 as the logged-in user).
+- [ ] Helper confirms, in `treck-agent-helper-*.jsonl`:
+  - [ ] username + session id (*"Starting in capture-helper mode: user=… session=…"*)
+  - [ ] desktop `winsta0\default` (from the launcher log)
+  - [ ] write access to `%ProgramData%\TreckAgent\helper` (*"Spool directory is writable"*)
+- [ ] Screenshot self-test succeeds (`--capture-helper-test` → exit 0).
+- [ ] Foreground / app-tracking events arrive with `CollectionMode = InteractiveHelper`.
+- [ ] Idle / heartbeat events arrive with `CollectionMode = InteractiveHelper`.
+- [ ] The service's `SyncWorker` uploads helper-generated events (server row counts rise).
+
+## 27.18 End-to-end Windows test procedure
+
+Run in an elevated PowerShell on the agent host, logged in as a normal user:
+
+```powershell
+# 1. Validate capture in isolation (no service, no upload)
+Stop-Service TreckAgent
+& "C:\Program Files\TreckAgent\TreckAgent.exe" --capture-helper-test
+#   → exits 0 and logs a per-monitor report to
+#     $env:ProgramData\TreckAgent\logs\treck-agent-selftest-*.jsonl
+
+# 2. Start the service and let a capture cycle elapse
+Start-Service TreckAgent
+Start-Sleep -Seconds 120
+```
+
+Verify on the agent host:
+
+```powershell
+# Helper logs — launch + capture + collection running
+Get-Content "$env:ProgramData\TreckAgent\logs\treck-agent-helper-*.jsonl" -Tail 40
+Get-Content "$env:ProgramData\TreckAgent\logs\treck-agent-*.jsonl" -Tail 40 |
+  Select-String "Capture helper launched"
+
+# Spool files draining (transient — should trend to empty as the service ingests)
+Get-ChildItem "$env:ProgramData\TreckAgent\helper\spool" -ErrorAction SilentlyContinue
+Get-ChildItem "$env:ProgramData\TreckAgent\helper\screenshots" -ErrorAction SilentlyContinue
+```
+
+Verify on the server (Laravel host):
+
+```bash
+# Uploaded events, by collection source (heartbeat / app_usage / session)
+php artisan tinker --execute="\$e = App\Models\AgentEvent::latest()->first(); echo \$e->kind->value.' '.(\$e->payload['CollectionMode'] ?? 'n/a').' session='.(\$e->payload['SourceSessionId'] ?? 'n/a');"
+
+# Screenshot records with their collection source
+php artisan tinker --execute="\$s = App\Models\Screenshot::whereNotNull('image_hash')->latest()->first(); echo \$s ? (\$s->collection_mode.' session='.\$s->source_session_id.' user='.\$s->source_user) : 'none';"
+
+# Totals
+php artisan tinker --execute="echo 'screenshots='.App\Models\Screenshot::whereNotNull('image_hash')->count().' app_usage='.App\Models\AgentEvent::where('kind','app_usage')->count();"
+```
+
+Healthy result: helper logs show launch + "Capture cycle complete"; spool
+directories trend empty; server counts rise; and every helper-sourced row shows
+`CollectionMode = InteractiveHelper` with a non-zero `SourceSessionId`.
+
+## 27.19 Heartbeat semantics & future device-online heartbeat
+
+With Phase 8, the heartbeat is produced by the interactive helper, so it now
+represents **interactive user presence**: heartbeats flow while a user is logged
+in (active or idle/locked) and stop when no one is logged in — at which point the
+device presents as offline. This is the intended, accepted semantics.
+
+**Future option (not implemented):** if "device powered on, regardless of login"
+monitoring is also required, add a lightweight **service-level device heartbeat**
+— a minimal ping emitted by the Session-0 `Worker` on its existing timer (it
+already runs there), sent as a distinct event kind (e.g. `device_heartbeat`) so
+the dashboard can show *device online* separately from *user present*. It needs no
+interactive desktop and would not affect user-presence accuracy. Left as a
+follow-up to avoid changing presence semantics without an explicit product
+decision.
 
 ---
 

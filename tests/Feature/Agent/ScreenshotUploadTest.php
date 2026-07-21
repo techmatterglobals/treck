@@ -83,6 +83,24 @@ class ScreenshotUploadTest extends TestCase
         Storage::disk('local')->assertExists($shot->path);
     }
 
+    public function test_stores_event_source_metadata(): void
+    {
+        [, $token] = $this->device();
+
+        $this->upload($token, UploadedFile::fake()->image('s.jpg'), [
+            'source_session_id' => 1,
+            'source_user' => 'CORP\\alice',
+            'source_process' => 'TreckAgent(helper)',
+            'collection_mode' => 'InteractiveHelper',
+        ])->assertCreated();
+
+        $shot = Screenshot::firstOrFail();
+        $this->assertSame(1, $shot->source_session_id);
+        $this->assertSame('CORP\\alice', $shot->source_user);
+        $this->assertSame('TreckAgent(helper)', $shot->source_process);
+        $this->assertSame('InteractiveHelper', $shot->collection_mode);
+    }
+
     public function test_owner_is_taken_from_the_device_not_the_body(): void
     {
         $employee = Employee::factory()->create();

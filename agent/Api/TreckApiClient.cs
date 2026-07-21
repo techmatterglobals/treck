@@ -121,6 +121,24 @@ public sealed class TreckApiClient : ITreckApiClient
             form.Add(new StringContent(metadata.ActiveWindowTitle), "active_window_title");
         }
 
+        // Event source metadata (Phase 8 #3): where the capture was collected.
+        form.Add(new StringContent(metadata.SourceSessionId.ToString(CultureInfo.InvariantCulture)), "source_session_id");
+
+        if (!string.IsNullOrEmpty(metadata.SourceUser))
+        {
+            form.Add(new StringContent(metadata.SourceUser), "source_user");
+        }
+
+        if (!string.IsNullOrEmpty(metadata.SourceProcess))
+        {
+            form.Add(new StringContent(metadata.SourceProcess), "source_process");
+        }
+
+        if (!string.IsNullOrEmpty(metadata.CollectionMode))
+        {
+            form.Add(new StringContent(metadata.CollectionMode), "collection_mode");
+        }
+
         using var request = new HttpRequestMessage(HttpMethod.Post, "api/agent/screenshots") { Content = form };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));

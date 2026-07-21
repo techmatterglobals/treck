@@ -7,6 +7,7 @@ using Treck.Agent.Configuration;
 using Treck.Agent.Offline;
 using Treck.Agent.Services;
 using Treck.Agent.Sessions;
+using Treck.Agent.Spooling;
 
 namespace Treck.Agent;
 
@@ -42,6 +43,7 @@ public sealed class Worker : BackgroundService
     // True when heartbeat/idle + app-usage collection run here; false when the
     // Session-0 service has delegated them to the interactive capture helper.
     private readonly bool _collectInteractive;
+    private readonly EventSource _source;
 
     public Worker(
         ILogger<Worker> logger,
@@ -53,7 +55,8 @@ public sealed class Worker : BackgroundService
         IApplicationSessionManager applicationSessions,
         IOptions<ApplicationTrackingOptions> appTrackingOptions,
         IOfflineEventStore eventStore,
-        AgentRuntime runtime)
+        AgentRuntime runtime,
+        EventSource source)
     {
         _logger = logger;
         _options = options.Value;
@@ -65,6 +68,7 @@ public sealed class Worker : BackgroundService
         _appTrackingOptions = appTrackingOptions.Value;
         _eventStore = eventStore;
         _collectInteractive = runtime.CollectInteractiveInProcess;
+        _source = source;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -184,7 +188,7 @@ public sealed class Worker : BackgroundService
     {
         try
         {
-            var json = JsonSerializer.Serialize(payload);
+            var json = SourceStamp.Apply(JsonSerializer.Serialize(payload), _source);
             _eventStore.Enqueue(OfflineEvent.Create(kind, json, createdAtUtc));
         }
         catch (Exception ex)

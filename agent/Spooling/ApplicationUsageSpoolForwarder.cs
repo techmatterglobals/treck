@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Treck.Agent.Applications;
+using Treck.Agent.Configuration;
 using Treck.Agent.Offline;
 
 namespace Treck.Agent.Spooling;
@@ -21,19 +22,22 @@ public sealed class ApplicationUsageSpoolForwarder : IHostedService
     private readonly IApplicationTracker _tracker;
     private readonly IApplicationSessionManager _sessions;
     private readonly IAgentEventSpool _spool;
+    private readonly EventSource _source;
 
     public ApplicationUsageSpoolForwarder(
         ILogger<ApplicationUsageSpoolForwarder> logger,
         IOptions<ApplicationTrackingOptions> options,
         IApplicationTracker tracker,
         IApplicationSessionManager sessions,
-        IAgentEventSpool spool)
+        IAgentEventSpool spool,
+        EventSource source)
     {
         _logger = logger;
         _options = options.Value;
         _tracker = tracker;
         _sessions = sessions;
         _spool = spool;
+        _source = source;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -72,7 +76,7 @@ public sealed class ApplicationUsageSpoolForwarder : IHostedService
     {
         try
         {
-            var json = JsonSerializer.Serialize(session);
+            var json = SourceStamp.Apply(JsonSerializer.Serialize(session), _source);
             _spool.Submit(OfflineEvent.Create(OfflineEventKind.AppUsage, json, session.EndedAt));
         }
         catch (Exception ex)

@@ -8,7 +8,11 @@ namespace Treck.Agent.Screenshots;
 ///
 /// The server's StoreScreenshotRequest reads CapturedAt / MonitorNumber /
 /// Width / Height / ImageHash / ActiveProcess / ActiveWindowTitle / SessionId
-/// as multipart fields (LocalPath and Format never leave the device).
+/// plus the source_* fields as multipart fields (LocalPath and Format never
+/// leave the device).
+///
+/// The Source* fields (Phase 8 #3) record WHERE the capture was collected so the
+/// backend can confirm it came from the interactive helper, not session 0.
 /// </summary>
 public sealed record ScreenshotMetadata(
     DateTimeOffset CapturedAt,
@@ -21,4 +25,8 @@ public sealed record ScreenshotMetadata(
     string? ActiveWindowTitle,
     string SessionId,
     string LocalPath,
-    string Format);
+    string Format,
+    int SourceSessionId = 0,
+    string? SourceUser = null,
+    string? SourceProcess = null,
+    string? CollectionMode = null);

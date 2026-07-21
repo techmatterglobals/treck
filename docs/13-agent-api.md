@@ -128,6 +128,7 @@ Multipart fields:
 | `image_hash` | SHA-256 hex (server recomputes from the bytes; client value is advisory). |
 | `active_process` / `active_window_title` | Foreground context (nullable). |
 | `session_id` | Capture-session id tying a multi-monitor set together. |
+| `source_session_id` / `source_user` / `source_process` / `collection_mode` | Event source metadata (Phase 8 #3): where the capture was collected (`InteractiveHelper` vs `Service`), for backend debugging (nullable). |
 
 Responses (both 2xx → the agent clears the queue item and deletes its temp file):
 

@@ -34,6 +34,12 @@ class StoreScreenshotRequest extends FormRequest
             'active_process' => ['nullable', 'string', 'max:255'],
             'active_window_title' => ['nullable', 'string', 'max:255'],
             'session_id' => ['nullable', 'string', 'max:64'],
+
+            // Event source metadata (Phase 8 #3): where the capture was collected.
+            'source_session_id' => ['nullable', 'integer', 'min:0', 'max:4294967295'],
+            'source_user' => ['nullable', 'string', 'max:255'],
+            'source_process' => ['nullable', 'string', 'max:255'],
+            'collection_mode' => ['nullable', 'string', 'max:32'],
         ];
     }
 }

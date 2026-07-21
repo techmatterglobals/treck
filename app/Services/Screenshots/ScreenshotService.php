@@ -64,6 +64,10 @@ class ScreenshotService
             'active_process' => $data['active_process'] ?? null,
             'active_window_title' => $data['active_window_title'] ?? null,
             'session_id' => $data['session_id'] ?? null,
+            'source_session_id' => isset($data['source_session_id']) ? (int) $data['source_session_id'] : null,
+            'source_user' => $data['source_user'] ?? null,
+            'source_process' => $data['source_process'] ?? null,
+            'collection_mode' => $data['collection_mode'] ?? null,
         ];
 
         try {
