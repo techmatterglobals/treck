@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
@@ -26,6 +27,10 @@ public sealed class WindowsScreenshotCaptureService : IScreenshotCaptureService
 {
     private readonly ILogger<WindowsScreenshotCaptureService> _logger;
     private readonly ScreenshotOptions _options;
+
+    // Remembers the last capture-availability so the reason is logged on change
+    // (a flip to unavailable / recovered), not spammed every cycle.
+    private bool? _lastCanCapture;
 
     public WindowsScreenshotCaptureService(
         ILogger<WindowsScreenshotCaptureService> logger,
@@ -87,6 +92,9 @@ public sealed class WindowsScreenshotCaptureService : IScreenshotCaptureService
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool CloseDesktop(IntPtr hDesktop);
 
+    [DllImport("kernel32.dll")]
+    private static extern uint WTSGetActiveConsoleSessionId();
+
     private const int UOI_NAME = 2;
     private const uint DESKTOP_READOBJECTS = 0x0001;
 
@@ -94,6 +102,40 @@ public sealed class WindowsScreenshotCaptureService : IScreenshotCaptureService
 
     public bool CanCapture()
     {
+        var can = ComputeCanCapture(out var desktopName);
+
+        // Log only when availability changes, with enough context to diagnose
+        // session-0 isolation (the #1 cause of "worker started, nothing captured").
+        if (_lastCanCapture != can)
+        {
+            _lastCanCapture = can;
+
+            if (can)
+            {
+                _logger.LogInformation(
+                    "Screenshot capture available: interactive desktop \"{Desktop}\" (process session {ProcSession}).",
+                    desktopName, CurrentSessionId());
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Screenshot capture UNAVAILABLE: cannot read the interactive input desktop " +
+                    "(desktop=\"{Desktop}\", process session={ProcSession}, active console session={ConsoleSession}). " +
+                    "A LocalSystem service runs in session 0 and cannot capture the user's desktop (session-0 isolation), " +
+                    "or the secure/lock desktop is active. Run capture in the interactive user session — see docs/27-screenshot-module.md §27.1.",
+                    string.IsNullOrEmpty(desktopName) ? "(none)" : desktopName,
+                    CurrentSessionId(),
+                    ActiveConsoleSessionId());
+            }
+        }
+
+        return can;
+    }
+
+    private static bool ComputeCanCapture(out string desktopName)
+    {
+        desktopName = string.Empty;
+
         var hDesktop = OpenInputDesktop(0, false, DESKTOP_READOBJECTS);
         if (hDesktop == IntPtr.Zero)
         {
@@ -103,11 +145,36 @@ public sealed class WindowsScreenshotCaptureService : IScreenshotCaptureService
 
         try
         {
-            return string.Equals(ReadDesktopName(hDesktop), "Default", StringComparison.OrdinalIgnoreCase);
+            desktopName = ReadDesktopName(hDesktop);
+            return string.Equals(desktopName, "Default", StringComparison.OrdinalIgnoreCase);
         }
         finally
         {
             CloseDesktop(hDesktop);
+        }
+    }
+
+    private static int CurrentSessionId()
+    {
+        try
+        {
+            return Process.GetCurrentProcess().SessionId;
+        }
+        catch
+        {
+            return -1;
+        }
+    }
+
+    private static long ActiveConsoleSessionId()
+    {
+        try
+        {
+            return WTSGetActiveConsoleSessionId();
+        }
+        catch
+        {
+            return -1;
         }
     }
 

@@ -29,6 +29,10 @@ try
 
     var builder = Host.CreateApplicationBuilder(args);
 
+    // Phase 8: the service (session 0) launches this same binary with
+    // --capture-helper into the interactive session to do screenshot capture.
+    var isCaptureHelper = args.Contains("--capture-helper");
+
     // --- Windows Service hosting (M6) ---
     // The service *name* (SCM key) must match what deploy/install-service.ps1
     // registers. The display name and description are set at install time by
@@ -50,9 +54,15 @@ try
     // a stable, writable location (%ProgramData%\TreckAgent\logs) before Serilog
     // reads the configuration. Console execution keeps the relative "logs/" path.
     // (WriteTo index 1 is the File sink; see appsettings.json.)
-    if (WindowsServiceHelpers.IsWindowsService())
+    // The capture helper is launched by the service (not the SCM), so
+    // IsWindowsService() is false for it, yet its working directory is still
+    // Program Files (not user-writable). Redirect its log sink to ProgramData too,
+    // to a distinct file so the two processes never contend on the same log.
+    if (WindowsServiceHelpers.IsWindowsService() || isCaptureHelper)
     {
-        builder.Configuration["Serilog:WriteTo:1:Args:path"] = ResolveServiceLogFilePath(builder.Configuration);
+        builder.Configuration["Serilog:WriteTo:1:Args:path"] = ResolveServiceLogFilePath(
+            builder.Configuration,
+            isCaptureHelper ? "treck-agent-helper-.jsonl" : "treck-agent-.jsonl");
     }
 
     builder.Services.AddSerilog((services, loggerConfiguration) => loggerConfiguration
@@ -95,10 +105,13 @@ try
     builder.Services.AddSingleton<IApplicationSessionManager, ApplicationSessionManager>();
     builder.Services.AddSingleton<IApplicationTracker, WindowsApplicationTracker>();
 
-    // --- Screenshot module (Phase 8; opt-in, own capture cadence) ---
+    // --- Screenshot module (Phase 8; opt-in) ---
+    // Capture must run in the interactive session; the service launches a helper
+    // there (see the hosted-service wiring below).
     builder.Services.AddSingleton<IScreenshotCaptureService, WindowsScreenshotCaptureService>();
     builder.Services.AddSingleton<IScreenshotProcessingService, ScreenshotProcessingService>();
     builder.Services.AddSingleton<IScreenshotSyncService, ScreenshotSyncService>();
+    builder.Services.AddSingleton<IInteractiveSessionLauncher, WindowsInteractiveSessionLauncher>();
 
     // --- Storage / security ---
     builder.Services.AddSingleton<IStoragePathProvider, StoragePathProvider>();
@@ -132,13 +145,36 @@ try
     builder.Services.AddSingleton<IOfflineEventStore, SqliteEventStore>();
     builder.Services.AddSingleton<IEventUploader, AgentEventUploader>();
     builder.Services.AddSingleton<ISyncService, SyncService>();
-    builder.Services.AddHostedService<SyncWorker>();
 
-    // Screenshot capture cadence (Phase 8) runs as its own hosted service so it
-    // never blocks the heartbeat / presence / app-tracking loops.
-    builder.Services.AddHostedService<ScreenshotWorker>();
+    // --- Hosted services: mode-aware wiring (Phase 8) ---
+    if (isCaptureHelper)
+    {
+        // Interactive capture helper: ONLY captures and spools. Registration,
+        // sync, heartbeat, session monitoring and app tracking stay in the service.
+        Log.Information("Starting in capture-helper mode (interactive session).");
+        builder.Services.AddSingleton<IScreenshotSink, SpoolScreenshotSink>();
+        builder.Services.AddHostedService<ScreenshotWorker>();
+    }
+    else
+    {
+        // Full agent (service or console).
+        builder.Services.AddHostedService<SyncWorker>();
+        builder.Services.AddHostedService<Worker>();
 
-    builder.Services.AddHostedService<Worker>();
+        if (WindowsServiceHelpers.IsWindowsService())
+        {
+            // Session 0 cannot see the user's desktop. Launch a capture helper in
+            // the active interactive session and ingest its spool into the queue.
+            builder.Services.AddHostedService<ScreenshotHelperSupervisor>();
+            builder.Services.AddHostedService<ScreenshotSpoolWorker>();
+        }
+        else
+        {
+            // Console/dev: already interactive → capture in-process.
+            builder.Services.AddSingleton<IScreenshotSink, OfflineQueueScreenshotSink>();
+            builder.Services.AddHostedService<ScreenshotWorker>();
+        }
+    }
 
     builder.Build().Run();
 
@@ -155,10 +191,11 @@ finally
     Log.CloseAndFlush();
 }
 
-// Resolves the service-mode log file path under the agent's writable data
-// directory (mirrors StoragePathProvider: %ProgramData%\TreckAgent unless
-// Agent:StoragePath overrides it) and ensures the directory exists.
-static string ResolveServiceLogFilePath(IConfiguration configuration)
+// Resolves a log file path under the agent's writable data directory (mirrors
+// StoragePathProvider: %ProgramData%\TreckAgent unless Agent:StoragePath
+// overrides it) and ensures the directory exists. The file name distinguishes
+// the service from the interactive capture helper so they never share a sink.
+static string ResolveServiceLogFilePath(IConfiguration configuration, string fileName)
 {
     var configuredStorage = configuration["Agent:StoragePath"];
 
@@ -169,7 +206,7 @@ static string ResolveServiceLogFilePath(IConfiguration configuration)
     var logDirectory = Path.Combine(baseDirectory, "logs");
     Directory.CreateDirectory(logDirectory);
 
-    return Path.Combine(logDirectory, "treck-agent-.jsonl");
+    return Path.Combine(logDirectory, fileName);
 }
 
 // Requirement 2: Polly retry with exponential backoff on transient failures.

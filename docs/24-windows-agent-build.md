@@ -832,16 +832,32 @@ opt-in (disabled by default) and never blocks the other loops.
 - **`ScreenshotProcessingService`** — compresses to JPEG (quality) or PNG,
   SHA-256 hashes, drops frames identical to the previous one per monitor, writes a
   temp file under `%ProgramData%\TreckAgent\screenshots`.
-- **`ScreenshotWorker`** (hosted) — its own cadence (fixed or jittered); evaluates
-  policy (enabled, interactive desktop, active user, not ignored) then captures →
-  processes → enqueues each as a `Screenshot` offline event.
+- **`ScreenshotWorker`** (hosted, **interactive session**) — its own cadence (fixed
+  or jittered); evaluates policy (enabled, interactive desktop, active user, not
+  ignored) then captures → processes → hands each survivor to an `IScreenshotSink`.
 - **`ScreenshotSyncService`** — invoked by `AgentEventUploader` for `Screenshot`
   events: reads the temp file, POSTs it multipart to `/api/agent/screenshots`, and
   deletes the temp file on success. The `SyncWorker` drain, ordering and backoff
   are unchanged.
 
-Reuses Phase 7's `IActiveWindowService` to record the foreground process/title
-with each capture.
+**Session-0 isolation (important).** A Windows service runs in session 0 and
+cannot see the user's desktop, so capture runs in the **interactive session**:
+
+- **Service (session 0):** `ScreenshotHelperSupervisor` launches
+  `TreckAgent.exe --capture-helper` into the active console session via
+  `WTSQueryUserToken` + `CreateProcessAsUser` (`WindowsInteractiveSessionLauncher`),
+  and relaunches it on crash / log-off→on / fast-user-switch. `ScreenshotSpoolWorker`
+  ingests the helper's spool sidecars into the offline queue (keeping the service
+  the single DB writer). The supervisor grants the interactive user write access to
+  only the `screenshots` directory.
+- **Helper (interactive session):** runs `ScreenshotWorker` with `SpoolScreenshotSink`
+  — captures and writes a spool sidecar per capture; no registration/sync/heartbeat.
+- **Console/dev:** already interactive, so `ScreenshotWorker` runs in-process with
+  `OfflineQueueScreenshotSink` (no helper needed).
+
+`Program.cs` picks the topology automatically (`--capture-helper` arg /
+`WindowsServiceHelpers.IsWindowsService()`). Reuses Phase 7's `IActiveWindowService`
+to record the foreground process/title with each capture.
 
 ### Folders added
 
@@ -856,7 +872,15 @@ agent/Screenshots/
 ├── ScreenshotProcessingService.cs     # compress + SHA-256 + dedup + temp file
 ├── IScreenshotSyncService.cs
 ├── ScreenshotSyncService.cs           # upload + temp-file cleanup
-└── ScreenshotWorker.cs                # hosted capture cadence + policy
+├── ScreenshotWorker.cs                # hosted capture cadence + policy (interactive)
+├── IScreenshotSink.cs                 # capture destination abstraction
+├── OfflineQueueScreenshotSink.cs      # in-process → offline queue
+├── SpoolScreenshotSink.cs             # helper → spool sidecar
+├── ScreenshotSpool.cs                 # shared spool/image path resolver
+├── ScreenshotSpoolWorker.cs           # service: spool → offline queue (single DB writer)
+├── IInteractiveSessionLauncher.cs
+├── WindowsInteractiveSessionLauncher.cs  # WTS + CreateProcessAsUser
+└── ScreenshotHelperSupervisor.cs      # service: launch/monitor helper in session 1
 agent/tests/Treck.Agent.Tests/
 └── ScreenshotSyncServiceTests.cs
 ```

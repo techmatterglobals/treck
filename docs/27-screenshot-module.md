@@ -51,7 +51,11 @@ offline-first, privacy-aware and secure.
 | `IScreenshotCaptureService` / `WindowsScreenshotCaptureService` | GDI capture per monitor; secure-desktop guard; DPI-aware. |
 | `IScreenshotProcessingService` / `ScreenshotProcessingService` | Compress (JPEG/PNG), SHA-256, per-monitor dedup, temp file. |
 | `IScreenshotSyncService` / `ScreenshotSyncService` | Upload one screenshot; delete temp file on success. |
-| `ScreenshotWorker` (hosted) | Capture cadence + policy; enqueues completed captures. |
+| `ScreenshotWorker` (hosted, **interactive session**) | Capture cadence + policy; hands captures to the sink. |
+| `IScreenshotSink` → `OfflineQueueScreenshotSink` / `SpoolScreenshotSink` | Capture destination: offline queue directly (in-process) or spool sidecar (helper). |
+| `IInteractiveSessionLauncher` / `WindowsInteractiveSessionLauncher` | Launches the helper into the active console session (WTS + CreateProcessAsUser). |
+| `ScreenshotHelperSupervisor` (hosted, **service/session 0**) | Launches/monitors/relaunches the helper; grants the screenshots-dir ACL. |
+| `ScreenshotSpoolWorker` (hosted, **service/session 0**) | Ingests spool sidecars into the offline queue (single DB owner). |
 | `ScreenshotMetadata`, `MonitorCapture`, `ScreenshotOptions` | Payload record, capture holder, configuration. |
 
 **Server**
@@ -83,6 +87,47 @@ offline-first, privacy-aware and secure.
   loops are never blocked.
 
 ---
+
+## 27.1a Session-0 isolation & the capture helper (critical)
+
+A Windows service runs in **Session 0**, which has **no access to the interactive
+user's desktop** (Session 1+). GDI capture, `GetForegroundWindow`, and idle input
+are all per-desktop, so a `LocalSystem` service **cannot** screenshot the user's
+screen — `OpenInputDesktop` fails and `CanCapture()` returns false (the symptom is
+"worker started, nothing captured", with no error). Capture therefore must run in
+the **interactive session**.
+
+The module handles this by process topology (chosen automatically):
+
+| Run context | Where capture runs | Wiring |
+| ----------- | ------------------ | ------ |
+| Windows service (session 0) | A **helper** the service launches into the active console session | `ScreenshotHelperSupervisor` → `WindowsInteractiveSessionLauncher` → `TreckAgent.exe --capture-helper` |
+| Console / dev (already interactive) | **In-process** | `ScreenshotWorker` + `OfflineQueueScreenshotSink` |
+
+**Service → helper handoff (session 0):**
+
+```
+Service (session 0)                         Helper (session 1, as the user)
+──────────────────                          ──────────────────────────────
+ScreenshotHelperSupervisor
+  ├─ WTSGetActiveConsoleSessionId
+  ├─ WTSQueryUserToken → DuplicateTokenEx
+  ├─ CreateEnvironmentBlock
+  └─ CreateProcessAsUser("… --capture-helper",
+        lpDesktop = winsta0\default) ─────▶ ScreenshotWorker + SpoolScreenshotSink
+                                              ├─ capture + compress + hash + temp file
+  grants Users:Modify on \screenshots  ◀──┘  └─ write spool sidecar (.json)
+ScreenshotSpoolWorker (polls spool)
+  └─ enqueue Screenshot event ─▶ offline queue ─▶ SyncWorker ─▶ upload + delete temp
+```
+
+Why a **spool** rather than sharing the SQLite queue across both processes: it
+keeps the service the **single writer** of `offline.db` (no cross-process lock
+contention), and it lets the service grant the interactive user write access to
+**only** the `screenshots` directory — the offline queue and the DPAPI-encrypted
+device token are never exposed. The supervisor relaunches the helper on crash,
+log-off→on, and fast-user-switch (active session change); with no interactive
+session (login screen) it simply waits.
 
 ## 27.2 Screenshot capture lifecycle
 
@@ -296,7 +341,10 @@ Agent (on a Windows host, `Screenshots.Enabled = true`):
 
 | Symptom | Likely cause / fix |
 | ------- | ------------------ |
-| No screenshots appear | `Screenshots.Enabled=false` (agent) or the device isn't registered. Check the agent log for "Screenshot worker started". |
+| No screenshots appear | `Screenshots.Enabled=false`, device not registered, or **session-0 isolation** (see below). Check the service log for "Screenshot helper supervisor started" / "Capture helper launched into session N", and the **helper** log (`treck-agent-helper-*.jsonl`) for "Screenshot worker started" + "Capture cycle complete". |
+| Service log: "Screenshot capture UNAVAILABLE … process session=0" | Session-0 isolation. The **service** must not capture directly; ensure `ScreenshotHelperSupervisor` is launching the helper (service log). If you deployed an older build that captured in-process, upgrade — capture now runs in the interactive helper. |
+| Helper never launches | The service account lacks `SeTcbPrivilege` (needed for `WTSQueryUserToken`/`CreateProcessAsUser`) — run as `LocalSystem`; or no user is logged into the console (login screen). |
+| Helper can't spool (access denied) | The icacls grant on `\screenshots` failed; grant BUILTIN\Users (or the interactive user) Modify on `%ProgramData%\TreckAgent\screenshots`. |
 | Captures only while locked are missing | Expected — the secure/lock desktop is never captured. |
 | Everything is skipped | `CaptureOnlyWhenActive` with an idle user, or the foreground app is on the ignore list. |
 | Image 403 in the dashboard | The signed URL expired (raise `url_ttl_minutes`) or the viewer is not an admin. |

@@ -1,11 +1,9 @@
-using System.Text.Json;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Treck.Agent.Activity;
 using Treck.Agent.Applications;
 using Treck.Agent.Configuration;
-using Treck.Agent.Offline;
 
 namespace Treck.Agent.Screenshots;
 
@@ -17,10 +15,17 @@ namespace Treck.Agent.Screenshots;
 ///   1. evaluate policy (enabled, interactive desktop, active user, not ignored);
 ///   2. capture each monitor;
 ///   3. compress + hash + dedup + write temp file (ScreenshotProcessingService);
-///   4. enqueue each survivor as a <c>Screenshot</c> offline event.
+///   4. hand each survivor to the <see cref="IScreenshotSink"/>.
 ///
-/// The existing SyncWorker drains the queue and uploads; nothing is captured or
-/// uploaded synchronously here. Interval is fixed or randomized per options.
+/// The sink either enqueues to the offline queue directly (in-process mode) or
+/// spools it for the Session-0 service (helper mode). Either way the existing
+/// SyncWorker drains the queue and uploads; nothing is uploaded synchronously
+/// here. Interval is fixed or randomized per options.
+///
+/// This worker must run in the INTERACTIVE user session — a Session-0 service
+/// cannot read the user's desktop. In the Windows-service deployment it runs
+/// inside the capture helper the service launches into the active session; see
+/// <see cref="ScreenshotHelperSupervisor"/> and docs/27-screenshot-module.md.
 /// </summary>
 public sealed class ScreenshotWorker : BackgroundService
 {
@@ -31,7 +36,7 @@ public sealed class ScreenshotWorker : BackgroundService
     private readonly IScreenshotProcessingService _processing;
     private readonly IActiveWindowService _activeWindow;
     private readonly IIdleDetector _idleDetector;
-    private readonly IOfflineEventStore _eventStore;
+    private readonly IScreenshotSink _sink;
 
     public ScreenshotWorker(
         ILogger<ScreenshotWorker> logger,
@@ -41,7 +46,7 @@ public sealed class ScreenshotWorker : BackgroundService
         IScreenshotProcessingService processing,
         IActiveWindowService activeWindow,
         IIdleDetector idleDetector,
-        IOfflineEventStore eventStore)
+        IScreenshotSink sink)
     {
         _logger = logger;
         _options = options.Value;
@@ -50,7 +55,7 @@ public sealed class ScreenshotWorker : BackgroundService
         _processing = processing;
         _activeWindow = activeWindow;
         _idleDetector = idleDetector;
-        _eventStore = eventStore;
+        _sink = sink;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -64,6 +69,11 @@ public sealed class ScreenshotWorker : BackgroundService
         _logger.LogInformation(
             "Screenshot worker started (interval={Interval}s, jitter={Jitter}s, format={Format}, multiMonitor={Multi}).",
             _options.IntervalSeconds, _options.RandomJitterSeconds, _options.Format, _options.MultiMonitor);
+
+        // Probe capture availability now so any session-0 isolation is reported at
+        // startup (the capture service logs the reason on the first evaluation),
+        // instead of silently after the first interval elapses.
+        _ = _capture.CanCapture();
 
         try
         {
@@ -111,10 +121,22 @@ public sealed class ScreenshotWorker : BackgroundService
 
         var captures = _capture.CaptureAll();
 
+        if (captures.Count == 0)
+        {
+            _logger.LogWarning("Capture cycle produced 0 monitors (capture unavailable or enumeration failed).");
+            return;
+        }
+
+        var queued = 0;
+        var deduped = 0;
+
         foreach (var monitor in captures)
         {
             using (monitor)
             {
+                _logger.LogDebug("Captured monitor {Monitor}: {Width}x{Height}.",
+                    monitor.MonitorNumber, monitor.Image.Width, monitor.Image.Height);
+
                 var metadata = _processing.Process(
                     monitor,
                     active?.ProcessName,
@@ -124,10 +146,19 @@ public sealed class ScreenshotWorker : BackgroundService
 
                 if (metadata is not null)
                 {
-                    Enqueue(metadata);
+                    Submit(metadata);
+                    queued++;
+                }
+                else
+                {
+                    deduped++;
                 }
             }
         }
+
+        _logger.LogInformation(
+            "Capture cycle complete: monitors={Monitors} queued={Queued} unchanged={Deduped} session={Session}.",
+            captures.Count, queued, deduped, sessionId);
     }
 
     private bool ShouldCapture()
@@ -177,20 +208,15 @@ public sealed class ScreenshotWorker : BackgroundService
     private static bool Matches(string? value, string candidate)
         => !string.IsNullOrEmpty(value) && string.Equals(value, candidate, StringComparison.OrdinalIgnoreCase);
 
-    private void Enqueue(ScreenshotMetadata metadata)
+    private void Submit(ScreenshotMetadata metadata)
     {
         try
         {
-            var json = JsonSerializer.Serialize(metadata);
-            _eventStore.Enqueue(OfflineEvent.Create(OfflineEventKind.Screenshot, json, metadata.CapturedAt));
-
-            _logger.LogInformation(
-                "Screenshot queued: monitor={Monitor} {Width}x{Height} {Size}B.",
-                metadata.MonitorNumber, metadata.Width, metadata.Height, metadata.FileSize);
+            _sink.Submit(metadata);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to enqueue screenshot.");
+            _logger.LogError(ex, "Failed to submit screenshot to the sink.");
         }
     }
 
