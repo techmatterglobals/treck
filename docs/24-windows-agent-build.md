@@ -841,23 +841,30 @@ opt-in (disabled by default) and never blocks the other loops.
   are unchanged.
 
 **Session-0 isolation (important).** A Windows service runs in session 0 and
-cannot see the user's desktop, so capture runs in the **interactive session**:
+cannot see the user's desktop. This affects **all** desktop-bound collection —
+screenshots (Phase 8), foreground/app-usage (Phase 7) and idle detection (Phase
+4) — so every one of them runs in an **interactive capture helper**:
 
 - **Service (session 0):** `ScreenshotHelperSupervisor` launches
   `TreckAgent.exe --capture-helper` into the active console session via
   `WTSQueryUserToken` + `CreateProcessAsUser` (`WindowsInteractiveSessionLauncher`),
-  and relaunches it on crash / log-off→on / fast-user-switch. `ScreenshotSpoolWorker`
-  ingests the helper's spool sidecars into the offline queue (keeping the service
-  the single DB writer). The supervisor grants the interactive user write access to
-  only the `screenshots` directory.
-- **Helper (interactive session):** runs `ScreenshotWorker` with `SpoolScreenshotSink`
-  — captures and writes a spool sidecar per capture; no registration/sync/heartbeat.
-- **Console/dev:** already interactive, so `ScreenshotWorker` runs in-process with
-  `OfflineQueueScreenshotSink` (no helper needed).
+  logging session/user/pid, and relaunches on crash / log-off→on /
+  fast-user-switch. `AgentEventSpoolWorker` ingests the helper's spool sidecars
+  (screenshot / app_usage / heartbeat) into the offline queue — the service stays
+  the single DB writer. The supervisor grants the interactive user Modify on only
+  the `helper` directory. The service's `Worker` keeps registration + session
+  monitor + sync but no longer collects heartbeat/foreground
+  (`AgentRuntime.CollectInteractiveInProcess = false`).
+- **Helper (interactive session):** `ScreenshotWorker` (screenshots),
+  `ApplicationUsageSpoolForwarder` (Phase 7 foreground) and `HeartbeatSpoolForwarder`
+  (Phase 4 idle/heartbeat), all emitting to `FileAgentEventSpool`. No
+  registration/sync.
+- **Console/dev:** already interactive, so the `Worker` collects heartbeat +
+  app-usage in-process and `ScreenshotWorker` uses `OfflineQueueScreenshotSink`.
 
-`Program.cs` picks the topology automatically (`--capture-helper` arg /
-`WindowsServiceHelpers.IsWindowsService()`). Reuses Phase 7's `IActiveWindowService`
-to record the foreground process/title with each capture.
+`Program.cs` picks the topology automatically (`--capture-helper` /
+`--capture-helper-test` args, `WindowsServiceHelpers.IsWindowsService()`).
+`--capture-helper-test` runs a one-shot capture validation and exits.
 
 ### Folders added
 
@@ -875,14 +882,23 @@ agent/Screenshots/
 ├── ScreenshotWorker.cs                # hosted capture cadence + policy (interactive)
 ├── IScreenshotSink.cs                 # capture destination abstraction
 ├── OfflineQueueScreenshotSink.cs      # in-process → offline queue
-├── SpoolScreenshotSink.cs             # helper → spool sidecar
-├── ScreenshotSpool.cs                 # shared spool/image path resolver
-├── ScreenshotSpoolWorker.cs           # service: spool → offline queue (single DB writer)
+├── SpoolScreenshotSink.cs             # helper → event spool
+├── ScreenshotSelfTest.cs              # --capture-helper-test one-shot validation
 ├── IInteractiveSessionLauncher.cs
-├── WindowsInteractiveSessionLauncher.cs  # WTS + CreateProcessAsUser
-└── ScreenshotHelperSupervisor.cs      # service: launch/monitor helper in session 1
+├── WindowsInteractiveSessionLauncher.cs  # WTS + CreateProcessAsUser (+ session/user/pid diag)
+└── ScreenshotHelperSupervisor.cs      # service: launch/monitor helper; ACL grant
+agent/Spooling/                        # helper → service event bridge (Phase 8 / #4)
+├── HelperPaths.cs                     # shared helper dir tree resolver
+├── SpooledEvent.cs                    # sidecar DTO ↔ OfflineEvent
+├── IAgentEventSpool.cs
+├── FileAgentEventSpool.cs             # helper writer + startup write-probe
+├── AgentEventSpoolWorker.cs           # service: spool → offline queue (single DB writer)
+├── HeartbeatSpoolForwarder.cs         # Phase 4 idle/heartbeat, in the helper
+└── ApplicationUsageSpoolForwarder.cs  # Phase 7 foreground, in the helper
+agent/Configuration/AgentRuntime.cs    # in-process vs delegated collection flag
 agent/tests/Treck.Agent.Tests/
-└── ScreenshotSyncServiceTests.cs
+├── ScreenshotSyncServiceTests.cs
+└── AgentEventSpoolTests.cs
 ```
 
 Also modified: `Offline/OfflineEvent.cs` (adds `OfflineEventKind.Screenshot`),

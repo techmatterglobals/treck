@@ -39,6 +39,10 @@ public sealed class Worker : BackgroundService
     private readonly ApplicationTrackingOptions _appTrackingOptions;
     private readonly IOfflineEventStore _eventStore;
 
+    // True when heartbeat/idle + app-usage collection run here; false when the
+    // Session-0 service has delegated them to the interactive capture helper.
+    private readonly bool _collectInteractive;
+
     public Worker(
         ILogger<Worker> logger,
         IOptions<AgentOptions> options,
@@ -48,7 +52,8 @@ public sealed class Worker : BackgroundService
         IApplicationTracker applicationTracker,
         IApplicationSessionManager applicationSessions,
         IOptions<ApplicationTrackingOptions> appTrackingOptions,
-        IOfflineEventStore eventStore)
+        IOfflineEventStore eventStore,
+        AgentRuntime runtime)
     {
         _logger = logger;
         _options = options.Value;
@@ -59,6 +64,7 @@ public sealed class Worker : BackgroundService
         _applicationSessions = applicationSessions;
         _appTrackingOptions = appTrackingOptions.Value;
         _eventStore = eventStore;
+        _collectInteractive = runtime.CollectInteractiveInProcess;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -69,19 +75,31 @@ public sealed class Worker : BackgroundService
 
         _eventStore.Initialize();
         _sessionMonitor.SessionChanged += OnSessionChanged;
-        _heartbeatScheduler.HeartbeatProduced += OnHeartbeatProduced;
         _sessionMonitor.Start();
-        _heartbeatScheduler.Start();
 
-        if (_appTrackingOptions.Enabled)
+        if (_collectInteractive)
         {
-            _applicationSessions.SessionCompleted += OnApplicationSessionCompleted;
-            _applicationTracker.ApplicationChanged += OnApplicationChanged;
-            _applicationTracker.Start();
+            // In-process interactive collection (console/dev, already interactive).
+            _heartbeatScheduler.HeartbeatProduced += OnHeartbeatProduced;
+            _heartbeatScheduler.Start();
+
+            if (_appTrackingOptions.Enabled)
+            {
+                _applicationSessions.SessionCompleted += OnApplicationSessionCompleted;
+                _applicationTracker.ApplicationChanged += OnApplicationChanged;
+                _applicationTracker.Start();
+            }
+            else
+            {
+                _logger.LogInformation("Application tracking is disabled by configuration.");
+            }
         }
         else
         {
-            _logger.LogInformation("Application tracking is disabled by configuration.");
+            // Session-0 service: heartbeat/idle + app-usage collection run in the
+            // interactive capture helper instead (they cannot see the user's
+            // desktop from session 0). This Worker keeps session monitoring + sync.
+            _logger.LogInformation("Interactive collection delegated to the capture helper (session-0 service).");
         }
 
         try
@@ -105,18 +123,22 @@ public sealed class Worker : BackgroundService
         }
         finally
         {
-            if (_appTrackingOptions.Enabled)
+            if (_collectInteractive)
             {
-                _applicationTracker.Stop();
-                _applicationTracker.ApplicationChanged -= OnApplicationChanged;
-                // Ship the session that was open when we stopped.
-                _applicationSessions.Flush(DateTimeOffset.UtcNow);
-                _applicationSessions.SessionCompleted -= OnApplicationSessionCompleted;
+                if (_appTrackingOptions.Enabled)
+                {
+                    _applicationTracker.Stop();
+                    _applicationTracker.ApplicationChanged -= OnApplicationChanged;
+                    // Ship the session that was open when we stopped.
+                    _applicationSessions.Flush(DateTimeOffset.UtcNow);
+                    _applicationSessions.SessionCompleted -= OnApplicationSessionCompleted;
+                }
+
+                _heartbeatScheduler.HeartbeatProduced -= OnHeartbeatProduced;
+                _heartbeatScheduler.Stop();
             }
 
             _sessionMonitor.SessionChanged -= OnSessionChanged;
-            _heartbeatScheduler.HeartbeatProduced -= OnHeartbeatProduced;
-            _heartbeatScheduler.Stop();
             _sessionMonitor.Stop();
         }
 
@@ -131,7 +153,9 @@ public sealed class Worker : BackgroundService
 
         // When the desktop is no longer interactive, close the open app session
         // so its duration stops accruing against a screen the user cannot see.
-        if (_appTrackingOptions.Enabled && sessionEvent.Type is
+        // (Only relevant when app tracking runs in-process; in the delegated
+        // topology the helper owns the session state.)
+        if (_collectInteractive && _appTrackingOptions.Enabled && sessionEvent.Type is
             SessionEventType.Lock or SessionEventType.Logoff or SessionEventType.Shutdown)
         {
             _applicationSessions.Flush(sessionEvent.TimestampUtc);

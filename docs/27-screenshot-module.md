@@ -99,10 +99,31 @@ the **interactive session**.
 
 The module handles this by process topology (chosen automatically):
 
-| Run context | Where capture runs | Wiring |
+| Run context | Where interactive collection runs | Wiring |
 | ----------- | ------------------ | ------ |
 | Windows service (session 0) | A **helper** the service launches into the active console session | `ScreenshotHelperSupervisor` → `WindowsInteractiveSessionLauncher` → `TreckAgent.exe --capture-helper` |
-| Console / dev (already interactive) | **In-process** | `ScreenshotWorker` + `OfflineQueueScreenshotSink` |
+| Console / dev (already interactive) | **In-process** | `Worker` (heartbeat + app-usage) + `ScreenshotWorker` |
+
+**What the helper runs (all interactive-session collection).** Because the same
+Session-0 limitation affects Phase 4 idle detection (`GetLastInputInfo`) and
+Phase 7 foreground tracking (`GetForegroundWindow`/WinEvent hooks), the helper
+hosts **all** desktop-bound collection, not just screenshots:
+
+- `ScreenshotWorker` → screenshots;
+- `ApplicationUsageSpoolForwarder` → Phase 7 application-usage (foreground);
+- `HeartbeatSpoolForwarder` → Phase 4 heartbeat with **accurate idle**.
+
+Each emits into a shared **event spool** (`FileAgentEventSpool`); the service's
+`AgentEventSpoolWorker` ingests every kind (screenshot / app_usage / heartbeat)
+into the single-owner offline queue, and the existing `SyncWorker` uploads. The
+service's `Worker` keeps registration, session monitoring and sync, but no longer
+collects heartbeat/idle or foreground data itself (`AgentRuntime.CollectInteractiveInProcess = false`).
+
+> **Consequence (by design):** heartbeats now flow only while a user is logged in
+> interactively. With no interactive session (login screen / logged off) there is
+> no heartbeat and the device presents as offline — which matches *user*-presence
+> semantics. If you also need "device powered on" monitoring independent of login,
+> add a lightweight service-side liveness ping (not included).
 
 **Service → helper handoff (session 0):**
 
@@ -124,10 +145,26 @@ ScreenshotSpoolWorker (polls spool)
 Why a **spool** rather than sharing the SQLite queue across both processes: it
 keeps the service the **single writer** of `offline.db` (no cross-process lock
 contention), and it lets the service grant the interactive user write access to
-**only** the `screenshots` directory — the offline queue and the DPAPI-encrypted
-device token are never exposed. The supervisor relaunches the helper on crash,
-log-off→on, and fast-user-switch (active session change); with no interactive
-session (login screen) it simply waits.
+**only** the `helper` directory (`%ProgramData%\TreckAgent\helper`, containing the
+image temp files and spool sidecars) — the offline queue and the DPAPI-encrypted
+device token at the data-dir root are never exposed. The supervisor relaunches the
+helper on crash, log-off→on, and fast-user-switch (active session change); with no
+interactive session (login screen) it simply waits.
+
+**Launch diagnostics & startup checks.** The supervisor/launcher log the target
+**session id, user (domain\\user) and PID** on every helper launch; the helper
+logs its own `user / session / pid` at startup; and `FileAgentEventSpool` performs
+a **write probe** of the spool directory at startup, logging a clear error if the
+ACL grant did not take. Run a **one-shot validation** any time with:
+
+```
+TreckAgent.exe --capture-helper-test
+```
+
+It captures once in the current session and logs a per-monitor report
+(dimensions, byte size, hash, temp path, foreground app), then exits 0 (captured)
+or 1 (capture unavailable — e.g. run from session 0 or a secure desktop). Logs go
+to `treck-agent-selftest-*.jsonl`.
 
 ## 27.2 Screenshot capture lifecycle
 
@@ -328,12 +365,18 @@ php artisan test tests/Feature/Agent/ScreenshotUploadTest.php \
 
 Agent (on a Windows host, `Screenshots.Enabled = true`):
 
-1. Run the agent; after `IntervalSeconds`, logs show `Screenshot queued: …`.
-2. Confirm rows arrive:
+1. **One-shot self-test (fastest):** in the interactive user session run
+   `TreckAgent.exe --capture-helper-test` and read `treck-agent-selftest-*.jsonl` —
+   it reports session/user/pid and a per-monitor capture result. Exit 0 = healthy.
+2. Install/run the service; confirm in `treck-agent-*.jsonl`:
+   "Capture helper launched: session=… user=… pid=…", and in the **helper** log
+   `treck-agent-helper-*.jsonl`: "Spool directory is writable", "Capture cycle
+   complete", "Application-usage collection running", "Heartbeat collection running".
+3. Confirm rows arrive:
    `php artisan tinker --execute="echo App\Models\Screenshot::whereNotNull('image_hash')->count();"`
-3. Lock the workstation — no captures are queued while locked.
-4. Go offline, keep working, come back — queued screenshots drain on the next
-   sync cycle; temp files under `%ProgramData%\TreckAgent\screenshots` clear.
+4. Lock the workstation — no captures are queued while locked.
+5. Go offline, keep working, come back — queued items drain on the next sync
+   cycle; temp files under `%ProgramData%\TreckAgent\helper\screenshots` clear.
 
 ---
 

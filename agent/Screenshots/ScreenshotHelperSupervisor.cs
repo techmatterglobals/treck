@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Treck.Agent.Spooling;
 using Treck.Agent.Storage;
 
 namespace Treck.Agent.Screenshots;
@@ -55,11 +56,11 @@ public sealed class ScreenshotHelperSupervisor : BackgroundService
 
         _logger.LogInformation("Screenshot helper supervisor started (session-0 → interactive launch).");
 
-        // The helper runs as the interactive user but the screenshots directory is
+        // The helper runs as the interactive user but the helper directory is
         // created by this LocalSystem service; grant the interactive user write so
-        // the helper can spool captures. Scope the grant to the screenshots folder
-        // only — the offline queue and the encrypted device token stay untouched.
-        GrantInteractiveAccessToScreenshots();
+        // the helper can spool captures/events. Scope the grant to the helper
+        // subtree only — the offline queue and encrypted device token stay untouched.
+        GrantInteractiveAccessToHelperDir();
 
         try
         {
@@ -146,19 +147,20 @@ public sealed class ScreenshotHelperSupervisor : BackgroundService
         => Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule!.FileName;
 
     /// <summary>
-    /// Best-effort: grant BUILTIN\Users Modify on the screenshots directory via
-    /// icacls, so the interactive helper can write spool files there. Failure is
-    /// non-fatal (logged); the helper will simply be unable to spool until an
-    /// administrator grants access.
+    /// Best-effort: grant BUILTIN\Users Modify on the helper directory via icacls,
+    /// so the interactive helper can write image temp files and spool sidecars
+    /// there. Failure is non-fatal (logged); the helper will simply be unable to
+    /// spool until an administrator grants access.
     /// </summary>
-    private void GrantInteractiveAccessToScreenshots()
+    private void GrantInteractiveAccessToHelperDir()
     {
-        var directory = ScreenshotSpool.ImageDirectory(_paths);
+        var directory = HelperPaths.Root(_paths);
 
         try
         {
             Directory.CreateDirectory(directory);
-            Directory.CreateDirectory(ScreenshotSpool.SpoolDirectory(_paths));
+            Directory.CreateDirectory(HelperPaths.Screenshots(_paths));
+            Directory.CreateDirectory(HelperPaths.Spool(_paths));
 
             // *S-1-5-32-545 = BUILTIN\Users; (OI)(CI) = inherit to files/subdirs; M = Modify.
             var startInfo = new ProcessStartInfo("icacls")

@@ -15,6 +15,7 @@ using Treck.Agent.Screenshots;
 using Treck.Agent.Security;
 using Treck.Agent.Services;
 using Treck.Agent.Sessions;
+using Treck.Agent.Spooling;
 using Treck.Agent.Storage;
 using Treck.Agent.Sync;
 
@@ -30,7 +31,9 @@ try
     var builder = Host.CreateApplicationBuilder(args);
 
     // Phase 8: the service (session 0) launches this same binary with
-    // --capture-helper into the interactive session to do screenshot capture.
+    // --capture-helper into the interactive session to do screenshot + interactive
+    // collection. --capture-helper-test runs a one-shot capture validation.
+    var isCaptureHelperTest = args.Contains("--capture-helper-test");
     var isCaptureHelper = args.Contains("--capture-helper");
 
     // --- Windows Service hosting (M6) ---
@@ -58,11 +61,12 @@ try
     // IsWindowsService() is false for it, yet its working directory is still
     // Program Files (not user-writable). Redirect its log sink to ProgramData too,
     // to a distinct file so the two processes never contend on the same log.
-    if (WindowsServiceHelpers.IsWindowsService() || isCaptureHelper)
+    if (WindowsServiceHelpers.IsWindowsService() || isCaptureHelper || isCaptureHelperTest)
     {
-        builder.Configuration["Serilog:WriteTo:1:Args:path"] = ResolveServiceLogFilePath(
-            builder.Configuration,
-            isCaptureHelper ? "treck-agent-helper-.jsonl" : "treck-agent-.jsonl");
+        var logFile = isCaptureHelperTest ? "treck-agent-selftest-.jsonl"
+            : isCaptureHelper ? "treck-agent-helper-.jsonl"
+            : "treck-agent-.jsonl";
+        builder.Configuration["Serilog:WriteTo:1:Args:path"] = ResolveServiceLogFilePath(builder.Configuration, logFile);
     }
 
     builder.Services.AddSerilog((services, loggerConfiguration) => loggerConfiguration
@@ -146,34 +150,52 @@ try
     builder.Services.AddSingleton<IEventUploader, AgentEventUploader>();
     builder.Services.AddSingleton<ISyncService, SyncService>();
 
+    // --- One-shot capture self-test (--capture-helper-test) ---
+    if (isCaptureHelperTest)
+    {
+        Log.Information("Running one-shot capture self-test…");
+        using var testHost = builder.Build();
+        return ScreenshotSelfTest.Run(testHost.Services);
+    }
+
     // --- Hosted services: mode-aware wiring (Phase 8) ---
     if (isCaptureHelper)
     {
-        // Interactive capture helper: ONLY captures and spools. Registration,
-        // sync, heartbeat, session monitoring and app tracking stay in the service.
-        Log.Information("Starting in capture-helper mode (interactive session).");
+        // Interactive capture/collection helper. It runs everything that must see
+        // the user's desktop — screenshots, app-usage (foreground) and
+        // heartbeat/idle — and spools each event for the service to upload.
+        // Registration, sync, session monitoring and the offline queue stay in the
+        // service.
+        Log.Information(
+            "Starting in capture-helper mode: user={User} session={Session} pid={Pid}.",
+            Environment.UserName, System.Diagnostics.Process.GetCurrentProcess().SessionId, Environment.ProcessId);
+
+        builder.Services.AddSingleton(new AgentRuntime { CollectInteractiveInProcess = false });
+        builder.Services.AddSingleton<IAgentEventSpool, FileAgentEventSpool>();
         builder.Services.AddSingleton<IScreenshotSink, SpoolScreenshotSink>();
         builder.Services.AddHostedService<ScreenshotWorker>();
+        builder.Services.AddHostedService<HeartbeatSpoolForwarder>();
+        builder.Services.AddHostedService<ApplicationUsageSpoolForwarder>();
+    }
+    else if (WindowsServiceHelpers.IsWindowsService())
+    {
+        // Session-0 service: cannot see the user's desktop. Delegate all
+        // interactive collection (screenshots + foreground + idle) to a helper it
+        // launches into the active session, and ingest the helper's spool.
+        builder.Services.AddSingleton(new AgentRuntime { CollectInteractiveInProcess = false });
+        builder.Services.AddHostedService<SyncWorker>();
+        builder.Services.AddHostedService<Worker>();
+        builder.Services.AddHostedService<ScreenshotHelperSupervisor>();
+        builder.Services.AddHostedService<AgentEventSpoolWorker>();
     }
     else
     {
-        // Full agent (service or console).
+        // Console/dev: already interactive → collect + capture in-process.
+        builder.Services.AddSingleton(new AgentRuntime { CollectInteractiveInProcess = true });
+        builder.Services.AddSingleton<IScreenshotSink, OfflineQueueScreenshotSink>();
         builder.Services.AddHostedService<SyncWorker>();
         builder.Services.AddHostedService<Worker>();
-
-        if (WindowsServiceHelpers.IsWindowsService())
-        {
-            // Session 0 cannot see the user's desktop. Launch a capture helper in
-            // the active interactive session and ingest its spool into the queue.
-            builder.Services.AddHostedService<ScreenshotHelperSupervisor>();
-            builder.Services.AddHostedService<ScreenshotSpoolWorker>();
-        }
-        else
-        {
-            // Console/dev: already interactive → capture in-process.
-            builder.Services.AddSingleton<IScreenshotSink, OfflineQueueScreenshotSink>();
-            builder.Services.AddHostedService<ScreenshotWorker>();
-        }
+        builder.Services.AddHostedService<ScreenshotWorker>();
     }
 
     builder.Build().Run();

@@ -4,6 +4,7 @@ using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Treck.Agent.Spooling;
 using Treck.Agent.Storage;
 
 namespace Treck.Agent.Screenshots;
@@ -32,7 +33,7 @@ public sealed class ScreenshotProcessingService : IScreenshotProcessingService
     {
         _logger = logger;
         _options = options.Value;
-        _tempDirectory = Path.Combine(paths.BaseDirectory, "screenshots");
+        _tempDirectory = HelperPaths.Screenshots(paths);
         Directory.CreateDirectory(_tempDirectory);
     }
 

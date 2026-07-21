@@ -1,36 +1,31 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using Treck.Agent.Storage;
+using Treck.Agent.Offline;
+using Treck.Agent.Spooling;
 
 namespace Treck.Agent.Screenshots;
 
 /// <summary>
-/// Writes a completed capture as a spool sidecar (one JSON file per capture) for
-/// the Session-0 service to ingest. Used by the interactive capture helper so the
-/// service remains the single writer of the offline SQLite queue (no cross-process
-/// database contention). The sidecar is written atomically (temp file + rename)
-/// so the service never reads a half-written file.
+/// Submits a completed capture to the interactive helper's event spool as a
+/// <c>Screenshot</c> event (payload = <see cref="ScreenshotMetadata"/>, which
+/// references the temp image path). The Session-0 service ingests it into the
+/// offline queue, so the service remains the single writer of the SQLite database.
 /// </summary>
 public sealed class SpoolScreenshotSink : IScreenshotSink
 {
     private readonly ILogger<SpoolScreenshotSink> _logger;
-    private readonly string _spoolDirectory;
+    private readonly IAgentEventSpool _spool;
 
-    public SpoolScreenshotSink(ILogger<SpoolScreenshotSink> logger, IStoragePathProvider paths)
+    public SpoolScreenshotSink(ILogger<SpoolScreenshotSink> logger, IAgentEventSpool spool)
     {
         _logger = logger;
-        _spoolDirectory = ScreenshotSpool.SpoolDirectory(paths);
-        Directory.CreateDirectory(_spoolDirectory);
+        _spool = spool;
     }
 
     public void Submit(ScreenshotMetadata metadata)
     {
-        var finalPath = Path.Combine(_spoolDirectory, $"{metadata.ImageHash}.json");
-        var tempPath = finalPath + ".tmp";
-
         var json = JsonSerializer.Serialize(metadata);
-        File.WriteAllText(tempPath, json);
-        File.Move(tempPath, finalPath, overwrite: true);
+        _spool.Submit(OfflineEvent.Create(OfflineEventKind.Screenshot, json, metadata.CapturedAt));
 
         _logger.LogInformation(
             "Screenshot spooled: monitor={Monitor} {Width}x{Height} {Size}B.",

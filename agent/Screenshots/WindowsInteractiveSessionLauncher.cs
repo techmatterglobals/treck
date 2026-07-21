@@ -80,7 +80,8 @@ public sealed class WindowsInteractiveSessionLauncher : IInteractiveSessionLaunc
             CloseHandle(processInfo.hThread);
 
             _logger.LogInformation(
-                "Capture helper launched into session {Session} (pid {Pid}).", sessionId, processInfo.dwProcessId);
+                "Capture helper launched: session={Session} user={User} pid={Pid} desktop=winsta0\\default.",
+                sessionId, GetSessionUserName(sessionId), processInfo.dwProcessId);
 
             return new LaunchedProcess(processInfo.hProcess, sessionId);
         }
@@ -134,9 +135,42 @@ public sealed class WindowsInteractiveSessionLauncher : IInteractiveSessionLaunc
         }
     }
 
+    /// <summary>Domain\user of the session, for diagnostics; "(unknown)" on failure.</summary>
+    private string GetSessionUserName(uint sessionId)
+    {
+        var domain = QuerySessionString(sessionId, WTS_DOMAIN_NAME);
+        var user = QuerySessionString(sessionId, WTS_USER_NAME);
+
+        if (string.IsNullOrEmpty(user))
+        {
+            return "(unknown)";
+        }
+
+        return string.IsNullOrEmpty(domain) ? user : $"{domain}\\{user}";
+    }
+
+    private string QuerySessionString(uint sessionId, int infoClass)
+    {
+        if (!WTSQuerySessionInformation(IntPtr.Zero, sessionId, infoClass, out var buffer, out _) || buffer == IntPtr.Zero)
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            return Marshal.PtrToStringUni(buffer) ?? string.Empty;
+        }
+        finally
+        {
+            WTSFreeMemory(buffer);
+        }
+    }
+
     // ---- Native interop ----------------------------------------------------
 
     private const uint MAXIMUM_ALLOWED = 0x02000000;
+    private const int WTS_USER_NAME = 5;
+    private const int WTS_DOMAIN_NAME = 7;
     private const int SecurityImpersonation = 2;
     private const int TokenPrimary = 1;
     private const uint CREATE_UNICODE_ENVIRONMENT = 0x00000400;
@@ -181,6 +215,14 @@ public sealed class WindowsInteractiveSessionLauncher : IInteractiveSessionLaunc
     [DllImport("wtsapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool WTSQueryUserToken(uint sessionId, out IntPtr phToken);
+
+    [DllImport("wtsapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool WTSQuerySessionInformation(
+        IntPtr hServer, uint sessionId, int wtsInfoClass, out IntPtr ppBuffer, out uint pBytesReturned);
+
+    [DllImport("wtsapi32.dll")]
+    private static extern void WTSFreeMemory(IntPtr pMemory);
 
     [DllImport("advapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
