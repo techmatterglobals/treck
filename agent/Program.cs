@@ -153,7 +153,13 @@ try
     // --- One-shot capture self-test (--capture-helper-test) ---
     if (isCaptureHelperTest)
     {
+        // Exercise the real interactive-collection path (capture → process →
+        // spool) so the test validates monitor enumeration, JPEG creation,
+        // hashing AND spool writability in one shot.
         Log.Information("Running one-shot capture self-test…");
+        builder.Services.AddSingleton(EventSource.Current(EventSource.InteractiveHelper, "TreckAgent(selftest)"));
+        builder.Services.AddSingleton<IAgentEventSpool, FileAgentEventSpool>();
+        builder.Services.AddSingleton<IScreenshotSink, SpoolScreenshotSink>();
         using var testHost = builder.Build();
         return ScreenshotSelfTest.Run(testHost.Services);
     }
@@ -167,7 +173,7 @@ try
         // Registration, sync, session monitoring and the offline queue stay in the
         // service.
         Log.Information(
-            "Starting in capture-helper mode: user={User} session={Session} pid={Pid}.",
+            "Starting in capture-helper mode: CollectionMode=InteractiveHelper User={User} SessionId={Session} PID={Pid} Desktop=WinSta0\\Default.",
             Environment.UserName, System.Diagnostics.Process.GetCurrentProcess().SessionId, Environment.ProcessId);
 
         builder.Services.AddSingleton(new AgentRuntime { CollectInteractiveInProcess = false });

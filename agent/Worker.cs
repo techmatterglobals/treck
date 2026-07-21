@@ -103,7 +103,11 @@ public sealed class Worker : BackgroundService
             // Session-0 service: heartbeat/idle + app-usage collection run in the
             // interactive capture helper instead (they cannot see the user's
             // desktop from session 0). This Worker keeps session monitoring + sync.
-            _logger.LogInformation("Interactive collection delegated to the capture helper (session-0 service).");
+            // Explicit proof that no interactive collector runs here (Phase 8 #6).
+            _logger.LogInformation(
+                "Interactive collectors disabled in service mode: ScreenshotWorker not hosted, " +
+                "ApplicationSessionManager (foreground) not started, idle/heartbeat collector not started. " +
+                "The interactive helper collects them; this service only ingests the spool and syncs.");
         }
 
         try

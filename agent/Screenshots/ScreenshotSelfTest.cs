@@ -2,6 +2,7 @@ using System.Runtime.Versioning;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Treck.Agent.Applications;
+using Treck.Agent.Configuration;
 
 namespace Treck.Agent.Screenshots;
 
@@ -24,12 +25,15 @@ public static class ScreenshotSelfTest
         var capture = services.GetRequiredService<IScreenshotCaptureService>();
         var processing = services.GetRequiredService<IScreenshotProcessingService>();
         var activeWindow = services.GetRequiredService<IActiveWindowService>();
+        var sink = services.GetRequiredService<IScreenshotSink>();
+        var source = services.GetRequiredService<EventSource>();
 
         logger.LogInformation(
-            "Self-test: session={Session} user={User} pid={Pid}.",
+            "Self-test: session={Session} user={User} pid={Pid} collectionMode={Mode}.",
             System.Diagnostics.Process.GetCurrentProcess().SessionId,
             Environment.UserName,
-            Environment.ProcessId);
+            Environment.ProcessId,
+            source.CollectionMode);
 
         if (!capture.CanCapture())
         {
@@ -64,15 +68,27 @@ public static class ScreenshotSelfTest
                     continue;
                 }
 
-                written++;
                 logger.LogInformation(
                     "Monitor {Monitor}: {Width}x{Height}, {Size} bytes, hash={Hash}, file={File}.",
                     metadata.MonitorNumber, metadata.Width, metadata.Height, metadata.FileSize,
                     metadata.ImageHash[..12], metadata.LocalPath);
+
+                // Exercise the real spool path (writes a sidecar under helper\spool).
+                metadata = metadata with
+                {
+                    SourceSessionId = source.SessionId,
+                    SourceUser = source.User,
+                    SourceProcess = source.Process,
+                    CollectionMode = source.CollectionMode,
+                };
+                sink.Submit(metadata);
+                written++;
             }
         }
 
-        logger.LogInformation("Self-test OK: {Count} monitor(s) captured, {Written} file(s) written.", captures.Count, written);
+        logger.LogInformation(
+            "Self-test OK: {Count} monitor(s) captured, {Written} spooled. Check helper\\spool for sidecars.",
+            captures.Count, written);
         return 0;
     }
 }
