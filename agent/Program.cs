@@ -36,6 +36,21 @@ try
     var isCaptureHelperTest = args.Contains("--capture-helper-test");
     var isCaptureHelper = args.Contains("--capture-helper");
 
+    // Topology is decided by the SESSION the process runs in, not by
+    // WindowsServiceHelpers.IsWindowsService() (whose parent-process heuristic
+    // proved unreliable and left the supervisor unregistered). A Windows service
+    // always runs in session 0; a console/dev run or the launched helper runs in
+    // an interactive session (1+). Session 0 = cannot see the desktop = must
+    // delegate interactive collection to a helper.
+    var currentSessionId = 0;
+    try { currentSessionId = System.Diagnostics.Process.GetCurrentProcess().SessionId; } catch { /* default 0 */ }
+    var runningInSession0 = currentSessionId == 0 && !isCaptureHelper && !isCaptureHelperTest;
+
+    Log.Information(
+        "Treck Agent startup: captureHelper={Helper} selfTest={Test} sessionId={Session} isWindowsService={Svc} → topology={Topology}",
+        isCaptureHelper, isCaptureHelperTest, currentSessionId, WindowsServiceHelpers.IsWindowsService(),
+        isCaptureHelper ? "capture-helper" : isCaptureHelperTest ? "self-test" : runningInSession0 ? "service(session0)+helper" : "in-process(interactive)");
+
     // --- Windows Service hosting (M6) ---
     // The service *name* (SCM key) must match what deploy/install-service.ps1
     // registers. The display name and description are set at install time by
@@ -61,7 +76,7 @@ try
     // IsWindowsService() is false for it, yet its working directory is still
     // Program Files (not user-writable). Redirect its log sink to ProgramData too,
     // to a distinct file so the two processes never contend on the same log.
-    if (WindowsServiceHelpers.IsWindowsService() || isCaptureHelper || isCaptureHelperTest)
+    if (runningInSession0 || WindowsServiceHelpers.IsWindowsService() || isCaptureHelper || isCaptureHelperTest)
     {
         var logFile = isCaptureHelperTest ? "treck-agent-selftest-.jsonl"
             : isCaptureHelper ? "treck-agent-helper-.jsonl"
@@ -184,11 +199,12 @@ try
         builder.Services.AddHostedService<HeartbeatSpoolForwarder>();
         builder.Services.AddHostedService<ApplicationUsageSpoolForwarder>();
     }
-    else if (WindowsServiceHelpers.IsWindowsService())
+    else if (runningInSession0)
     {
         // Session-0 service: cannot see the user's desktop. Delegate all
         // interactive collection (screenshots + foreground + idle) to a helper it
         // launches into the active session, and ingest the helper's spool.
+        Log.Information("Topology: SERVICE (session 0) — hosting helper supervisor + spool ingester + sync.");
         builder.Services.AddSingleton(new AgentRuntime { CollectInteractiveInProcess = false });
         builder.Services.AddSingleton(EventSource.Current(EventSource.Service, "TreckAgent(service)"));
         builder.Services.AddHostedService<SyncWorker>();
@@ -199,6 +215,7 @@ try
     else
     {
         // Console/dev: already interactive → collect + capture in-process.
+        Log.Information("Topology: IN-PROCESS (interactive session {Session}) — capturing in-process.", currentSessionId);
         builder.Services.AddSingleton(new AgentRuntime { CollectInteractiveInProcess = true });
         builder.Services.AddSingleton(EventSource.Current(EventSource.Service, "TreckAgent(console)"));
         builder.Services.AddSingleton<IScreenshotSink, OfflineQueueScreenshotSink>();

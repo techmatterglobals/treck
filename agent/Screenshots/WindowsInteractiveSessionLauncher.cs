@@ -32,17 +32,20 @@ public sealed class WindowsInteractiveSessionLauncher : IInteractiveSessionLaunc
     public ILaunchedProcess? Launch(string executablePath, string arguments)
     {
         var sessionId = WTSGetActiveConsoleSessionId();
+        _logger.LogInformation("Launch: WTSGetActiveConsoleSessionId returned {Session}.", sessionId);
         if (sessionId == INVALID_SESSION)
         {
-            _logger.LogWarning("No active console session; cannot launch the capture helper yet.");
+            _logger.LogWarning("No active console session (0xFFFFFFFF); cannot launch the capture helper yet.");
             return null;
         }
 
         if (!WTSQueryUserToken(sessionId, out var userToken))
         {
-            _logger.LogWarning("WTSQueryUserToken failed for session {Session} (win32={Err}).", sessionId, Marshal.GetLastWin32Error());
+            _logger.LogWarning("WTSQueryUserToken FAILED for session {Session}, GetLastError={Err}.", sessionId, Marshal.GetLastWin32Error());
             return null;
         }
+
+        _logger.LogInformation("WTSQueryUserToken OK for session {Session} (user={User}).", sessionId, GetSessionUserName(sessionId));
 
         var duplicated = IntPtr.Zero;
         var environment = IntPtr.Zero;
@@ -51,13 +54,20 @@ public sealed class WindowsInteractiveSessionLauncher : IInteractiveSessionLaunc
         {
             if (!DuplicateTokenEx(userToken, MAXIMUM_ALLOWED, IntPtr.Zero, SecurityImpersonation, TokenPrimary, out duplicated))
             {
-                _logger.LogWarning("DuplicateTokenEx failed (win32={Err}).", Marshal.GetLastWin32Error());
+                _logger.LogWarning("DuplicateTokenEx FAILED, GetLastError={Err}.", Marshal.GetLastWin32Error());
                 return null;
             }
 
+            _logger.LogInformation("DuplicateTokenEx OK.");
+
             if (!CreateEnvironmentBlock(out environment, duplicated, false))
             {
+                _logger.LogWarning("CreateEnvironmentBlock FAILED, GetLastError={Err}; proceeding without a per-user environment.", Marshal.GetLastWin32Error());
                 environment = IntPtr.Zero; // proceed without a per-user block
+            }
+            else
+            {
+                _logger.LogInformation("CreateEnvironmentBlock OK.");
             }
 
             var startupInfo = new STARTUPINFO
@@ -69,18 +79,20 @@ public sealed class WindowsInteractiveSessionLauncher : IInteractiveSessionLaunc
             var commandLine = $"\"{executablePath}\" {arguments}";
             var flags = CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW;
 
+            _logger.LogInformation("CreateProcessAsUser: cmd={Cmd} desktop=winsta0\\default.", commandLine);
+
             if (!CreateProcessAsUser(
                     duplicated, null, commandLine, IntPtr.Zero, IntPtr.Zero, false,
                     flags, environment, Path.GetDirectoryName(executablePath), ref startupInfo, out var processInfo))
             {
-                _logger.LogWarning("CreateProcessAsUser failed (win32={Err}).", Marshal.GetLastWin32Error());
+                _logger.LogWarning("CreateProcessAsUser FAILED, GetLastError={Err}.", Marshal.GetLastWin32Error());
                 return null;
             }
 
             CloseHandle(processInfo.hThread);
 
             _logger.LogInformation(
-                "Capture helper launched: session={Session} user={User} pid={Pid} desktop=winsta0\\default.",
+                "CreateProcessAsUser OK — capture helper launched: session={Session} user={User} pid={Pid} desktop=winsta0\\default.",
                 sessionId, GetSessionUserName(sessionId), processInfo.dwProcessId);
 
             return new LaunchedProcess(processInfo.hProcess, sessionId);

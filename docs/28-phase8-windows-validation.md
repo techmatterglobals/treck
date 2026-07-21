@@ -14,6 +14,28 @@ real machine.
 
 ---
 
+## 0. Diagnosing "helper never launches" (start here)
+
+If the service runs but no Session-1 helper appears and the spool stays empty,
+read the **service** log (`%ProgramData%\TreckAgent\logs\treck-agent-*.jsonl`)
+top-to-bottom. The agent now logs every decision point; find the first line that
+is missing or wrong:
+
+| Expected log line (service) | If missing / wrong → cause |
+| --------------------------- | -------------------------- |
+| `Treck Agent startup: … sessionId=0 … → topology=service(session0)+helper` | If `topology=in-process(interactive)` or `sessionId≠0`, the process is not detected as the session-0 service. Topology is now decided by **session id == 0** (not `IsWindowsService()`), so this should read `service(session0)+helper` for a real service. |
+| `Topology: SERVICE (session 0) — hosting helper supervisor …` | Confirms the supervisor branch was taken. |
+| `ScreenshotHelperSupervisor.ExecuteAsync entered (screenshots enabled=True)` | `enabled=False` → the `Screenshots.Enabled` config isn't binding (check `appsettings.json` section name/casing). Missing entirely → supervisor not hosted (stale binary — redeploy `publish`). |
+| `Helper supervision cycle: activeConsoleSession=<n> helperRunning=False` | `activeConsoleSession=none` → `WTSGetActiveConsoleSessionId` sees no console session (RDP-only / locked at boot); log in on the physical console. |
+| `Launching capture helper into session <n>…` then `Launch: WTSGetActiveConsoleSessionId returned <n>` | The launch attempt began. |
+| `WTSQueryUserToken OK …` → `DuplicateTokenEx OK` → `CreateEnvironmentBlock OK` → `CreateProcessAsUser OK — … pid=<pid>` | Any `… FAILED, GetLastError=<n>` pinpoints the failing Win32 call. Common: `WTSQueryUserToken` error 1314 = the service lacks `SeTcbPrivilege` (must run as LocalSystem). |
+| Helper log `treck-agent-helper-*.jsonl`: `Starting in capture-helper mode: CollectionMode=InteractiveHelper …` | Present ⇒ the `--capture-helper` path actually ran after `CreateProcessAsUser` (checklist item 4). |
+
+The most common historical cause was topology mis-detection via
+`IsWindowsService()`; that is now replaced by the session-0 check above.
+
+---
+
 ## 1. Agent build validation
 
 ```powershell

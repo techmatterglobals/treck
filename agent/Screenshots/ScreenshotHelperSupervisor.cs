@@ -48,6 +48,12 @@ public sealed class ScreenshotHelperSupervisor : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Unconditional first line so its presence proves the supervisor was
+        // registered and started, before any config check or Windows API call.
+        _logger.LogInformation(
+            "ScreenshotHelperSupervisor.ExecuteAsync entered (screenshots enabled={Enabled}).",
+            _options.Enabled);
+
         if (!_options.Enabled)
         {
             _logger.LogInformation("Screenshot capture is disabled; helper supervisor idle.");
@@ -93,6 +99,10 @@ public sealed class ScreenshotHelperSupervisor : BackgroundService
     private void EnsureHelper()
     {
         var activeSession = _launcher.ActiveConsoleSessionId;
+        _logger.LogInformation(
+            "Helper supervision cycle: activeConsoleSession={ActiveSession} helperRunning={Running}.",
+            activeSession == INVALID_SESSION ? "none" : activeSession.ToString(),
+            _helper?.IsRunning ?? false);
 
         // No interactive session (login screen / all logged off): nothing to do.
         if (activeSession == INVALID_SESSION)
@@ -101,6 +111,10 @@ public sealed class ScreenshotHelperSupervisor : BackgroundService
             {
                 _logger.LogInformation("Interactive session ended; stopping capture helper.");
                 StopHelper();
+            }
+            else
+            {
+                _logger.LogInformation("No active console session yet; waiting to launch the capture helper.");
             }
 
             return;
@@ -115,7 +129,16 @@ public sealed class ScreenshotHelperSupervisor : BackgroundService
             StopHelper();
         }
 
-        _helper ??= _launcher.Launch(ExecutablePath(), HelperArgument);
+        if (_helper is null)
+        {
+            _logger.LogInformation("Launching capture helper into session {Session}…", activeSession);
+            _helper = _launcher.Launch(ExecutablePath(), HelperArgument);
+
+            if (_helper is null)
+            {
+                _logger.LogWarning("Capture helper launch returned no process; will retry next cycle.");
+            }
+        }
     }
 
     private void StopHelper()
