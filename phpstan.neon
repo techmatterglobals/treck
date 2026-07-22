@@ -1,0 +1,24 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    # Level 6 is the highest practical level for a Laravel application without
+    # extensive per-line ignores. Raise toward 8 incrementally as the baseline
+    # is tightened. Run: composer require --dev larastan/larastan && vendor/bin/phpstan analyse
+    level: 6
+
+    paths:
+        - app
+        - database/factories
+        - database/seeders
+        - routes
+
+    # Framework magic that PHPStan cannot infer statically.
+    ignoreErrors:
+        - '#Unsafe usage of new static#'
+
+    excludePaths:
+        - app/Console/Kernel.php
+
+    checkModelProperties: true
+    checkOctaneCompatibility: false

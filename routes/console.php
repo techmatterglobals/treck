@@ -24,3 +24,6 @@ Schedule::command('treck:daily-rollup '.now()->subDay()->toDateString())->dailyA
 
 // Enforce the screenshot retention policy (Phase 8).
 Schedule::command('treck:prune-screenshots')->dailyAt('01:00')->withoutOverlapping();
+
+// Enforce the raw-event retention policy (agent_events; doc 30).
+Schedule::command('treck:prune-events')->dailyAt('01:15')->withoutOverlapping();

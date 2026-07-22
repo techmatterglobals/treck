@@ -13,9 +13,7 @@ use Illuminate\Support\Carbon;
  */
 class ActivitySummaryService
 {
-    public function __construct(private readonly DeviceStatusService $status)
-    {
-    }
+    public function __construct(private readonly DeviceStatusService $status) {}
 
     /**
      * Daily summary for an employee: active/idle totals, active ratio, live

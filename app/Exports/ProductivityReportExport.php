@@ -19,8 +19,7 @@ class ProductivityReportExport implements FromCollection, ShouldAutoSize, WithHe
     public function __construct(
         private readonly Collection $rows,
         private readonly ReportPeriod $period,
-    ) {
-    }
+    ) {}
 
     public function collection(): Collection
     {

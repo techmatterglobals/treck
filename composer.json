@@ -1,5 +1,6 @@
 {
     "name": "techmatterglobals/treck",
+    "version": "1.0.0",
     "type": "project",
     "description": "Treck — Employee Productivity & PC Activity Monitoring System",
     "keywords": ["laravel", "monitoring", "productivity"],

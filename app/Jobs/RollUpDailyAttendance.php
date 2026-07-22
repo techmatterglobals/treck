@@ -13,9 +13,7 @@ class RollUpDailyAttendance implements ShouldQueue
 {
     use Queueable;
 
-    public function __construct(public readonly ?string $date = null)
-    {
-    }
+    public function __construct(public readonly ?string $date = null) {}
 
     public function handle(AttendanceService $service): void
     {

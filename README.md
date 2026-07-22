@@ -1,15 +1,20 @@
 # Treck — Employee Productivity & PC Activity Monitoring System
 
+**Version 1.0.0 — Production Ready.**
+
 Treck is an employee productivity and workstation-activity monitoring platform.
 A lightweight **desktop agent** installed on employee PCs captures workstation
 activity (login/logout, active/idle time, computer status, foreground
-application usage) and streams it to a **Laravel backend**, which stores,
-aggregates, and exposes the data through a REST API and a real-time admin
-dashboard for HR, team leads, and management.
+application usage, and optional screenshots) and streams it to a **Laravel
+backend**, which stores, aggregates, and exposes the data through a REST API,
+a real-time admin dashboard, and a rule-driven notification system for HR,
+team leads, and management.
 
-> This repository currently contains the **architecture and technical design**
-> for the platform. Implementation follows the phased
-> [development roadmap](docs/07-development-roadmap.md).
+> All ten delivery phases are complete and verified (architecture, backend,
+> security, documentation, Windows agent, real-time dashboard, application-usage
+> tracking, screenshots, notifications, and production release). See the
+> [production release guide](docs/30-production-release.md) for the final
+> architecture, deployment, upgrade, and operations runbook.
 
 ---
 
@@ -23,6 +28,9 @@ dashboard for HR, team leads, and management.
 | Idle time             | Time the workstation was idle beyond the configured threshold          |
 | Computer status       | Live online / idle / locked / offline state per device                 |
 | Productivity reports  | Per-employee / team / department productivity scores and trends        |
+| Application usage     | Foreground application / window usage and duration per employee         |
+| Screenshots           | Opt-in scheduled desktop captures with private storage + signed access  |
+| Notifications         | Rule-driven in-app + email alerts (presence, apps, agent/system health) |
 
 ---
 
@@ -70,6 +78,11 @@ The full technical design lives in [`docs/`](docs/):
 23. [Requirements Review](docs/23-requirements-review.md)
 24. [Windows Agent — Milestone Build & Service Packaging](docs/24-windows-agent-build.md) — deploy scripts in [`agent/deploy/`](agent/deploy/)
 25. [Real-Time Presence Dashboard](docs/25-realtime-presence.md) — materialized presence + broadcasting (M7)
+26. [Application Usage](docs/26-application-usage.md) — foreground app tracking + usage dashboard (Phase 7)
+27. [Screenshot Module](docs/27-screenshot-module.md) — opt-in capture, private storage, signed access (Phase 8)
+28. [Phase 8 Windows Validation](docs/28-phase8-windows-validation.md) — agent-side capture/upload validation
+29. [Notifications](docs/29-notifications.md) — rule engine, in-app + email channels, async delivery (Phase 9)
+30. [Production Release](docs/30-production-release.md) — final architecture, deployment, upgrade, operations, v1.0 release notes (Phase 10)
 
 ## Setup
 

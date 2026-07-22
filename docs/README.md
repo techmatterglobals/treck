@@ -37,6 +37,7 @@ directly to the area you need.
 | 27 | [Screenshot Module](27-screenshot-module.md) | Phase 8: opt-in desktop capture, multipart upload, private storage + signed URLs, admin viewer |
 | 28 | [Phase 8 Windows Validation](28-phase8-windows-validation.md) | Phase 8: Windows-side capture/upload validation notes |
 | 29 | [Notifications](29-notifications.md) | Phase 9: centralized rule engine, in-app + email channels, preferences, live dashboard, async delivery |
+| 30 | [Production Release](30-production-release.md) | Phase 10: final architecture, deployment/upgrade/DR runbook, retention enforcement, v1.0.0 release notes |
 
 ## Deployment artifacts
 

@@ -19,7 +19,7 @@ class ActivityTrackingService
      * Accumulate the active/idle deltas onto a session and update the computer.
      *
      * @param  int  $activeDelta  Seconds of real input since the last report.
-     * @param  int  $idleDelta    Seconds idle since the last report.
+     * @param  int  $idleDelta  Seconds idle since the last report.
      */
     public function record(
         ActivityLog $session,

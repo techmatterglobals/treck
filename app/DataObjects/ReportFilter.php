@@ -17,8 +17,7 @@ class ReportFilter
         public readonly ?int $departmentId,
         public readonly Carbon $from,
         public readonly Carbon $to,
-    ) {
-    }
+    ) {}
 
     public static function fromArray(array $data): self
     {

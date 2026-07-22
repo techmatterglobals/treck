@@ -153,7 +153,11 @@ npm install && npm run build
 The scheduler (`routes/console.php`) runs:
 
 - `treck:reconcile-sessions` — every minute (marks stale computers offline).
+- `treck:presence-sweep` — every minute (transitions quiet computers to Offline).
 - `treck:daily-rollup` — hourly + a nightly finalize (attendance + productivity).
+- `treck:prune-screenshots` — daily (enforces screenshot retention).
+- `treck:prune-events` — daily (enforces raw `agent_events` retention,
+  `TRECK_RAW_RETENTION` days; prevents unbounded table growth).
 
 In production, a single cron entry drives it:
 
@@ -378,6 +382,10 @@ monitoring, and the full deployment checklist. Use
 [`deploy/.env.production.example`](deploy/.env.production.example) as the env
 template. On first deploy, seed **roles only** (`RolePermissionSeeder`), never
 `DemoDataSeeder`.
+
+For the **v1.0.0 production-release runbook** — final architecture, upgrade and
+uninstall procedures, backup/disaster-recovery, operational checklist, and
+release notes — see [`docs/30-production-release.md`](docs/30-production-release.md).
 
 ---
 
