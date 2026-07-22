@@ -242,3 +242,13 @@ fed by a dedicated multipart upload endpoint (`/api/agent/screenshots`). It is
 independent of presence — screenshots do not flow through the presence projector
 or broadcast — but reuses the same admin auth model and the same agent offline
 queue + sync pipeline. Full design: [`docs/27-screenshot-module.md`](27-screenshot-module.md).
+
+---
+
+## 25.11 Phase 9 note — Notifications
+
+Phase 9 reuses this phase's broadcasting infrastructure. A queued listener on
+`PresenceChanged` feeds the notification engine (without touching the presence
+pipeline), which evaluates configurable rules and broadcasts `NotificationCreated`
+on each recipient's private channel so the admin bell and notifications dashboard
+update live — no polling. Full design: [`docs/29-notifications.md`](29-notifications.md).

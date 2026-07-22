@@ -18,6 +18,7 @@
                     <a href="{{ route('presence.index') }}" class="text-sm hover:underline">Live Presence</a>
                     <a href="{{ route('application-usage.index') }}" class="text-sm hover:underline">App Usage</a>
                     <a href="{{ route('screenshots.index') }}" class="text-sm hover:underline">Screenshots</a>
+                    <a href="{{ route('notifications.index') }}" class="text-sm hover:underline">Notifications</a>
                 @endrole
                 @can('manage employees')
                     <a href="{{ route('employees.index') }}" class="text-sm hover:underline">Employees</a>
@@ -26,12 +27,17 @@
                     <a href="{{ route('reports.index') }}" class="text-sm hover:underline">Reports</a>
                 @endcan
             </div>
-            <form method="POST" action="{{ route('logout') }}">
-                @csrf
-                <button type="submit" class="text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
-                    Log out ({{ auth()->user()?->name }})
-                </button>
-            </form>
+            <div class="flex items-center gap-4">
+                @role('admin')
+                    <livewire:notifications.notification-bell />
+                @endrole
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button type="submit" class="text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
+                        Log out ({{ auth()->user()?->name }})
+                    </button>
+                </form>
+            </div>
         </div>
     </nav>
 

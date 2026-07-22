@@ -62,6 +62,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Notifications (Phase 9)
+    |--------------------------------------------------------------------------
+    | Per-rule behaviour (enabled/severity/channels/thresholds/throttle) lives in
+    | the `notification_rules` table so admins can retune without a deploy. These
+    | are process-level defaults only.
+    */
+    'notifications' => [
+        // Default throttle window (seconds) applied when a rule has none set.
+        'default_throttle_seconds' => (int) env('TRECK_NOTIFY_THROTTLE', 300),
+        // Digest email cadence for users in digest mode (cron-driven).
+        'digest_hours' => (int) env('TRECK_NOTIFY_DIGEST_HOURS', 24),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Data retention (days)
     |--------------------------------------------------------------------------
     */

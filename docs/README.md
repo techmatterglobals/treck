@@ -33,6 +33,10 @@ directly to the area you need.
 | 23 | [Requirements Review](23-requirements-review.md) | Module-by-module status (complete/partial/not started), missing features, priority |
 | 24 | [Windows Agent — Milestone Build](24-windows-agent-build.md) | .NET 8 agent built in milestones; M1–M6 complete (M6: Windows Service packaging, production runtime, server-side `/api/agent/events`) |
 | 25 | [Real-Time Presence Dashboard](25-realtime-presence.md) | Phase 6: materialized `computer_presence`, event projection, admin broadcasting, live Livewire dashboard |
+| 26 | [Application Usage](26-application-usage.md) | Phase 7: foreground app tracking, usage projection, admin dashboard (summary, top apps, timeline, breakdowns) |
+| 27 | [Screenshot Module](27-screenshot-module.md) | Phase 8: opt-in desktop capture, multipart upload, private storage + signed URLs, admin viewer |
+| 28 | [Phase 8 Windows Validation](28-phase8-windows-validation.md) | Phase 8: Windows-side capture/upload validation notes |
+| 29 | [Notifications](29-notifications.md) | Phase 9: centralized rule engine, in-app + email channels, preferences, live dashboard, async delivery |
 
 ## Deployment artifacts
 

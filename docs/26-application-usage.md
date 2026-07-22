@@ -393,3 +393,13 @@ endpoint). See [`docs/27-screenshot-module.md`](27-screenshot-module.md).
 ---
 
 *Phase 7 complete.*
+
+---
+
+## Phase 9 note — Notifications
+
+Phase 9 observes completed application-usage rows (via an Eloquent observer, so
+this phase's projection is untouched) and evaluates them against configurable
+rules — restricted applications, blacklisted processes and usage-beyond-duration
+— generating admin notifications asynchronously. Full design:
+[`docs/29-notifications.md`](29-notifications.md).

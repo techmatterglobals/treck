@@ -330,6 +330,34 @@ Windows secure desktop (UAC / Ctrl+Alt+Del / login / lock screen). Full design:
 
 ---
 
+## 7d. Notifications (Phase 9)
+
+An admin-only **Notifications** dashboard (`/notifications`, "Notifications" in
+the nav, plus a live bell) turns monitoring signals into rule-driven alerts
+delivered **in-app** (live, no polling) and by **email**. A settings page
+(`/notifications/settings`) configures everything from the DB — no code changes:
+per-rule enable/severity/channels/throttle, key thresholds (idle, long-usage,
+restricted apps, blacklisted processes) and each admin's own preferences
+(channels, minimum severity, digest, quiet hours).
+
+It observes the existing presence (Phase 6) and application-usage (Phase 7)
+pipelines without modifying them, and processes everything **asynchronously**
+(queued evaluation + queued delivery + queued mail) so agent sync, presence,
+app tracking and screenshot uploads are never blocked. Requirements: a running
+`php artisan queue:work`, a configured mail transport, and Reverb for live
+in-app updates (see §7a). Optional tunables:
+
+```bash
+# .env (server)
+TRECK_NOTIFY_THROTTLE=300          # default per-rule dedupe window (seconds)
+TRECK_NOTIFY_DIGEST_HOURS=24       # digest batching window
+```
+
+Migrations seed one rule per event type (with `presence.online` disabled by
+default). Full design: [`docs/29-notifications.md`](docs/29-notifications.md).
+
+---
+
 ## 8. Running tests
 
 ```bash
@@ -371,5 +399,6 @@ template. On first deploy, seed **roles only** (`RolePermissionSeeder`), never
 
 See [`docs/23-requirements-review.md`](docs/23-requirements-review.md) for the
 module-by-module completion table. Known gaps at the time of writing:
-Attendance UI/correction, full auth suite, app-usage ingestion, Department &
-Computer admin UIs, Notifications, and the Screenshot module.
+Attendance UI/correction, full auth suite, and Department & Computer admin UIs.
+Real-time presence (Phase 6), application usage (Phase 7), the Screenshot module
+(Phase 8) and Notifications (Phase 9) are implemented — see §§7a–7d.

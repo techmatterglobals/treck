@@ -421,3 +421,15 @@ curl -sX POST https://treck.test/api/agent/logout \
   -H "Authorization: Bearer $TOKEN" -H 'Accept: application/json' \
   -d session_id=8801
 ```
+
+---
+
+## Phase 9 note — Notifications
+
+Agent-observable signals feed the Phase 9 notification engine. Presence changes
+and completed application-usage sessions (already ingested via the endpoints
+above) are evaluated automatically against configurable rules; agent/system
+health failures (registration failed, heartbeat stopped, repeated sync failures,
+growing queue) are modelled as notification event types and are ready to be
+driven by dedicated agent-fed signals. No new agent endpoint is required for
+Phase 9. Full design: [`docs/29-notifications.md`](29-notifications.md).

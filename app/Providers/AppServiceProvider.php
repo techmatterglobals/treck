@@ -2,8 +2,16 @@
 
 namespace App\Providers;
 
+use App\Events\PresenceChanged;
+use App\Listeners\EvaluatePresenceNotifications;
+use App\Models\ApplicationUsage;
+use App\Models\NotificationLog;
+use App\Observers\ApplicationUsageObserver;
+use App\Policies\NotificationPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -17,6 +25,14 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Notifications (Phase 9): bridge existing events/models into the engine
+        // without modifying the presence (Phase 6) or app-usage (Phase 7) code.
+        Event::listen(PresenceChanged::class, EvaluatePresenceNotifications::class);
+        ApplicationUsage::observe(ApplicationUsageObserver::class);
+
+        // The policy name doesn't follow model-name auto-discovery, so bind it.
+        Gate::policy(NotificationLog::class, NotificationPolicy::class);
+
         // Login: strict, per email + IP to reduce credential stuffing.
         RateLimiter::for('login', function (Request $request) {
             return [

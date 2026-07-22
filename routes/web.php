@@ -3,6 +3,8 @@
 use App\Http\Controllers\Admin\UserRoleController;
 use App\Http\Controllers\ApplicationUsageController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\NotificationSettingsController;
 use App\Http\Controllers\PresenceController;
 use App\Http\Controllers\ScreenshotController;
 use Illuminate\Support\Facades\Route;
@@ -33,6 +35,10 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/screenshots/{screenshot}/image', [ScreenshotController::class, 'image'])
             ->middleware('signed')
             ->name('screenshots.image');
+
+        // Admin-only notifications (Phase 9).
+        Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+        Route::get('/notifications/settings', [NotificationSettingsController::class, 'index'])->name('notifications.settings');
     });
 });
 

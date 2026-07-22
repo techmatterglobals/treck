@@ -23,3 +23,9 @@ Broadcast::channel('presence', function (User $user) {
 Broadcast::channel('presence.computer.{computerId}', function (User $user, int $computerId) {
     return $user->is_active && $user->isAdministrator();
 });
+
+// A recipient's own notifications (Phase 9): live bell/badge updates. Admin-only,
+// and a user may only subscribe to their own channel.
+Broadcast::channel('notifications.user.{userId}', function (User $user, int $userId) {
+    return $user->is_active && $user->isAdministrator() && $user->id === $userId;
+});

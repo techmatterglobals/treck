@@ -574,3 +574,13 @@ decision.
 ---
 
 *Phase 8 complete.*
+
+---
+
+## Phase 9 note — Notifications
+
+Phase 9 models screenshot failures (capture failed, sync failed) as notification
+event types in the central engine. These are wired through the engine's
+`report()` entry point and are ready to be driven by dedicated agent-fed signals;
+they generate admin alerts asynchronously like every other notification. Full
+design: [`docs/29-notifications.md`](29-notifications.md).

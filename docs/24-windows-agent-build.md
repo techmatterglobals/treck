@@ -926,3 +926,12 @@ multipart), `Sync/AgentEventUploader.cs` (Screenshot branch), `Program.cs`
 - Privacy-preserving (image + metadata only; no input/clipboard/file capture).
 
 Full design: [`docs/27-screenshot-module.md`](27-screenshot-module.md).
+
+---
+
+## Phase 9 note — Notifications
+
+Phase 9 adds a server-side notification engine that turns agent signals
+(presence, application usage, and agent/system health) into rule-driven in-app
+and email alerts for administrators. It is additive and requires no agent build
+changes. Full design: [`docs/29-notifications.md`](29-notifications.md).
