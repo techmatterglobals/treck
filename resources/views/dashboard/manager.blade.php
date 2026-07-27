@@ -12,22 +12,6 @@
                 screenshots and reports below are automatically scoped to your assigned employees.
             </div>
 
-            {{-- Quick links to the (team-scoped) monitoring screens. --}}
-            <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <a href="{{ route('presence.index') }}" class="rounded-lg bg-white dark:bg-gray-800 shadow p-4 text-center hover:ring-2 hover:ring-indigo-400">
-                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100">Presence</div>
-                </a>
-                <a href="{{ route('application-usage.index') }}" class="rounded-lg bg-white dark:bg-gray-800 shadow p-4 text-center hover:ring-2 hover:ring-indigo-400">
-                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100">App Usage</div>
-                </a>
-                <a href="{{ route('screenshots.index') }}" class="rounded-lg bg-white dark:bg-gray-800 shadow p-4 text-center hover:ring-2 hover:ring-indigo-400">
-                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100">Screenshots</div>
-                </a>
-                <a href="{{ route('reports.index') }}" class="rounded-lg bg-white dark:bg-gray-800 shadow p-4 text-center hover:ring-2 hover:ring-indigo-400">
-                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100">Reports</div>
-                </a>
-            </div>
-
             {{-- Team presence (scoped to this manager's employees). --}}
             <livewire:presence.presence-board />
 
