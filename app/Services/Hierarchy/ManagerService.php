@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 
 /**
  * Organization-hierarchy operations (Phase 11). All Manager/Employee mutations
@@ -26,7 +27,7 @@ class ManagerService
             'is_active' => true,
         ]);
 
-        $user->syncRoles([UserRole::Manager->value]);
+        $user->syncRoles([$this->role(UserRole::Manager)->name]);
 
         return $user;
     }
@@ -34,7 +35,7 @@ class ManagerService
     /** Promote an existing user (typically an employee) to Manager. */
     public function promote(User $user): void
     {
-        $user->syncRoles([UserRole::Manager->value]);
+        $user->syncRoles([$this->role(UserRole::Manager)->name]);
     }
 
     /**
@@ -46,8 +47,17 @@ class ManagerService
     {
         DB::transaction(function () use ($user) {
             $user->managedEmployees()->update(['manager_user_id' => null]);
-            $user->syncRoles([UserRole::Employee->value]);
+            $user->syncRoles([$this->role(UserRole::Employee)->name]);
         });
+    }
+
+    /**
+     * Resolve a role, creating it on demand so hierarchy actions never fail with
+     * RoleDoesNotExist on a deployment that migrated but hasn't re-seeded.
+     */
+    private function role(UserRole $role): Role
+    {
+        return Role::findOrCreate($role->value, 'web');
     }
 
     /** Assign (or reassign/transfer) an employee to a manager. */

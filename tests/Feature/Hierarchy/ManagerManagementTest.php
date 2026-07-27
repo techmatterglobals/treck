@@ -105,4 +105,21 @@ class ManagerManagementTest extends TestCase
 
         Livewire::actingAs($manager)->test(ManagerManagement::class)->assertForbidden();
     }
+
+    /**
+     * Regression: promoting/creating a manager must work on a deployment that
+     * migrated but never seeded the `manager` role (the service creates it on
+     * demand instead of throwing RoleDoesNotExist).
+     */
+    public function test_promote_works_when_manager_role_was_not_seeded(): void
+    {
+        Role::whereName('manager')->delete();
+        $employeeUser = tap(User::factory()->create(), fn (User $u) => $u->assignRole('employee'));
+
+        Livewire::actingAs($this->superAdmin())->test(ManagerManagement::class)
+            ->call('promote', $employeeUser->id)
+            ->assertHasNoErrors();
+
+        $this->assertTrue($employeeUser->fresh()->isManager());
+    }
 }
