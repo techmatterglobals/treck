@@ -1,8 +1,11 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-            {{ __('Reports') }}
-        </h2>
+        <div class="flex items-center justify-between">
+            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                {{ __('Reports') }}
+            </h2>
+            <a href="{{ route('reports.computer-usage') }}" class="text-sm text-indigo-600 hover:underline">Computer Usage History &rarr;</a>
+        </div>
     </x-slot>
 
     <div class="py-6">
@@ -47,6 +50,21 @@
                             @endforeach
                         </select>
                     </div>
+
+                    @if ($managers->isNotEmpty())
+                        <div>
+                            <x-input-label for="manager_user_id" :value="__('Manager')" />
+                            <select id="manager_user_id" name="manager_user_id"
+                                    class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                <option value="">All managers</option>
+                                @foreach ($managers as $manager)
+                                    <option value="{{ $manager->id }}" @selected($filter->managerUserId === $manager->id)>
+                                        {{ $manager->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
 
                     <div>
                         <x-input-label for="from" :value="__('From')" />

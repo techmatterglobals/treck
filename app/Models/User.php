@@ -54,6 +54,15 @@ class User extends Authenticatable
         return $this->hasMany(Department::class, 'manager_id');
     }
 
+    /**
+     * Employees this user supervises as their Manager (Phase 11), via
+     * employees.manager_user_id. Empty for non-managers.
+     */
+    public function managedEmployees(): HasMany
+    {
+        return $this->hasMany(Employee::class, 'manager_user_id');
+    }
+
     // ----------------------------------------------------------------
     // Scopes
     // ----------------------------------------------------------------
@@ -80,6 +89,22 @@ class User extends Authenticatable
     public function isAdministrator(): bool
     {
         return $this->hasRole(UserRole::Admin->value);
+    }
+
+    /**
+     * The Super Admin is the top of the hierarchy (Phase 11). It is the existing
+     * `admin` role, aliased here so hierarchy code can read intent clearly
+     * without changing the underlying role string.
+     */
+    public function isSuperAdmin(): bool
+    {
+        return $this->isAdministrator();
+    }
+
+    /** Whether this user supervises employees as a Manager (Phase 11). */
+    public function isManager(): bool
+    {
+        return $this->hasRole(UserRole::Manager->value);
     }
 
     /** Convenience check for the employee (self-service) role. */

@@ -11,6 +11,10 @@ use Illuminate\Support\Carbon;
  */
 class AppUsageFilter
 {
+    /**
+     * @param  list<int>|null  $employeeIds  Manager/employee visibility restriction
+     *                                       (Phase 11). Null = unrestricted (Super Admin).
+     */
     public function __construct(
         public readonly Carbon $from,
         public readonly Carbon $to,
@@ -18,7 +22,17 @@ class AppUsageFilter
         public readonly ?int $computerId = null,
         public readonly ?int $departmentId = null,
         public readonly ?string $application = null,
+        public readonly ?array $employeeIds = null,
     ) {}
+
+    /** Return a copy restricted to a visible-employee id set (null = unrestricted). */
+    public function restrictToEmployees(?array $employeeIds): self
+    {
+        return new self(
+            $this->from, $this->to, $this->employeeId, $this->computerId,
+            $this->departmentId, $this->application, $employeeIds,
+        );
+    }
 
     public static function fromArray(array $data): self
     {

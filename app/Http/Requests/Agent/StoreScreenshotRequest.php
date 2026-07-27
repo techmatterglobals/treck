@@ -38,6 +38,8 @@ class StoreScreenshotRequest extends FormRequest
             // Event source metadata (Phase 8 #3): where the capture was collected.
             'source_session_id' => ['nullable', 'integer', 'min:0', 'max:4294967295'],
             'source_user' => ['nullable', 'string', 'max:255'],
+            // Explicit Windows-identity alias for the employee resolver (Phase 11).
+            'windows_username' => ['nullable', 'string', 'max:255'],
             'source_process' => ['nullable', 'string', 'max:255'],
             'collection_mode' => ['nullable', 'string', 'max:32'],
         ];

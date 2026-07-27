@@ -403,3 +403,12 @@ this phase's projection is untouched) and evaluates them against configurable
 rules — restricted applications, blacklisted processes and usage-beyond-duration
 — generating admin notifications asynchronously. Full design:
 [`docs/29-notifications.md`](29-notifications.md).
+
+---
+
+## Phase 11 note — shared computers & manager scoping
+
+Application-usage rows are attributed to the employee behind the active Windows
+account on shared computers (Phase 11), and the dashboard/reports are scoped so a
+Manager sees only their own team. The Super Admin view is unchanged. Full design:
+[`docs/31-multi-user-computer-and-manager-hierarchy.md`](31-multi-user-computer-and-manager-hierarchy.md).

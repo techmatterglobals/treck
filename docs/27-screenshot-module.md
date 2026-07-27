@@ -584,3 +584,13 @@ event types in the central engine. These are wired through the engine's
 `report()` entry point and are ready to be driven by dedicated agent-fed signals;
 they generate admin alerts asynchronously like every other notification. Full
 design: [`docs/29-notifications.md`](29-notifications.md).
+
+---
+
+## Phase 11 note — shared computers & manager scoping
+
+Screenshots are attributed to the employee behind the active Windows account
+(from `source_user`/`windows_username`) on shared computers, and access is
+scoped: a Manager may view/download only their own team's captures (enforced by
+`ScreenshotPolicy` and the scoped dashboard). Full design:
+[`docs/31-multi-user-computer-and-manager-hierarchy.md`](31-multi-user-computer-and-manager-hierarchy.md).

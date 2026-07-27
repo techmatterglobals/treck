@@ -16,9 +16,11 @@ class Employee extends Model
 
     protected $fillable = [
         'user_id',
+        'manager_user_id',
         'department_id',
         'employee_code',
         'designation',
+        'status',
         'phone',
         'joined_on',
     ];
@@ -44,6 +46,22 @@ class Employee extends Model
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    /**
+     * The supervising Manager (a user), Phase 11. Null when unassigned. This is
+     * the direct hierarchy link (employees.manager_user_id) — independent of the
+     * department's manager.
+     */
+    public function manager(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'manager_user_id');
+    }
+
+    /** Per-Windows-account mappings on this employee's shared computers (1:N). */
+    public function computerUsers(): HasMany
+    {
+        return $this->hasMany(ComputerUser::class);
     }
 
     /** Workstations assigned to this employee (1:N). */
@@ -104,6 +122,38 @@ class Employee extends Model
     public function scopeInDepartment(Builder $query, int $departmentId): Builder
     {
         return $query->where('department_id', $departmentId);
+    }
+
+    /** Employees supervised by a given manager (Phase 11). */
+    public function scopeManagedBy(Builder $query, User|int $manager): Builder
+    {
+        $id = $manager instanceof User ? $manager->id : $manager;
+
+        return $query->where('manager_user_id', $id);
+    }
+
+    /**
+     * Restrict the query to the employees a user may see (Phase 11):
+     *   - Super Admin  → all employees (no restriction)
+     *   - Manager      → only their assigned employees
+     *   - Employee     → only their own profile
+     *   - anyone else  → none
+     *
+     * Uses indexed columns (manager_user_id / user_id); it never scans events.
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        if ($user->isManager()) {
+            return $query->where('manager_user_id', $user->id);
+        }
+
+        // A plain employee sees only their own row; the Super Admin and any other
+        // privileged viewer (pre-Phase-11 permission-holders) are unrestricted.
+        if ($user->isEmployee() && ! $user->isSuperAdmin()) {
+            return $query->where('user_id', $user->id);
+        }
+
+        return $query;
     }
 
     /** Search by employee code, or by the linked user's name/email. */

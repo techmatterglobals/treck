@@ -26,7 +26,8 @@ class ScreenshotViewer extends Component
 
     public function mount(Screenshot $screenshot): void
     {
-        abort_unless(auth()->user()?->isAdministrator() ?? false, 403);
+        // Super Admin: any capture. Manager: only their team's (Phase 11).
+        abort_unless(auth()->user()?->can('view', $screenshot) ?? false, 403);
 
         $this->screenshotId = $screenshot->id;
     }

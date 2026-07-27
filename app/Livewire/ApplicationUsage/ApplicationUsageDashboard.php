@@ -3,9 +3,8 @@
 namespace App\Livewire\ApplicationUsage;
 
 use App\DataObjects\AppUsageFilter;
-use App\Models\Computer;
+use App\Livewire\Concerns\ScopesToViewer;
 use App\Models\Department;
-use App\Models\Employee;
 use App\Services\Reporting\ApplicationUsageService;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Url;
@@ -26,7 +25,7 @@ use Livewire\WithPagination;
  */
 class ApplicationUsageDashboard extends Component
 {
-    use WithPagination;
+    use ScopesToViewer, WithPagination;
 
     #[Url]
     public string $from = '';
@@ -48,7 +47,7 @@ class ApplicationUsageDashboard extends Component
 
     public function mount(): void
     {
-        abort_unless(auth()->user()?->isAdministrator() ?? false, 403);
+        $this->authorizeViewer();
 
         $this->from = $this->from ?: today()->subDays(6)->toDateString();
         $this->to = $this->to ?: today()->toDateString();
@@ -77,7 +76,7 @@ class ApplicationUsageDashboard extends Component
             'computer_id' => $this->computerId,
             'department_id' => $this->departmentId,
             'application' => $this->application,
-        ]);
+        ])->restrictToEmployees($this->visibleEmployeeIds());
     }
 
     public function render(ApplicationUsageService $usage): View
@@ -91,9 +90,8 @@ class ApplicationUsageDashboard extends Component
             'perEmployee' => $usage->perEmployee($filter),
             'perDepartment' => $usage->perDepartment($filter),
             'sessions' => $usage->recent($filter),
-            'employees' => Employee::query()->with('user')->get()
-                ->sortBy('name')->values(),
-            'computers' => Computer::query()->orderBy('hostname')->get(),
+            'employees' => $this->visibleEmployees(),
+            'computers' => $this->visibleComputers(),
             'departments' => Department::query()->orderBy('name')->get(),
         ]);
     }

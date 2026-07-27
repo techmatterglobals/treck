@@ -5,6 +5,7 @@ namespace App\Services\Screenshots;
 use App\DataObjects\ScreenshotFilter;
 use App\Models\Computer;
 use App\Models\Screenshot;
+use App\Services\Agent\EmployeeResolver;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -25,6 +26,7 @@ class ScreenshotService
 {
     public function __construct(
         private readonly ScreenshotStorageService $storage,
+        private readonly EmployeeResolver $resolver,
     ) {}
 
     // ---- Ingest ------------------------------------------------------------
@@ -50,8 +52,14 @@ class ScreenshotService
 
         [$width, $height] = $this->dimensions($file, $data);
 
+        // Attribute the capture to the employee behind the reported Windows
+        // account on shared computers (Phase 11); legacy uploads without a
+        // username resolve to the computer's assigned employee.
+        $windowsUsername = $data['windows_username'] ?? $data['source_user'] ?? null;
+        $employeeId = $this->resolver->resolve($computer, $windowsUsername)->employeeId;
+
         $attributes = [
-            'employee_id' => $computer->employee_id,
+            'employee_id' => $employeeId,
             'path' => $path,
             'disk' => $this->storage->disk(),
             'filename' => $filename,
@@ -111,7 +119,9 @@ class ScreenshotService
             ->when($filter->departmentId, fn (Builder $q) => $q->whereHas(
                 'employee',
                 fn (Builder $e) => $e->where('department_id', $filter->departmentId),
-            ));
+            ))
+            // Manager/employee visibility restriction (Phase 11); null = unrestricted.
+            ->when($filter->employeeIds !== null, fn (Builder $q) => $q->whereIn('employee_id', $filter->employeeIds ?: [0]));
     }
 
     /** Latest captures (paginated), newest first. */

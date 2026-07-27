@@ -484,3 +484,13 @@ Delivered across ten phases:
 operator-side action are environment configuration (secrets, TLS/trusted proxies,
 Supervisor/cron) — all documented — and running the agent build/tests on a Windows
 or CI host, which this Linux backend environment cannot execute.
+
+---
+
+## 30.20 Phase 11 addendum — multi-user computers & manager hierarchy
+
+Phase 11 (post-v1.0) adds a Manager→Employee hierarchy, role-scoped dashboards
+and reports, and shared-computer support (per-Windows-account employee
+resolution). It is additive and backward compatible — existing single-user
+deployments are unaffected. Full design:
+[`docs/31-multi-user-computer-and-manager-hierarchy.md`](31-multi-user-computer-and-manager-hierarchy.md).

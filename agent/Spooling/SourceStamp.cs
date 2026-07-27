@@ -33,6 +33,11 @@ public static class SourceStamp
 
         obj["SourceSessionId"] = source.SessionId;
         obj["SourceUser"] = source.User;
+        // Explicit alias for the backend's employee resolver (Phase 11). The
+        // server maps computer + windows_username -> employee; keeping both keys
+        // makes the wire contract self-describing while staying backward
+        // compatible (older payloads carried only SourceUser).
+        obj["WindowsUsername"] = source.User;
         obj["SourceProcess"] = source.Process;
         obj["CollectionMode"] = source.CollectionMode;
 

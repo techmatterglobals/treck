@@ -127,6 +127,8 @@ public sealed class TreckApiClient : ITreckApiClient
         if (!string.IsNullOrEmpty(metadata.SourceUser))
         {
             form.Add(new StringContent(metadata.SourceUser), "source_user");
+            // Explicit alias for the backend's employee resolver (Phase 11).
+            form.Add(new StringContent(metadata.SourceUser), "windows_username");
         }
 
         if (!string.IsNullOrEmpty(metadata.SourceProcess))

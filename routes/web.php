@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\ManagerController;
 use App\Http\Controllers\Admin\UserRoleController;
 use App\Http\Controllers\ApplicationUsageController;
 use App\Http\Controllers\DashboardController;
@@ -14,29 +15,37 @@ Route::get('/', fn () => redirect()->route('dashboard'));
 Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    // Admin-only management (role assignment).
+    // Super-Admin-only management (role assignment + Manager Management, Phase 11).
     Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function () {
         Route::patch('users/{user}/role', [UserRoleController::class, 'update'])->name('users.role');
+
+        // Manager Management: create/promote/demote managers, assign/transfer employees.
+        Route::get('managers', [ManagerController::class, 'index'])->name('managers.index');
     });
 
-    // Admin-only real-time presence dashboard (M7).
-    Route::middleware('role:admin')->group(function () {
+    // Monitoring dashboards. Super Admin sees the whole organization; a Manager
+    // is admitted to the same screens but every query is scoped to their team
+    // (Phase 11). Scoping is enforced in the components/services/policies.
+    Route::middleware('role:admin|manager')->group(function () {
         Route::get('/presence', [PresenceController::class, 'index'])->name('presence.index');
         Route::get('/presence/computers/{computer}', [PresenceController::class, 'show'])->name('presence.show');
 
-        // Admin-only application usage dashboard (Phase 7).
+        // Application usage dashboard (Phase 7).
         Route::get('/application-usage', [ApplicationUsageController::class, 'index'])->name('application-usage.index');
 
-        // Admin-only screenshot management (Phase 8).
+        // Screenshot management (Phase 8).
         Route::get('/screenshots', [ScreenshotController::class, 'index'])->name('screenshots.index');
         Route::get('/screenshots/{screenshot}', [ScreenshotController::class, 'show'])->name('screenshots.show');
         Route::get('/screenshots/{screenshot}/download', [ScreenshotController::class, 'download'])->name('screenshots.download');
-        // Image bytes: admin + a short-lived signed URL; never a filesystem path.
+        // Image bytes: authorized + a short-lived signed URL; never a filesystem path.
         Route::get('/screenshots/{screenshot}/image', [ScreenshotController::class, 'image'])
             ->middleware('signed')
             ->name('screenshots.image');
+    });
 
-        // Admin-only notifications (Phase 9).
+    // Notifications remain Super-Admin-only (the alert inbox + global settings
+    // are organization-wide; per-manager notification routing is a future phase).
+    Route::middleware('role:admin')->group(function () {
         Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
         Route::get('/notifications/settings', [NotificationSettingsController::class, 'index'])->name('notifications.settings');
     });

@@ -36,6 +36,7 @@ enum NotificationEventType: string
 
     // System
     case SystemInactive = 'system.inactive';
+    case SystemUnknownUser = 'system.unknown_user';
 
     public function category(): string
     {
@@ -61,6 +62,7 @@ enum NotificationEventType: string
             self::AgentSyncFailed => 'Synchronization failures',
             self::AgentQueueGrowing => 'Offline queue growing beyond threshold',
             self::SystemInactive => 'Computer inactive for configured duration',
+            self::SystemUnknownUser => 'Unrecognized Windows user on a computer',
         };
     }
 
@@ -73,7 +75,8 @@ enum NotificationEventType: string
 
             self::PresenceIdle, self::AppRestricted, self::AppLongUsage,
             self::ScreenshotSyncFailed, self::AgentSyncFailed,
-            self::AgentQueueGrowing, self::SystemInactive => NotificationSeverity::Warning,
+            self::AgentQueueGrowing, self::SystemInactive,
+            self::SystemUnknownUser => NotificationSeverity::Warning,
 
             self::AppBlacklisted, self::ScreenshotFailed, self::AgentRegistrationFailed,
             self::AgentHeartbeatStopped => NotificationSeverity::Critical,

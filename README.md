@@ -31,6 +31,8 @@ team leads, and management.
 | Application usage     | Foreground application / window usage and duration per employee         |
 | Screenshots           | Opt-in scheduled desktop captures with private storage + signed access  |
 | Notifications         | Rule-driven in-app + email alerts (presence, apps, agent/system health) |
+| Manager hierarchy     | Super Admin → Manager → Employee, with team-scoped dashboards & reports |
+| Shared computers      | One PC used by many employees across shifts, resolved by Windows account |
 
 ---
 
@@ -83,6 +85,7 @@ The full technical design lives in [`docs/`](docs/):
 28. [Phase 8 Windows Validation](docs/28-phase8-windows-validation.md) — agent-side capture/upload validation
 29. [Notifications](docs/29-notifications.md) — rule engine, in-app + email channels, async delivery (Phase 9)
 30. [Production Release](docs/30-production-release.md) — final architecture, deployment, upgrade, operations, v1.0 release notes (Phase 10)
+31. [Multi-User Computers & Manager Hierarchy](docs/31-multi-user-computer-and-manager-hierarchy.md) — organization hierarchy, shared computers, Windows-username resolution, role-scoped dashboards (Phase 11)
 
 ## Setup
 

@@ -32,6 +32,18 @@ class RolePermissionSeeder extends Seeder
         'view own data',        // an employee's own attendance/activity/reports
     ];
 
+    /**
+     * Subset granted to the Manager role (Phase 11). A manager sees a dashboard
+     * and reports, but scoped to their assigned employees — the scoping is
+     * enforced by policies and query scopes, not by a distinct permission set.
+     */
+    public const MANAGER_PERMISSIONS = [
+        'view dashboard',
+        'view reports',
+        'view attendance',
+        'view own data',
+    ];
+
     /** Subset granted to the Employee (self-service) role. */
     public const EMPLOYEE_PERMISSIONS = [
         'view dashboard',
@@ -50,10 +62,12 @@ class RolePermissionSeeder extends Seeder
 
         // 2. Roles.
         $admin = Role::firstOrCreate(['name' => UserRole::Admin->value, 'guard_name' => 'web']);
+        $manager = Role::firstOrCreate(['name' => UserRole::Manager->value, 'guard_name' => 'web']);
         $employee = Role::firstOrCreate(['name' => UserRole::Employee->value, 'guard_name' => 'web']);
 
         // 3. Assign permissions.
         $admin->syncPermissions(Permission::all());
+        $manager->syncPermissions(self::MANAGER_PERMISSIONS);
         $employee->syncPermissions(self::EMPLOYEE_PERMISSIONS);
 
         // 4. Default admin account (change the password after first login).

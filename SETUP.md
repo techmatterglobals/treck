@@ -362,6 +362,30 @@ default). Full design: [`docs/29-notifications.md`](docs/29-notifications.md).
 
 ---
 
+## 7e. Manager hierarchy & shared computers (Phase 11)
+
+Treck supports a **Super Admin → Manager → Employee** hierarchy with role-scoped
+dashboards, and **shared computers** used by multiple employees across shifts.
+
+- **Roles:** the existing `admin` role is the **Super Admin** (unrestricted); a
+  new `manager` role supervises an assigned set of employees; `employee` is
+  self-service. `php artisan db:seed --class=RolePermissionSeeder` idempotently
+  adds the manager role.
+- **Manager Management** (`/admin/managers`, "Managers" in the nav, Super Admin
+  only): create/promote/demote managers and assign/transfer/remove employees.
+- **Scoping:** a Manager sees only their team across presence, application usage,
+  screenshots, employees and reports; the Super Admin sees everything.
+- **Shared computers:** the agent reports the logged-in Windows username on every
+  event; the server maps `computer + windows_username → employee`
+  (`computer_users` table) and attributes each event to the right person.
+  Unrecognized accounts become *pending* mappings and alert the Super Admin.
+- **Backward compatible:** existing single-user computers and legacy agents
+  (no username) keep attributing to the computer's assigned employee. Migrations
+  are additive/nullable — no existing column is removed. Full design:
+  [`docs/31-multi-user-computer-and-manager-hierarchy.md`](docs/31-multi-user-computer-and-manager-hierarchy.md).
+
+---
+
 ## 8. Running tests
 
 ```bash

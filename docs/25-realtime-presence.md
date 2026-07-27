@@ -252,3 +252,14 @@ Phase 9 reuses this phase's broadcasting infrastructure. A queued listener on
 pipeline), which evaluates configurable rules and broadcasts `NotificationCreated`
 on each recipient's private channel so the admin bell and notifications dashboard
 update live — no polling. Full design: [`docs/29-notifications.md`](29-notifications.md).
+
+---
+
+## 25.12 Phase 11 note — role-scoped presence
+
+The presence board is now admitted to Managers as well as the Super Admin. A
+Manager sees only their own team's computers (scoped via
+`EmployeeVisibility::computerIds()`); the Super Admin still sees every computer.
+On shared computers, presence is attributed to the employee behind the active
+Windows account. Full design:
+[`docs/31-multi-user-computer-and-manager-hierarchy.md`](31-multi-user-computer-and-manager-hierarchy.md).

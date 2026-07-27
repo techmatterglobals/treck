@@ -11,13 +11,28 @@ use Illuminate\Support\Carbon;
  */
 class ReportFilter
 {
+    /**
+     * @param  list<int>|null  $employeeIds  Manager/employee visibility restriction
+     *                                       (Phase 11). Null = unrestricted (Super Admin).
+     */
     public function __construct(
         public readonly ReportPeriod $period,
         public readonly ?int $employeeId,
         public readonly ?int $departmentId,
         public readonly Carbon $from,
         public readonly Carbon $to,
+        public readonly ?int $managerUserId = null,
+        public readonly ?array $employeeIds = null,
     ) {}
+
+    /** Return a copy restricted to a visible-employee id set (null = unrestricted). */
+    public function restrictToEmployees(?array $employeeIds): self
+    {
+        return new self(
+            $this->period, $this->employeeId, $this->departmentId,
+            $this->from, $this->to, $this->managerUserId, $employeeIds,
+        );
+    }
 
     public static function fromArray(array $data): self
     {
@@ -27,6 +42,7 @@ class ReportFilter
             departmentId: ! empty($data['department_id']) ? (int) $data['department_id'] : null,
             from: ! empty($data['from']) ? Carbon::parse($data['from'])->startOfDay() : today()->startOfMonth(),
             to: ! empty($data['to']) ? Carbon::parse($data['to'])->endOfDay() : today()->endOfDay(),
+            managerUserId: ! empty($data['manager_user_id']) ? (int) $data['manager_user_id'] : null,
         );
     }
 

@@ -433,3 +433,16 @@ health failures (registration failed, heartbeat stopped, repeated sync failures,
 growing queue) are modelled as notification event types and are ready to be
 driven by dedicated agent-fed signals. No new agent endpoint is required for
 Phase 9. Full design: [`docs/29-notifications.md`](29-notifications.md).
+
+---
+
+## Phase 11 note — Windows identity for shared computers
+
+Every event payload now carries the interactive Windows username (`SourceUser`
+and the explicit `WindowsUsername` alias); screenshot uploads add a
+`windows_username` field alongside `source_user`. The agent still reports only
+the Windows identity — never an employee or manager id. The server resolves
+`computer + windows_username → employee` (falling back to the computer's
+assigned employee when absent), so no new agent endpoint is required and legacy
+agents keep working. Full design:
+[`docs/31-multi-user-computer-and-manager-hierarchy.md`](31-multi-user-computer-and-manager-hierarchy.md).

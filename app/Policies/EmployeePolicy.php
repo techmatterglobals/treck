@@ -19,8 +19,10 @@ class EmployeePolicy
 
     public function view(User $user, Employee $employee): bool
     {
-        // Admins see everyone; an employee may view their own profile.
+        // Admins see everyone; a Manager sees their assigned team (Phase 11);
+        // an employee may view their own profile.
         return $user->can('manage employees')
+            || ($user->isManager() && $employee->manager_user_id === $user->id)
             || $employee->user_id === $user->id;
     }
 

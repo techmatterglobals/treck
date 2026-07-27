@@ -305,3 +305,13 @@ transport configured in `.env`, and Reverb running for live in-app updates
   digest-send command is a future enhancement.
 - Channels shipped: in-app + email. Teams/Slack/SMS/Push/Webhook are designed
   for but not implemented.
+
+---
+
+## Phase 11 note — unknown Windows user alert
+
+A new `system.unknown_user` notification (seeded, in-app + email) alerts the
+Super Admin when an unrecognized Windows account is seen on a shared computer so
+it can be mapped to an employee. Notifications remain Super-Admin-scoped in this
+phase. Full design:
+[`docs/31-multi-user-computer-and-manager-hierarchy.md`](31-multi-user-computer-and-manager-hierarchy.md).

@@ -14,11 +14,14 @@
             <div class="flex items-center gap-6">
                 <a href="{{ route('dashboard') }}" class="font-bold text-indigo-600">Treck</a>
                 <a href="{{ route('dashboard') }}" class="text-sm hover:underline">Dashboard</a>
-                @role('admin')
+                @hasanyrole('admin|manager')
                     <a href="{{ route('presence.index') }}" class="text-sm hover:underline">Live Presence</a>
                     <a href="{{ route('application-usage.index') }}" class="text-sm hover:underline">App Usage</a>
                     <a href="{{ route('screenshots.index') }}" class="text-sm hover:underline">Screenshots</a>
+                @endhasanyrole
+                @role('admin')
                     <a href="{{ route('notifications.index') }}" class="text-sm hover:underline">Notifications</a>
+                    <a href="{{ route('admin.managers.index') }}" class="text-sm hover:underline">Managers</a>
                 @endrole
                 @can('manage employees')
                     <a href="{{ route('employees.index') }}" class="text-sm hover:underline">Employees</a>

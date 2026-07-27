@@ -32,7 +32,9 @@ class ApplicationUsageService
             ->when($filter->departmentId, fn (Builder $q) => $q->whereHas(
                 'employee',
                 fn (Builder $e) => $e->where('department_id', $filter->departmentId),
-            ));
+            ))
+            // Manager/employee visibility restriction (Phase 11); null = unrestricted.
+            ->when($filter->employeeIds !== null, fn (Builder $q) => $q->whereIn('employee_id', $filter->employeeIds ?: [0]));
     }
 
     // ---- Summary / reporting ----------------------------------------------

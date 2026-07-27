@@ -6,6 +6,7 @@ use App\Enums\AgentEventKind;
 use App\Enums\PresenceStatus;
 use App\Models\AgentEvent;
 use App\Models\Computer;
+use App\Services\Hierarchy\EmployeeVisibility;
 use App\Services\Presence\PresenceService;
 use App\Services\Reporting\ApplicationUsageService;
 use Illuminate\Contracts\View\View;
@@ -24,7 +25,15 @@ class ComputerPresenceDetail extends Component
 
     public function mount(Computer $computer): void
     {
-        abort_unless(auth()->user()?->isAdministrator() ?? false, 403);
+        $user = auth()->user();
+        abort_unless($user && ($user->isSuperAdmin() || $user->isManager()), 403);
+
+        // A Manager may only open a computer belonging to one of their employees
+        // (Phase 11); the Super Admin may open any.
+        abort_unless(
+            app(EmployeeVisibility::class)->canSeeComputer($user, $computer->id),
+            403,
+        );
 
         $this->computerId = $computer->id;
     }

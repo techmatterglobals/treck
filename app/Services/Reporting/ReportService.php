@@ -29,6 +29,39 @@ class ReportService
     }
 
     /**
+     * Computer Usage History (Phase 11): each PC session across the range, in
+     * time order, showing which employee used the machine and when — the
+     * shared-computer shift timeline (e.g. 08:00 Hassan → 12:00 Zain → 17:00
+     * Hassan). Honors the filter's date range, optional employee, and the
+     * manager/employee visibility restriction (employeeIds). Reads indexed
+     * `activity_logs` — never a scan of raw events.
+     *
+     * @return Collection<int,object>
+     */
+    public function computerUsageHistory(ReportFilter $filter): Collection
+    {
+        return DB::table('activity_logs')
+            ->join('computers', 'computers.id', '=', 'activity_logs.computer_id')
+            ->join('employees', 'employees.id', '=', 'activity_logs.employee_id')
+            ->join('users', 'users.id', '=', 'employees.user_id')
+            ->whereBetween('activity_logs.login_at', [
+                $filter->from->startOfDay()->toDateTimeString(),
+                $filter->to->endOfDay()->toDateTimeString(),
+            ])
+            ->when($filter->employeeId, fn ($q) => $q->where('activity_logs.employee_id', $filter->employeeId))
+            ->when($filter->employeeIds !== null, fn ($q) => $q->whereIn('activity_logs.employee_id', $filter->employeeIds ?: [0]))
+            ->orderBy('computers.hostname')
+            ->orderBy('activity_logs.login_at')
+            ->get([
+                'computers.hostname as computer',
+                'users.name as employee',
+                'employees.employee_code',
+                'activity_logs.login_at',
+                'activity_logs.logout_at',
+            ]);
+    }
+
+    /**
      * Paginated result set for the index page (default 50/page). Filters and the
      * fixed sort are preserved: the query carries the where/order clauses and
      * withQueryString() appends the current filters to the page links.
@@ -59,6 +92,9 @@ class ReportService
             ])
             ->when($filter->employeeId, fn ($q) => $q->where('activity_logs.employee_id', $filter->employeeId))
             ->when($filter->departmentId, fn ($q) => $q->where('employees.department_id', $filter->departmentId))
+            ->when($filter->managerUserId, fn ($q) => $q->where('employees.manager_user_id', $filter->managerUserId))
+            // Manager/employee visibility restriction (Phase 11); null = unrestricted.
+            ->when($filter->employeeIds !== null, fn ($q) => $q->whereIn('activity_logs.employee_id', $filter->employeeIds ?: [0]))
             ->groupBy(
                 'activity_logs.employee_id',
                 'users.name',
@@ -96,6 +132,8 @@ class ReportService
             ])
             ->when($filter->employeeId, fn ($q) => $q->where('activity_logs.employee_id', $filter->employeeId))
             ->when($filter->departmentId, fn ($q) => $q->where('employees.department_id', $filter->departmentId))
+            ->when($filter->managerUserId, fn ($q) => $q->where('employees.manager_user_id', $filter->managerUserId))
+            ->when($filter->employeeIds !== null, fn ($q) => $q->whereIn('activity_logs.employee_id', $filter->employeeIds ?: [0]))
             ->selectRaw('COALESCE(SUM(active_seconds),0) a, COALESCE(SUM(idle_seconds),0) i')
             ->first();
 

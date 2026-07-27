@@ -30,18 +30,25 @@ class PresenceService
      * Summary counts for the dashboard cards. Computers without a presence row
      * (never reported) count as Offline.
      *
+     * When $computerIds is provided (Phase 11 manager scoping), the counts cover
+     * only those computers; null (the default) keeps the organization-wide view.
+     *
+     * @param  list<int>|null  $computerIds
      * @return array{total:int,online:int,offline:int,active:int,idle:int,locked:int,logged_out:int}
      */
-    public function summary(): array
+    public function summary(?array $computerIds = null): array
     {
         $counts = ComputerPresence::query()
+            ->when($computerIds !== null, fn ($q) => $q->whereIn('computer_id', $computerIds ?: [0]))
             ->selectRaw('status, COUNT(*) as c')
             ->groupBy('status')
             ->pluck('c', 'status');
 
         $of = fn (PresenceStatus $s): int => (int) ($counts[$s->value] ?? 0);
 
-        $total = Computer::count();
+        $total = Computer::query()
+            ->when($computerIds !== null, fn ($q) => $q->whereIn('id', $computerIds ?: [0]))
+            ->count();
         $withPresence = (int) $counts->sum();
 
         $active = $of(PresenceStatus::Active);
@@ -66,11 +73,16 @@ class PresenceService
      * materialized presence (defaulting to Offline when a computer has never
      * reported).
      *
+     * When $computerIds is provided (Phase 11 manager scoping), only those
+     * computers are listed; null (the default) lists every computer.
+     *
+     * @param  list<int>|null  $computerIds
      * @return Collection<int, array<string, mixed>>
      */
-    public function rows(): Collection
+    public function rows(?array $computerIds = null): Collection
     {
         return Computer::query()
+            ->when($computerIds !== null, fn ($q) => $q->whereIn('id', $computerIds ?: [0]))
             ->with(['employee.department', 'presence'])
             ->orderBy('hostname')
             ->get()

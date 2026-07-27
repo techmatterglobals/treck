@@ -48,6 +48,7 @@ class AgentEventIngestionService
         private readonly PresenceProjector $projector,
         private readonly PresenceBroadcaster $broadcaster,
         private readonly ApplicationUsageProjector $appUsageProjector,
+        private readonly EmployeeResolver $resolver,
     ) {}
 
     /**
@@ -62,12 +63,20 @@ class AgentEventIngestionService
             'idempotency_key' => $data['idempotency_key'],
         ];
 
+        // `payload` is validated JSON; decode so it lands as a queryable JSON
+        // document (the model casts it back to an array).
+        $payload = json_decode($data['payload'], true) ?: [];
+
+        // Resolve the active employee from the reported Windows identity so
+        // shared computers attribute each event to the right person (Phase 11).
+        // Legacy agents (no username) resolve to the computer's assigned
+        // employee, preserving existing single-user behavior exactly.
+        $identity = $this->resolver->resolve($computer, $this->windowsUsername($payload));
+
         $values = [
-            'employee_id' => $computer->employee_id,
+            'employee_id' => $identity->employeeId,
             'kind' => AgentEventKind::from($data['kind']),
-            // `payload` is validated JSON; decode so it lands as a queryable
-            // JSON document (the model casts it back to an array).
-            'payload' => json_decode($data['payload'], true),
+            'payload' => $payload,
             'occurred_at' => Carbon::parse($data['created_at']),
             'received_at' => now(),
         ];
@@ -130,6 +139,25 @@ class AgentEventIngestionService
         }
 
         $computer->forceFill($attributes)->save();
+    }
+
+    /**
+     * Extract the reported Windows username from an event payload, tolerating
+     * the agent's PascalCase source stamp (`SourceUser`) as well as snake_case
+     * variants. Returns null when absent (a legacy agent), which the resolver
+     * treats as the single-user path.
+     *
+     * @param  array<string,mixed>  $payload
+     */
+    private function windowsUsername(array $payload): ?string
+    {
+        foreach (['SourceUser', 'source_user', 'windows_username', 'WindowsUsername'] as $key) {
+            if (! empty($payload[$key]) && is_string($payload[$key])) {
+                return $payload[$key];
+            }
+        }
+
+        return null;
     }
 
     /** Map the presence vocabulary onto the legacy ComputerStatus enum. */

@@ -3,9 +3,8 @@
 namespace App\Livewire\Screenshots;
 
 use App\DataObjects\ScreenshotFilter;
-use App\Models\Computer;
+use App\Livewire\Concerns\ScopesToViewer;
 use App\Models\Department;
-use App\Models\Employee;
 use App\Models\Screenshot;
 use App\Services\Screenshots\ScreenshotService;
 use App\Services\Screenshots\ScreenshotStorageService;
@@ -25,7 +24,7 @@ use Livewire\WithPagination;
  */
 class ScreenshotDashboard extends Component
 {
-    use WithPagination;
+    use ScopesToViewer, WithPagination;
 
     #[Url]
     public string $from = '';
@@ -47,7 +46,7 @@ class ScreenshotDashboard extends Component
 
     public function mount(): void
     {
-        abort_unless(auth()->user()?->isAdministrator() ?? false, 403);
+        $this->authorizeViewer();
 
         $this->from = $this->from ?: today()->subDays(6)->toDateString();
         $this->to = $this->to ?: today()->toDateString();
@@ -75,7 +74,7 @@ class ScreenshotDashboard extends Component
             'computer_id' => $this->computerId,
             'department_id' => $this->departmentId,
             'search' => $this->search,
-        ]);
+        ])->restrictToEmployees($this->visibleEmployeeIds());
     }
 
     public function render(ScreenshotService $service, ScreenshotStorageService $storage): View
@@ -92,8 +91,8 @@ class ScreenshotDashboard extends Component
             'screenshots' => $screenshots,
             'urls' => $urls,
             'status' => $service->status($filter),
-            'employees' => Employee::query()->with('user')->get()->sortBy('name')->values(),
-            'computers' => Computer::query()->orderBy('hostname')->get(),
+            'employees' => $this->visibleEmployees(),
+            'computers' => $this->visibleComputers(),
             'departments' => Department::query()->orderBy('name')->get(),
         ]);
     }

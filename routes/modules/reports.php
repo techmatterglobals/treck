@@ -18,4 +18,6 @@ Route::middleware(['auth', 'verified', 'active', 'permission:view reports'])->gr
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('reports/export/excel', [ReportController::class, 'exportExcel'])->name('reports.export.excel');
     Route::get('reports/export/pdf', [ReportController::class, 'exportPdf'])->name('reports.export.pdf');
+    // Computer Usage History — who used each computer, and when (Phase 11).
+    Route::get('reports/computer-usage', [ReportController::class, 'computerUsage'])->name('reports.computer-usage');
 });

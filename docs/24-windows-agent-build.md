@@ -935,3 +935,13 @@ Phase 9 adds a server-side notification engine that turns agent signals
 (presence, application usage, and agent/system health) into rule-driven in-app
 and email alerts for administrators. It is additive and requires no agent build
 changes. Full design: [`docs/29-notifications.md`](29-notifications.md).
+
+---
+
+## Phase 11 note — shared computers
+
+The agent reports the logged-in Windows username on every event/upload (via the
+existing `EventSource`/`SourceStamp`, now with an explicit `WindowsUsername`
+alias). This is additive and backward compatible — no build or deployment change
+is required for existing single-user machines. Full design:
+[`docs/31-multi-user-computer-and-manager-hierarchy.md`](31-multi-user-computer-and-manager-hierarchy.md).

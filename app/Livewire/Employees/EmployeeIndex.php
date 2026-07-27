@@ -51,7 +51,10 @@ class EmployeeIndex extends Component
     {
         $this->authorize('viewAny', Employee::class);
 
+        // Role-scoped (Phase 11): Super Admin sees all; a Manager sees only their
+        // assigned team; an employee sees only their own row.
         $employees = Employee::query()
+            ->visibleTo(auth()->user())
             ->with(['user', 'department', 'computers.presence'])
             ->search($this->search)
             ->when($this->department, fn ($q) => $q->inDepartment($this->department))

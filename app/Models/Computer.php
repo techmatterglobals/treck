@@ -57,6 +57,16 @@ class Computer extends Model implements AuthenticatableContract
         return $this->belongsTo(Employee::class);
     }
 
+    /**
+     * Per-Windows-account → employee mappings for this computer (1:N, Phase 11).
+     * Empty for single-user computers; populated when the machine is shared
+     * across employees/shifts.
+     */
+    public function computerUsers(): HasMany
+    {
+        return $this->hasMany(ComputerUser::class);
+    }
+
     /** PC login/logout sessions recorded on this computer (1:N). */
     public function activityLogs(): HasMany
     {
