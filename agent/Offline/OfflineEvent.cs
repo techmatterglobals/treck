@@ -6,6 +6,7 @@ public enum OfflineEventKind
     Session,
     AppUsage,
     Screenshot,
+    FileDownload,
 }
 
 /// <summary>

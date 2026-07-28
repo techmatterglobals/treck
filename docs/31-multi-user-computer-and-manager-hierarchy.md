@@ -288,3 +288,13 @@ build/test on Windows or CI.)
   script (future enhancement).
 - A single shared Windows login used by multiple people cannot be split further
   than that account (the OS identity is the finest signal available).
+
+---
+
+## 31.16 Phase 12 note — download attribution
+
+File Download Monitoring (Phase 12) reuses this phase's Windows-username
+resolution: each `file_download` event is attributed to the employee behind the
+active Windows account, and the downloads dashboard/reports are scoped by the
+same `EmployeeVisibility` rules (Super Admin all; Manager their team). Full
+design: [`docs/32-file-download-monitoring.md`](32-file-download-monitoring.md).

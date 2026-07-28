@@ -88,6 +88,7 @@ public sealed class AgentEventUploader : IEventUploader
         OfflineEventKind.Heartbeat => "heartbeat",
         OfflineEventKind.Session => "session",
         OfflineEventKind.AppUsage => "app_usage",
+        OfflineEventKind.FileDownload => "file_download",
         _ => kind.ToString().ToLowerInvariant(),
     };
 }

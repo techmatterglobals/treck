@@ -86,6 +86,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | File download monitoring (Phase 12)
+    |--------------------------------------------------------------------------
+    | Server-side thresholds for the download-alert rules. The Windows agent
+    | owns the detection policy (ignored folders/types/apps, hashing on/off, max
+    | hash size) via its own appsettings; these values only tune the backend
+    | alerting. Metadata only — file contents are never collected.
+    */
+    'downloads' => [
+        // A download at/above this size (bytes) is considered "large" for alerts.
+        'large_file_bytes' => (int) env('TRECK_DOWNLOAD_LARGE_BYTES', 104857600), // 100 MB
+        // Extensions treated as executables / archives for the default alert rules.
+        'executable_extensions' => ['exe', 'msi', 'bat', 'cmd', 'ps1', 'scr', 'com'],
+        'archive_extensions' => ['zip', 'rar', '7z', 'tar', 'gz', 'iso'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Data retention (days)
     |--------------------------------------------------------------------------
     */

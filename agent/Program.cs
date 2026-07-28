@@ -10,6 +10,7 @@ using Treck.Agent.Activity;
 using Treck.Agent.Api;
 using Treck.Agent.Applications;
 using Treck.Agent.Configuration;
+using Treck.Agent.Downloads;
 using Treck.Agent.Offline;
 using Treck.Agent.Screenshots;
 using Treck.Agent.Security;
@@ -111,6 +112,10 @@ try
         .Bind(builder.Configuration.GetSection(ScreenshotOptions.SectionName))
         .ValidateDataAnnotations();
 
+    builder.Services.AddOptions<FileDownloadOptions>()
+        .Bind(builder.Configuration.GetSection(FileDownloadOptions.SectionName))
+        .ValidateDataAnnotations();
+
     // --- Session detection (event-driven, no polling) ---
     builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddSingleton<ISessionMonitor, WindowsSessionMonitor>();
@@ -121,6 +126,10 @@ try
 
     // --- Application usage tracking (Phase 7; WinEvent-driven, no polling) ---
     builder.Services.AddSingleton<IActiveWindowService, WindowsActiveWindowService>();
+
+    // File download monitoring (Phase 12): hash helper is safe to register in
+    // every mode; the monitor itself is only hosted in interactive modes below.
+    builder.Services.AddSingleton<IFileHashService, FileHashService>();
     builder.Services.AddSingleton<IApplicationSessionManager, ApplicationSessionManager>();
     builder.Services.AddSingleton<IApplicationTracker, WindowsApplicationTracker>();
 
@@ -198,6 +207,7 @@ try
         builder.Services.AddHostedService<ScreenshotWorker>();
         builder.Services.AddHostedService<HeartbeatSpoolForwarder>();
         builder.Services.AddHostedService<ApplicationUsageSpoolForwarder>();
+        builder.Services.AddHostedService<FileDownloadMonitor>();
     }
     else if (runningInSession0)
     {

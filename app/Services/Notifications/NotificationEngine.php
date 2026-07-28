@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\NotificationLog;
 use App\Services\Notifications\Rules\AgentNotificationRule;
 use App\Services\Notifications\Rules\ApplicationNotificationRule;
+use App\Services\Notifications\Rules\DownloadNotificationRule;
 use App\Services\Notifications\Rules\NotificationRuleContract;
 use App\Services\Notifications\Rules\PresenceNotificationRule;
 use App\Services\Notifications\Rules\ScreenshotNotificationRule;
@@ -32,8 +33,9 @@ class NotificationEngine
         ApplicationNotificationRule $application,
         ScreenshotNotificationRule $screenshot,
         AgentNotificationRule $agent,
+        DownloadNotificationRule $download,
     ) {
-        $this->rules = [$presence, $application, $screenshot, $agent];
+        $this->rules = [$presence, $application, $screenshot, $agent, $download];
     }
 
     /**

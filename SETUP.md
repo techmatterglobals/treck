@@ -386,6 +386,32 @@ dashboards, and **shared computers** used by multiple employees across shifts.
 
 ---
 
+## 7f. File download monitoring (Phase 12, opt-in)
+
+An admin/manager **Downloads** dashboard (`/downloads`) lists files the agent
+observed being saved into user download locations — **metadata only**, never file
+contents. It reuses the Phase 11 resolution (attributed to the employee behind
+the active Windows account) and the same role scoping (Super Admin all; Manager
+their team). Includes a detail page, grouped reports (`/downloads/reports`),
+Excel/CSV export, and configurable alerts (executable / archive / large /
+restricted downloads) through the existing notification engine.
+
+**Disabled by default** on the agent. Enable and tune it in the agent's
+`appsettings.json` `FileDownloads` section (`Enabled`, watched folders, ignore
+rules, `HashEnabled`, `MaxHashBytes`). Backend alert thresholds live under
+`config/treck.php` → `downloads`:
+
+```bash
+# .env (server, optional)
+TRECK_DOWNLOAD_LARGE_BYTES=104857600   # "large file" alert threshold (100 MB)
+```
+
+`php artisan migrate` creates `file_downloads` and seeds the download alert
+rules. Full design:
+[`docs/32-file-download-monitoring.md`](docs/32-file-download-monitoring.md).
+
+---
+
 ## 8. Running tests
 
 ```bash
