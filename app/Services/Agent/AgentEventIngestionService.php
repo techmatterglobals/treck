@@ -9,6 +9,7 @@ use App\Models\AgentEvent;
 use App\Models\Computer;
 use App\Models\ComputerPresence;
 use App\Services\Presence\ApplicationUsageProjector;
+use App\Services\Presence\FileDownloadProjector;
 use App\Services\Presence\PresenceBroadcaster;
 use App\Services\Presence\PresenceProjector;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -48,6 +49,7 @@ class AgentEventIngestionService
         private readonly PresenceProjector $projector,
         private readonly PresenceBroadcaster $broadcaster,
         private readonly ApplicationUsageProjector $appUsageProjector,
+        private readonly FileDownloadProjector $fileDownloadProjector,
         private readonly EmployeeResolver $resolver,
     ) {}
 
@@ -94,6 +96,10 @@ class AgentEventIngestionService
                         // Application usage does not affect presence; project it
                         // into application_usage only (Phase 7).
                         $this->appUsageProjector->project($event);
+                    } elseif ($event->kind === AgentEventKind::FileDownload) {
+                        // File downloads (Phase 12) do not affect presence; project
+                        // metadata into file_downloads only.
+                        $this->fileDownloadProjector->project($event);
                     } else {
                         $presence = $this->projector->project($event);
 

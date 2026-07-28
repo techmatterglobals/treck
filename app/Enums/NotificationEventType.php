@@ -38,6 +38,12 @@ enum NotificationEventType: string
     case SystemInactive = 'system.inactive';
     case SystemUnknownUser = 'system.unknown_user';
 
+    // File downloads (Phase 12)
+    case DownloadExecutable = 'download.executable';
+    case DownloadArchive = 'download.archive';
+    case DownloadLarge = 'download.large';
+    case DownloadRestricted = 'download.restricted';
+
     public function category(): string
     {
         return explode('.', $this->value)[0];
@@ -63,6 +69,10 @@ enum NotificationEventType: string
             self::AgentQueueGrowing => 'Offline queue growing beyond threshold',
             self::SystemInactive => 'Computer inactive for configured duration',
             self::SystemUnknownUser => 'Unrecognized Windows user on a computer',
+            self::DownloadExecutable => 'Executable file downloaded',
+            self::DownloadArchive => 'Archive file downloaded',
+            self::DownloadLarge => 'Large file downloaded',
+            self::DownloadRestricted => 'Restricted file type downloaded',
         };
     }
 
@@ -76,10 +86,12 @@ enum NotificationEventType: string
             self::PresenceIdle, self::AppRestricted, self::AppLongUsage,
             self::ScreenshotSyncFailed, self::AgentSyncFailed,
             self::AgentQueueGrowing, self::SystemInactive,
-            self::SystemUnknownUser => NotificationSeverity::Warning,
+            self::SystemUnknownUser, self::DownloadArchive,
+            self::DownloadLarge => NotificationSeverity::Warning,
 
             self::AppBlacklisted, self::ScreenshotFailed, self::AgentRegistrationFailed,
-            self::AgentHeartbeatStopped => NotificationSeverity::Critical,
+            self::AgentHeartbeatStopped, self::DownloadExecutable,
+            self::DownloadRestricted => NotificationSeverity::Critical,
         };
     }
 

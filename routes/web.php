@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\ManagerController;
 use App\Http\Controllers\Admin\UserRoleController;
 use App\Http\Controllers\ApplicationUsageController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FileDownloadController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationSettingsController;
 use App\Http\Controllers\PresenceController;
@@ -41,6 +42,12 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/screenshots/{screenshot}/image', [ScreenshotController::class, 'image'])
             ->middleware('signed')
             ->name('screenshots.image');
+
+        // File download monitoring (Phase 12) — metadata only.
+        Route::get('/downloads', [FileDownloadController::class, 'index'])->name('downloads.index');
+        Route::get('/downloads/reports', [FileDownloadController::class, 'reports'])->name('downloads.reports');
+        Route::get('/downloads/reports/export', [FileDownloadController::class, 'export'])->name('downloads.export');
+        Route::get('/downloads/{download}', [FileDownloadController::class, 'show'])->name('downloads.show');
     });
 
     // Notifications remain Super-Admin-only (the alert inbox + global settings

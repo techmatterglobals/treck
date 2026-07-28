@@ -5,8 +5,10 @@ namespace App\Providers;
 use App\Events\PresenceChanged;
 use App\Listeners\EvaluatePresenceNotifications;
 use App\Models\ApplicationUsage;
+use App\Models\FileDownload;
 use App\Models\NotificationLog;
 use App\Observers\ApplicationUsageObserver;
+use App\Observers\FileDownloadObserver;
 use App\Policies\NotificationPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -29,6 +31,7 @@ class AppServiceProvider extends ServiceProvider
         // without modifying the presence (Phase 6) or app-usage (Phase 7) code.
         Event::listen(PresenceChanged::class, EvaluatePresenceNotifications::class);
         ApplicationUsage::observe(ApplicationUsageObserver::class);
+        FileDownload::observe(FileDownloadObserver::class);
 
         // The policy name doesn't follow model-name auto-discovery, so bind it.
         Gate::policy(NotificationLog::class, NotificationPolicy::class);

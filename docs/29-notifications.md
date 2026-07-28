@@ -315,3 +315,13 @@ Super Admin when an unrecognized Windows account is seen on a shared computer so
 it can be mapped to an employee. Notifications remain Super-Admin-scoped in this
 phase. Full design:
 [`docs/31-multi-user-computer-and-manager-hierarchy.md`](31-multi-user-computer-and-manager-hierarchy.md).
+
+---
+
+## Phase 12 note — download alerts
+
+Phase 12 adds configurable download-alert event types
+(`download.executable` / `download.archive` / `download.large` /
+`download.restricted`) evaluated by a new `DownloadNotificationRule` through this
+same engine, fired asynchronously when a download is recorded. Full design:
+[`docs/32-file-download-monitoring.md`](32-file-download-monitoring.md).

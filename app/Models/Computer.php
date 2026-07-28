@@ -85,6 +85,12 @@ class Computer extends Model implements AuthenticatableContract
         return $this->hasMany(Screenshot::class);
     }
 
+    /** File downloads observed on this computer (1:N, Phase 12). */
+    public function fileDownloads(): HasMany
+    {
+        return $this->hasMany(FileDownload::class);
+    }
+
     /** The materialized real-time presence for this computer (1:1, Phase 6). */
     public function presence(): HasOne
     {

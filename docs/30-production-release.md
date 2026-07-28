@@ -494,3 +494,13 @@ and reports, and shared-computer support (per-Windows-account employee
 resolution). It is additive and backward compatible — existing single-user
 deployments are unaffected. Full design:
 [`docs/31-multi-user-computer-and-manager-hierarchy.md`](31-multi-user-computer-and-manager-hierarchy.md).
+
+---
+
+## 30.21 Phase 12 addendum — file download monitoring
+
+Phase 12 (post-v1.0) adds opt-in file download monitoring: the agent reports
+download **metadata** (never contents) through the existing pipeline, attributed
+via Phase 11 resolution, with a role-scoped dashboard, reports/export, and
+configurable alerts. Additive and backward compatible. Full design:
+[`docs/32-file-download-monitoring.md`](32-file-download-monitoring.md).

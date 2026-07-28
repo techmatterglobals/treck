@@ -94,6 +94,12 @@ class Employee extends Model
         return $this->hasMany(Screenshot::class);
     }
 
+    /** File downloads attributed to this employee (1:N, Phase 12). */
+    public function fileDownloads(): HasMany
+    {
+        return $this->hasMany(FileDownload::class);
+    }
+
     // ----------------------------------------------------------------
     // Accessors
     // ----------------------------------------------------------------
