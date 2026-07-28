@@ -204,6 +204,7 @@ try
         builder.Services.AddSingleton(EventSource.Current(EventSource.InteractiveHelper, "TreckAgent(helper)"));
         builder.Services.AddSingleton<IAgentEventSpool, FileAgentEventSpool>();
         builder.Services.AddSingleton<IScreenshotSink, SpoolScreenshotSink>();
+        builder.Services.AddSingleton<IDownloadSink, SpoolDownloadSink>();
         builder.Services.AddHostedService<ScreenshotWorker>();
         builder.Services.AddHostedService<HeartbeatSpoolForwarder>();
         builder.Services.AddHostedService<ApplicationUsageSpoolForwarder>();
@@ -229,9 +230,11 @@ try
         builder.Services.AddSingleton(new AgentRuntime { CollectInteractiveInProcess = true });
         builder.Services.AddSingleton(EventSource.Current(EventSource.Service, "TreckAgent(console)"));
         builder.Services.AddSingleton<IScreenshotSink, OfflineQueueScreenshotSink>();
+        builder.Services.AddSingleton<IDownloadSink, OfflineQueueDownloadSink>();
         builder.Services.AddHostedService<SyncWorker>();
         builder.Services.AddHostedService<Worker>();
         builder.Services.AddHostedService<ScreenshotWorker>();
+        builder.Services.AddHostedService<FileDownloadMonitor>();
     }
 
     builder.Build().Run();

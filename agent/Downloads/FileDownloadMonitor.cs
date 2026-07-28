@@ -29,7 +29,7 @@ public sealed class FileDownloadMonitor : IHostedService, IDisposable
     private readonly FileDownloadOptions _options;
     private readonly IFileHashService _hashService;
     private readonly IActiveWindowService _activeWindow;
-    private readonly IAgentEventSpool _spool;
+    private readonly IDownloadSink _sink;
     private readonly EventSource _source;
     private readonly ILogger<FileDownloadMonitor> _logger;
 
@@ -41,14 +41,14 @@ public sealed class FileDownloadMonitor : IHostedService, IDisposable
         IOptions<FileDownloadOptions> options,
         IFileHashService hashService,
         IActiveWindowService activeWindow,
-        IAgentEventSpool spool,
+        IDownloadSink sink,
         EventSource source,
         ILogger<FileDownloadMonitor> logger)
     {
         _options = options.Value;
         _hashService = hashService;
         _activeWindow = activeWindow;
-        _spool = spool;
+        _sink = sink;
         _source = source;
         _logger = logger;
     }
@@ -199,7 +199,7 @@ public sealed class FileDownloadMonitor : IHostedService, IDisposable
             WindowTitle: app?.WindowTitle);
 
         var json = SourceStamp.Apply(JsonSerializer.Serialize(download), _source);
-        _spool.Submit(OfflineEvent.Create(OfflineEventKind.FileDownload, json, download.DownloadedAt));
+        _sink.Submit(OfflineEvent.Create(OfflineEventKind.FileDownload, json, download.DownloadedAt));
 
         _logger.LogInformation("Download recorded: {Name} ({Size} bytes).", info.Name, size);
     }
