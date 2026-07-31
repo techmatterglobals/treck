@@ -62,11 +62,15 @@ class AttendanceService
             $active = (int) $row->active;
             $idle = (int) $row->idle;
             $work = $active + $idle;
-            $firstIn = Carbon::parse($row->first_in);
+            // first_in / last_out are raw DB datetimes stored in UTC; parse as UTC
+            // and convert to the app timezone so classification (late/early) and
+            // display are correct when APP_TIMEZONE is not UTC.
+            $tz = config('app.timezone');
+            $firstIn = Carbon::parse($row->first_in, 'UTC')->timezone($tz);
 
             $attendance->fill([
                 'first_in_at' => $firstIn,
-                'last_out_at' => $row->last_out ? Carbon::parse($row->last_out) : null,
+                'last_out_at' => $row->last_out ? Carbon::parse($row->last_out, 'UTC')->timezone($tz) : null,
                 'work_seconds' => $work,
                 'active_seconds' => $active,
                 'idle_seconds' => $idle,
