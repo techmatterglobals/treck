@@ -1,4 +1,4 @@
-<div x-data="{ open: false }" class="relative">
+<div x-data="{ open: false }" class="relative" wire:poll.60s>
     <button type="button" @click="open = !open"
         class="relative inline-flex items-center text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
