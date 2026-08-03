@@ -13,7 +13,7 @@
 @endif
 @if ($log->computer)| Computer | {{ $log->computer->hostname }} |
 @endif
-| Timestamp | {{ $log->created_at?->format('M j, Y H:i') }} |
+| Timestamp | @dt($log->created_at, 'M j, Y H:i') |
 @endcomponent
 @endif
 

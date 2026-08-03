@@ -171,7 +171,7 @@
                             <td class="px-3 py-2 text-gray-500 max-w-xs truncate">{{ $session->window_title ?: '—' }}</td>
                             <td class="px-3 py-2">{{ $session->employee?->name ?? '—' }}</td>
                             <td class="px-3 py-2">{{ $session->computer?->hostname ?? '—' }}</td>
-                            <td class="px-3 py-2 text-gray-500">{{ $session->used_at?->format('M j, H:i') }}</td>
+                            <td class="px-3 py-2 text-gray-500">@dt($session->used_at)</td>
                             <td class="px-3 py-2 tabular-nums text-gray-500">
                                 {{ sprintf('%dh %02dm', intdiv($session->duration_seconds, 3600), intdiv($session->duration_seconds % 3600, 60)) }}
                             </td>

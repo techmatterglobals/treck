@@ -13,6 +13,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Display timezone
+    |--------------------------------------------------------------------------
+    | Timestamps are STORED and COMPUTED in UTC (keep APP_TIMEZONE=UTC). They are
+    | converted to this timezone only when rendered for humans (the @dt / @ago
+    | Blade directives). Set TRECK_DISPLAY_TIMEZONE to your operating timezone
+    | (e.g. Asia/Karachi); it defaults to APP_TIMEZONE for backward compatibility.
+    */
+    'display_timezone' => env('TRECK_DISPLAY_TIMEZONE', env('APP_TIMEZONE', 'UTC')),
+
+    /*
+    |--------------------------------------------------------------------------
     | Activity tracking
     |--------------------------------------------------------------------------
     */
