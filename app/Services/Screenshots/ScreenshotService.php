@@ -148,7 +148,7 @@ class ScreenshotService
         return [
             'total' => (int) ($row->total ?? 0),
             'computers' => (int) ($row->computers ?? 0),
-            'last_capture_at' => $row?->last_capture_at ? Carbon::parse($row->last_capture_at) : null,
+            'last_capture_at' => $row?->last_capture_at ? Carbon::parse($row->last_capture_at) ->setTimezone(config('app.timezone')) : null,
         ];
     }
 
