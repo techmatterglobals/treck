@@ -1,4 +1,6 @@
-<div class="space-y-6">
+<div class="space-y-6" wire:poll.30s>
+    {{-- Polls every 30s so it stays current without Reverb; the echo-private
+         listener adds instant updates when Reverb is configured. --}}
     {{-- Current presence --}}
     <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-5">
         <div class="flex items-center justify-between">
