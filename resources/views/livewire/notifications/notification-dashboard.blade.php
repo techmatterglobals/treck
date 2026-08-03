@@ -71,7 +71,7 @@
                         </div>
                         <p class="mt-1 text-gray-600 dark:text-gray-300">{{ $n->message }}</p>
                         <p class="mt-1 text-xs text-gray-400">
-                            {{ $n->created_at?->format('M j, H:i') }}
+                            @dt($n->created_at)
                             @if ($n->computer) · {{ $n->computer->hostname }} @endif
                         </p>
                     </div>

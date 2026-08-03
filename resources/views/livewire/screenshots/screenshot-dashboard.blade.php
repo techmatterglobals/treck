@@ -98,7 +98,7 @@
                             </div>
                             <div class="text-gray-500 truncate">{{ $shot->computer?->hostname ?? '—' }}</div>
                             <div class="mt-1 flex items-center justify-between text-gray-400">
-                                <span>{{ $shot->captured_at?->format('M j, H:i') }}</span>
+                                <span>@dt($shot->captured_at)</span>
                                 <span class="tabular-nums">{{ $shot->resolution }}</span>
                             </div>
                             @if ($shot->active_process)

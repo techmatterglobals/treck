@@ -39,7 +39,7 @@
             <dl class="space-y-3 text-sm">
                 <div>
                     <dt class="text-gray-500 dark:text-gray-400">Captured</dt>
-                    <dd class="font-medium">{{ $screenshot->captured_at?->format('M j, Y H:i:s') }}</dd>
+                    <dd class="font-medium">@dt($screenshot->captured_at, 'M j, Y H:i:s')</dd>
                 </div>
                 <div>
                     <dt class="text-gray-500 dark:text-gray-400">Employee</dt>

@@ -12,6 +12,7 @@ use App\Observers\FileDownloadObserver;
 use App\Policies\NotificationPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
@@ -35,6 +36,13 @@ class AppServiceProvider extends ServiceProvider
 
         // The policy name doesn't follow model-name auto-discovery, so bind it.
         Gate::policy(NotificationLog::class, NotificationPolicy::class);
+
+        // Display-timezone directives: timestamps are stored/computed in UTC and
+        // converted to treck.display_timezone only for rendering.
+        //   @dt($value[, 'format'])  → absolute time in the display timezone
+        //   @ago($value)             → relative "x ago" (instant-based)
+        Blade::directive('dt', fn ($expr) => "<?php echo \App\Support\DisplayTime::format($expr); ?>");
+        Blade::directive('ago', fn ($expr) => "<?php echo \App\Support\DisplayTime::ago($expr); ?>");
 
         // Login: strict, per email + IP to reduce credential stuffing.
         RateLimiter::for('login', function (Request $request) {

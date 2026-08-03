@@ -73,7 +73,7 @@
             <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                 @forelse ($downloads as $d)
                     <tr wire:key="dl-{{ $d->id }}" class="text-gray-900 dark:text-gray-100">
-                        <td class="px-4 py-2 whitespace-nowrap">{{ $d->downloaded_at?->format('Y-m-d H:i') }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap">@dt($d->downloaded_at, 'Y-m-d H:i')</td>
                         <td class="px-4 py-2 max-w-xs truncate" title="{{ $d->file_name }}">{{ $d->file_name }}</td>
                         <td class="px-4 py-2 uppercase">{{ $d->file_extension }}</td>
                         <td class="px-4 py-2 whitespace-nowrap">{{ $d->sizeLabel() }}</td>

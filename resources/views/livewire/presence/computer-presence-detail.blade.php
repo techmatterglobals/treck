@@ -74,7 +74,7 @@
                         <li class="py-2 flex items-center justify-between" wire:key="cd-recent-{{ $app->id }}">
                             <span class="font-medium truncate">{{ $app->application_name }}</span>
                             <span class="text-gray-500 tabular-nums">
-                                {{ $app->used_at?->format('H:i') }} · {{ $this->duration((int) $app->duration_seconds) }}
+                                @dt($app->used_at, 'H:i') · {{ $this->duration((int) $app->duration_seconds) }}
                             </span>
                         </li>
                     @empty

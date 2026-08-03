@@ -41,8 +41,8 @@
                             <tr class="text-gray-900 dark:text-gray-100">
                                 <td class="px-4 py-2 font-medium">{{ $s->computer }}</td>
                                 <td class="px-4 py-2">{{ $s->employee }} <span class="text-gray-400">({{ $s->employee_code }})</span></td>
-                                <td class="px-4 py-2">{{ \Illuminate\Support\Carbon::parse($s->login_at)->format('Y-m-d H:i') }}</td>
-                                <td class="px-4 py-2">{{ $s->logout_at ? \Illuminate\Support\Carbon::parse($s->logout_at)->format('Y-m-d H:i') : '—' }}</td>
+                                <td class="px-4 py-2">@dt($s->login_at, 'Y-m-d H:i')</td>
+                                <td class="px-4 py-2">@dt($s->logout_at, 'Y-m-d H:i')</td>
                             </tr>
                         @empty
                             <tr><td colspan="4" class="px-4 py-6 text-center text-gray-400">No computer sessions in this range.</td></tr>
