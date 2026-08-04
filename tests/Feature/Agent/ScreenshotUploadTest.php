@@ -101,6 +101,22 @@ class ScreenshotUploadTest extends TestCase
         $this->assertSame('InteractiveHelper', $shot->collection_mode);
     }
 
+    public function test_over_length_window_title_is_truncated_not_rejected(): void
+    {
+        [, $token] = $this->device();
+
+        // A 300-char title (e.g. a long browser tab) must not cost us the
+        // screenshot: the server truncates it to the column limit and stores it.
+        $this->upload($token, UploadedFile::fake()->image('long.jpg'), [
+            'active_window_title' => str_repeat('a', 300),
+            'active_process' => str_repeat('b', 300),
+        ])->assertCreated();
+
+        $shot = Screenshot::firstOrFail();
+        $this->assertSame(255, mb_strlen($shot->active_window_title));
+        $this->assertSame(255, mb_strlen($shot->active_process));
+    }
+
     public function test_owner_is_taken_from_the_device_not_the_body(): void
     {
         $employee = Employee::factory()->create();

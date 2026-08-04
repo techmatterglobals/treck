@@ -19,6 +19,11 @@ namespace Treck.Agent.Screenshots;
 [SupportedOSPlatform("windows")]
 public sealed class ScreenshotProcessingService : IScreenshotProcessingService
 {
+    // Foreground context columns on the server (active_process /
+    // active_window_title) are varchar(255); clamp before upload so a long
+    // window title never turns into a rejected screenshot.
+    private const int MaxMetadataLength = 255;
+
     private readonly ILogger<ScreenshotProcessingService> _logger;
     private readonly ScreenshotOptions _options;
     private readonly string _tempDirectory;
@@ -68,8 +73,8 @@ public sealed class ScreenshotProcessingService : IScreenshotProcessingService
             Height: capture.Image.Height,
             FileSize: bytes.LongLength,
             ImageHash: hash,
-            ActiveProcess: activeProcess,
-            ActiveWindowTitle: activeWindowTitle,
+            ActiveProcess: Truncate(activeProcess, MaxMetadataLength),
+            ActiveWindowTitle: Truncate(activeWindowTitle, MaxMetadataLength),
             SessionId: sessionId,
             LocalPath: path,
             Format: isPng ? "png" : "jpeg");
@@ -91,6 +96,25 @@ public sealed class ScreenshotProcessingService : IScreenshotProcessingService
         }
 
         return stream.ToArray();
+    }
+
+    /// <summary>
+    /// Clamp a metadata string to <paramref name="max"/> chars, without splitting
+    /// a surrogate pair at the boundary (which would corrupt the JSON payload).
+    /// </summary>
+    private static string? Truncate(string? value, int max)
+    {
+        if (value is null || value.Length <= max)
+        {
+            return value;
+        }
+
+        if (char.IsHighSurrogate(value[max - 1]))
+        {
+            max--;
+        }
+
+        return value[..max];
     }
 
     private static ImageCodecInfo JpegCodec()

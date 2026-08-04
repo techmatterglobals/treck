@@ -2,9 +2,8 @@
 
 namespace App\Http\Requests\Agent;
 
-use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * One screenshot uploaded from the agent's offline queue (Phase 8).
@@ -20,6 +19,35 @@ class StoreScreenshotRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    /**
+     * Free-text foreground metadata (window title, process, source identity) is
+     * cosmetic context, not integrity data — an over-length value must never
+     * cost us the screenshot. Clamp each to its column limit here, so the
+     * `max:*` rules below pass on truncated input instead of returning 422.
+     * The agent also truncates client-side; this is the server-side backstop.
+     */
+    protected function prepareForValidation(): void
+    {
+        $this->merge(array_filter([
+            'active_window_title' => $this->clamp($this->input('active_window_title'), 255),
+            'active_process' => $this->clamp($this->input('active_process'), 255),
+            'source_process' => $this->clamp($this->input('source_process'), 255),
+            'source_user' => $this->clamp($this->input('source_user'), 255),
+            'windows_username' => $this->clamp($this->input('windows_username'), 255),
+            'collection_mode' => $this->clamp($this->input('collection_mode'), 32),
+        ], static fn ($value) => $value !== null));
+    }
+
+    /** Truncate a string field to a character limit (mb-aware); null-safe. */
+    private function clamp(mixed $value, int $max): ?string
+    {
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        return Str::limit($value, $max, '');
     }
 
     public function rules(): array
@@ -45,35 +73,5 @@ class StoreScreenshotRequest extends FormRequest
             'source_process' => ['nullable', 'string', 'max:255'],
             'collection_mode' => ['nullable', 'string', 'max:32'],
         ];
-    }
-
-    /**
-     * TEMPORARY DIAGNOSTIC (screenshot 422 hunt) — REMOVE once the failing field
-     * is identified. Logs exactly which field the agent's multipart upload is
-     * being rejected on, plus the server-guessed MIME/size of the image (the
-     * `image`/`mimes`/`max` rules check the guessed type, not the client one).
-     * Grep the channel with:  grep 'SCREENSHOT-422' storage/logs/laravel.log
-     */
-    protected function failedValidation(Validator $validator): void
-    {
-        Log::warning('SCREENSHOT-422 errors', $validator->errors()->toArray());
-        Log::info('SCREENSHOT-422 input', $this->except(['image']));
-        Log::info('SCREENSHOT-422 files', collect($this->allFiles())->map(function ($file) {
-            if (is_array($file)) {
-                return 'array of '.count($file).' files';
-            }
-
-            return [
-                'clientName' => $file->getClientOriginalName(),
-                'clientMime' => $file->getClientMimeType(),
-                'guessedMime' => $file->isValid() ? $file->getMimeType() : '(invalid upload)',
-                'guessedExt' => $file->isValid() ? $file->guessExtension() : null,
-                'sizeBytes' => $file->getSize(),
-                'isValid' => $file->isValid(),
-                'uploadError' => $file->getError(), // 0 = OK; 1/2 = exceeds php.ini limits
-            ];
-        })->all());
-
-        parent::failedValidation($validator);
     }
 }
