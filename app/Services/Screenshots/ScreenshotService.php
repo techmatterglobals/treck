@@ -146,10 +146,15 @@ class ScreenshotService
             ->first();
 
         return [
-            'total' => (int) ($row->total ?? 0),
-            'computers' => (int) ($row->computers ?? 0),
-            'last_capture_at' => $row?->last_capture_at ? Carbon::parse($row->last_capture_at) ->setTimezone(config('app.timezone')) : null,
-        ];
+    'total' => (int) ($row->total ?? 0),
+    'computers' => (int) ($row->computers ?? 0),
+
+    // MAX() returns a raw DB datetime (stored in UTC); parse it as UTC and
+    // convert to the app timezone so diffForHumans()/format() are correct.
+    'last_capture_at' => $row?->last_capture_at
+        ? Carbon::parse($row->last_capture_at, 'UTC')->timezone(config('app.timezone'))
+        : null,
+];
     }
 
     /**

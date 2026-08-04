@@ -1,4 +1,6 @@
-<div class="space-y-6">
+<div class="space-y-6" wire:poll.30s>
+    {{-- Polls every 30s so it stays current without Reverb; the echo-private
+         listener adds instant updates when Reverb is configured. --}}
     {{-- Current presence --}}
     <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-5">
         <div class="flex items-center justify-between">
@@ -72,7 +74,7 @@
                         <li class="py-2 flex items-center justify-between" wire:key="cd-recent-{{ $app->id }}">
                             <span class="font-medium truncate">{{ $app->application_name }}</span>
                             <span class="text-gray-500 tabular-nums">
-                                {{ $app->used_at?->format('H:i') }} · {{ $this->duration((int) $app->duration_seconds) }}
+                                @dt($app->used_at, 'H:i') · {{ $this->duration((int) $app->duration_seconds) }}
                             </span>
                         </li>
                     @empty

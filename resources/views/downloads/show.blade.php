@@ -23,7 +23,7 @@
                         'Download folder' => $download->download_folder,
                         'Full local path' => $download->local_path,
                         'SHA-256 hash' => $download->sha256_hash ?: '— (hashing disabled or skipped)',
-                        'Downloaded at' => $download->downloaded_at?->toDayDateTimeString(),
+                        'Downloaded at' => \App\Support\DisplayTime::format($download->downloaded_at, 'D, M j Y H:i'),
                         'Employee' => $download->employee?->name ?? '—',
                         'Manager' => $download->employee?->manager?->name ?? '—',
                         'Computer' => $download->computer?->hostname ?? '—',

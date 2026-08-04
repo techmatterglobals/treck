@@ -1,4 +1,6 @@
-<div class="space-y-6">
+<div class="space-y-6" wire:poll.60s>
+    {{-- Polls as a fallback so new notifications appear without Reverb; the
+         echo-private listener delivers them instantly when Reverb is enabled. --}}
     {{-- Stats --}}
     <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
         @php
@@ -69,7 +71,7 @@
                         </div>
                         <p class="mt-1 text-gray-600 dark:text-gray-300">{{ $n->message }}</p>
                         <p class="mt-1 text-xs text-gray-400">
-                            {{ $n->created_at?->format('M j, H:i') }}
+                            @dt($n->created_at)
                             @if ($n->computer) · {{ $n->computer->hostname }} @endif
                         </p>
                     </div>

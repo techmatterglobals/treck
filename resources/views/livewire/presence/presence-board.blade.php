@@ -1,4 +1,7 @@
-<div class="space-y-6">
+<div class="space-y-6" wire:poll.30s>
+    {{-- Refreshes every 30s so the board stays current even without Reverb; when
+         Reverb IS configured the echo-private listener pushes instant updates on
+         top of this (the poll is a harmless fallback). --}}
     {{-- Summary cards --}}
     <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
         @php
