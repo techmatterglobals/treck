@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\UtcDateTime;
 use App\Enums\AgentEventKind;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -36,7 +37,9 @@ class AgentEvent extends Model
         return [
             'kind' => AgentEventKind::class,
             'payload' => 'array',
-            'occurred_at' => 'datetime',
+            // occurred_at is the device's UTC instant; received_at is the
+            // server's now() (app timezone).
+            'occurred_at' => UtcDateTime::class,
             'received_at' => 'datetime',
         ];
     }

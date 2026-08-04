@@ -2,14 +2,17 @@
 
 namespace App\Support;
 
+use App\Casts\UtcDateTime;
 use Illuminate\Support\Carbon;
 
 /**
  * Renders timestamps in the configured display timezone (Phase: timezone
- * hardening). All timestamps are stored and compared in UTC (APP_TIMEZONE=UTC);
- * this converts them to `treck.display_timezone` only at the presentation layer,
- * so relative ("x ago") and absolute times are always correct regardless of the
- * viewer/server locale. Backed by the @dt and @ago Blade directives.
+ * hardening). Agent-sourced instants are stored as UTC and decoded as UTC by
+ * {@see UtcDateTime}; this converts them to `treck.display_timezone`
+ * only at the presentation layer, so relative ("x ago") and absolute times are
+ * always correct regardless of the server's APP_TIMEZONE. `display_timezone`
+ * defaults to APP_TIMEZONE, so a server set to Asia/Karachi shows local time
+ * with no extra configuration. Backed by the @dt and @ago Blade directives.
  */
 class DisplayTime
 {

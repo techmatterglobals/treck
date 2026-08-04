@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\UtcDateTime;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -37,7 +38,8 @@ class FileDownload extends Model
     protected function casts(): array
     {
         return [
-            'downloaded_at' => 'datetime',
+            // Agent records the download instant on-device in UTC (UTC digits).
+            'downloaded_at' => UtcDateTime::class,
             'file_size' => 'integer',
         ];
     }
