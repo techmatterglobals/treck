@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\FileDownload;
+use App\Support\DisplayTime;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
@@ -42,7 +43,7 @@ class FileDownloadExport implements FromCollection, ShouldAutoSize, WithHeadings
     public function map($row): array
     {
         return [
-            optional($row->downloaded_at)->toDateTimeString(),
+            DisplayTime::format($row->downloaded_at, 'Y-m-d H:i:s'),
             $row->employee?->name ?? '—',
             $row->employee?->manager?->name ?? '—',
             $row->computer?->hostname ?? '—',

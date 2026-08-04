@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\UtcDateTime;
 use App\Enums\PresenceStatus;
 use App\Services\Presence\PresenceProjector;
 use Illuminate\Database\Eloquent\Builder;
@@ -35,11 +36,15 @@ class ComputerPresence extends Model
     {
         return [
             'status' => PresenceStatus::class,
-            'last_heartbeat_at' => 'datetime',
-            'last_activity_at' => 'datetime',
-            'last_event_at' => 'datetime',
+            // Agent-sourced instants are stored as UTC digits; read them as UTC
+            // so the true instant survives regardless of APP_TIMEZONE.
+            'last_heartbeat_at' => UtcDateTime::class,
+            'last_activity_at' => UtcDateTime::class,
+            'last_event_at' => UtcDateTime::class,
+            'session_started_at' => UtcDateTime::class,
+            // last_synced_at mirrors the server's now() (received_at), so it is
+            // stored in the app timezone and read back with the default cast.
             'last_synced_at' => 'datetime',
-            'session_started_at' => 'datetime',
             'idle_seconds' => 'integer',
         ];
     }

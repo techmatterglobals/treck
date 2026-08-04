@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\UtcDateTime;
 use App\Enums\ProductivityRating;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -34,8 +35,9 @@ class ApplicationUsage extends Model
     protected function casts(): array
     {
         return [
-            'used_at' => 'datetime',
-            'ended_at' => 'datetime',
+            // Agent-sourced instants stored as UTC digits.
+            'used_at' => UtcDateTime::class,
+            'ended_at' => UtcDateTime::class,
             'productivity' => ProductivityRating::class,
         ];
     }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\UtcDateTime;
 use App\Services\Screenshots\ScreenshotStorageService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -48,7 +49,8 @@ class Screenshot extends Model
     protected function casts(): array
     {
         return [
-            'captured_at' => 'datetime',
+            // Agent captures the timestamp on-device in UTC (stored as UTC digits).
+            'captured_at' => UtcDateTime::class,
             'monitor_number' => 'integer',
             'width' => 'integer',
             'height' => 'integer',
