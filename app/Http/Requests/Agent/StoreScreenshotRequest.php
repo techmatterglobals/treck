@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Agent;
 
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Log;
 
 /**
  * One screenshot uploaded from the agent's offline queue (Phase 8).
@@ -43,5 +45,35 @@ class StoreScreenshotRequest extends FormRequest
             'source_process' => ['nullable', 'string', 'max:255'],
             'collection_mode' => ['nullable', 'string', 'max:32'],
         ];
+    }
+
+    /**
+     * TEMPORARY DIAGNOSTIC (screenshot 422 hunt) — REMOVE once the failing field
+     * is identified. Logs exactly which field the agent's multipart upload is
+     * being rejected on, plus the server-guessed MIME/size of the image (the
+     * `image`/`mimes`/`max` rules check the guessed type, not the client one).
+     * Grep the channel with:  grep 'SCREENSHOT-422' storage/logs/laravel.log
+     */
+    protected function failedValidation(Validator $validator): void
+    {
+        Log::warning('SCREENSHOT-422 errors', $validator->errors()->toArray());
+        Log::info('SCREENSHOT-422 input', $this->except(['image']));
+        Log::info('SCREENSHOT-422 files', collect($this->allFiles())->map(function ($file) {
+            if (is_array($file)) {
+                return 'array of '.count($file).' files';
+            }
+
+            return [
+                'clientName' => $file->getClientOriginalName(),
+                'clientMime' => $file->getClientMimeType(),
+                'guessedMime' => $file->isValid() ? $file->getMimeType() : '(invalid upload)',
+                'guessedExt' => $file->isValid() ? $file->guessExtension() : null,
+                'sizeBytes' => $file->getSize(),
+                'isValid' => $file->isValid(),
+                'uploadError' => $file->getError(), // 0 = OK; 1/2 = exceeds php.ini limits
+            ];
+        })->all());
+
+        parent::failedValidation($validator);
     }
 }
