@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Agent;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 
 /**
  * One screenshot uploaded from the agent's offline queue (Phase 8).
@@ -18,6 +19,35 @@ class StoreScreenshotRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    /**
+     * Free-text foreground metadata (window title, process, source identity) is
+     * cosmetic context, not integrity data — an over-length value must never
+     * cost us the screenshot. Clamp each to its column limit here, so the
+     * `max:*` rules below pass on truncated input instead of returning 422.
+     * The agent also truncates client-side; this is the server-side backstop.
+     */
+    protected function prepareForValidation(): void
+    {
+        $this->merge(array_filter([
+            'active_window_title' => $this->clamp($this->input('active_window_title'), 255),
+            'active_process' => $this->clamp($this->input('active_process'), 255),
+            'source_process' => $this->clamp($this->input('source_process'), 255),
+            'source_user' => $this->clamp($this->input('source_user'), 255),
+            'windows_username' => $this->clamp($this->input('windows_username'), 255),
+            'collection_mode' => $this->clamp($this->input('collection_mode'), 32),
+        ], static fn ($value) => $value !== null));
+    }
+
+    /** Truncate a string field to a character limit (mb-aware); null-safe. */
+    private function clamp(mixed $value, int $max): ?string
+    {
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        return Str::limit($value, $max, '');
     }
 
     public function rules(): array
