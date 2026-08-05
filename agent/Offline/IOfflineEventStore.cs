@@ -21,6 +21,9 @@ public interface IOfflineEventStore
     /// <summary>Record a failed upload attempt (increments attempts, stores the error).</summary>
     void RecordFailure(IEnumerable<long> ids, string error);
 
+    /// <summary>Permanently remove one event — a dead-lettered poison item.</summary>
+    void Drop(long id);
+
     int CountPending();
 
     /// <summary>Delete old synced rows and enforce the max-size cap. Returns rows removed.</summary>

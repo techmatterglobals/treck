@@ -157,6 +157,19 @@ public sealed class SqliteEventStore : IOfflineEventStore, IDisposable
         }
     }
 
+    public void Drop(long id)
+    {
+        lock (_gate)
+        {
+            EnsureConnection();
+
+            using var cmd = _connection!.CreateCommand();
+            cmd.CommandText = "DELETE FROM events WHERE id = $id;";
+            cmd.Parameters.AddWithValue("$id", id);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
     public int CountPending()
     {
         lock (_gate)

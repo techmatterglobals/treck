@@ -92,6 +92,38 @@ public class SyncServiceTests
     }
 
     [Fact]
+    public async Task Poison_event_is_dropped_after_max_attempts_so_the_queue_drains()
+    {
+        using var paths = new TempPaths();
+        using var store = NewStore(paths);
+
+        // A head event the server always rejects, followed by a good one that
+        // would ship if it weren't blocked behind the poison.
+        store.Enqueue(OfflineEvent.Create(OfflineEventKind.Heartbeat, "poison", DateTimeOffset.UnixEpoch));
+        store.Enqueue(OfflineEvent.Create(OfflineEventKind.Heartbeat, "good", DateTimeOffset.UnixEpoch));
+        var poisonId = store.GetPending(10)[0].Id;
+
+        var options = Options.Create(new OfflineStoreOptions { MaxUploadAttempts = 3 });
+        var uploader = new FakeUploader(e => e.Id != poisonId); // poison fails, good succeeds
+        var sync = new SyncService(store, uploader, options, NullLogger<SyncService>.Instance);
+
+        // First two cycles: the poison keeps failing and blocks the good event.
+        for (var i = 0; i < 2; i++)
+        {
+            var blocked = await sync.SyncPendingAsync(CancellationToken.None);
+            Assert.Equal(0, blocked.Uploaded);
+            Assert.Equal(2, store.CountPending());
+        }
+
+        // Third attempt hits the cap → poison is dropped and the good event
+        // ships in the same cycle, so the queue fully drains.
+        var result = await sync.SyncPendingAsync(CancellationToken.None);
+
+        Assert.Equal(1, result.Uploaded);
+        Assert.Equal(0, store.CountPending());
+    }
+
+    [Fact]
     public async Task Empty_queue_is_a_noop()
     {
         using var paths = new TempPaths();

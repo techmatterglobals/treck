@@ -81,15 +81,23 @@ class PresenceService
      */
     public function rows(?array $computerIds = null): Collection
     {
+        // Today's accumulated active/idle per computer, so the board shows the
+        // same meaningful "Idle time" the dashboard does (the materialized
+        // idle_seconds is only the current streak, and is reset to 0 on offline).
+        $activity = $this->todaysActivityByComputer();
+
         return Computer::query()
             ->when($computerIds !== null, fn ($q) => $q->whereIn('id', $computerIds ?: [0]))
             ->with(['employee.department', 'presence'])
             ->orderBy('hostname')
             ->get()
-            ->map(function (Computer $computer) {
+            ->map(function (Computer $computer) use ($activity) {
                 $presence = $computer->presence;
                 $status = $presence?->status ?? PresenceStatus::Offline;
-                $idle = (int) ($presence?->idle_seconds ?? 0);
+
+                $act = $activity->get($computer->id);
+                $todayActive = (int) ($act->active ?? 0);
+                $todayIdle = (int) ($act->idle ?? 0);
 
                 return [
                     'computer_id' => $computer->id,
@@ -99,8 +107,10 @@ class PresenceService
                     'status' => $status,
                     'last_heartbeat_at' => $presence?->last_heartbeat_at,
                     'last_activity_at' => $presence?->last_activity_at,
-                    'idle_seconds' => $idle,
-                    'idle_label' => $this->duration($idle),
+                    'active_seconds' => $todayActive,
+                    'active_label' => $this->hoursMinutes($todayActive),
+                    'idle_seconds' => $todayIdle,
+                    'idle_label' => $this->hoursMinutes($todayIdle),
                 ];
             });
     }
@@ -217,6 +227,27 @@ class PresenceService
                 COALESCE(SUM(json_extract(payload, '$.IdleSeconds')), 0) as idle")
             ->get()
             ->keyBy('employee_id');
+    }
+
+    /**
+     * Today's active/idle seconds per computer, summed from today's heartbeat
+     * events. Keyed by computer_id. The per-computer counterpart of
+     * {@see todaysActivityByEmployee()} used by the Live Presence board.
+     *
+     * @return Collection<int, object>
+     */
+    public function todaysActivityByComputer(): Collection
+    {
+        return DB::table('agent_events')
+            ->where('kind', AgentEventKind::Heartbeat->value)
+            ->whereDate('occurred_at', today())
+            ->whereNotNull('computer_id')
+            ->groupBy('computer_id')
+            ->selectRaw("computer_id,
+                COALESCE(SUM(json_extract(payload, '$.ActiveSeconds')), 0) as active,
+                COALESCE(SUM(json_extract(payload, '$.IdleSeconds')), 0) as idle")
+            ->get()
+            ->keyBy('computer_id');
     }
 
     /** Latest activity across an employee's computers (last active, else last contact). */
