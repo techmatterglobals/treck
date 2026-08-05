@@ -26,4 +26,14 @@ public sealed class OfflineStoreOptions
     /// <summary>Synced rows older than this are cleaned up (hours).</summary>
     [Range(1, 8760)]
     public int RetentionHours { get; set; } = 24;
+
+    /// <summary>
+    /// How many times a single event may be rejected by the server before it is
+    /// dropped ("dead-lettered"). Without this, one permanently-rejected event
+    /// (e.g. a 4xx it can never satisfy) sits at the head of the ordered queue
+    /// and blocks every newer event forever. Transient failures (network/auth)
+    /// do not count toward this — they preserve order and retry.
+    /// </summary>
+    [Range(1, 1000)]
+    public int MaxUploadAttempts { get; set; } = 10;
 }
