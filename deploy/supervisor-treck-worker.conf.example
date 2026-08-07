@@ -1,0 +1,30 @@
+; Treck — Supervisor program for queue workers (reference)
+; Place at /etc/supervisor/conf.d/treck-worker.conf then:
+;   sudo supervisorctl reread && sudo supervisorctl update && sudo supervisorctl start treck-worker:*
+
+[program:treck-worker]
+process_name=%(program_name)s_%(process_num)02d
+command=php /var/www/treck/artisan queue:work redis --queue=ingestion,default --sleep=1 --tries=3 --backoff=5 --max-time=3600 --timeout=60
+directory=/var/www/treck
+autostart=true
+autorestart=true
+stopwaitsecs=3600
+killasgroup=true
+user=www-data
+numprocs=4
+redirect_stderr=true
+stdout_logfile=/var/www/treck/storage/logs/worker.log
+stdout_logfile_maxbytes=50MB
+stopsignal=QUIT
+
+; --- Alternative: Laravel Horizon (comment out the block above if used) ---
+; [program:treck-horizon]
+; process_name=%(program_name)s
+; command=php /var/www/treck/artisan horizon
+; directory=/var/www/treck
+; autostart=true
+; autorestart=true
+; user=www-data
+; redirect_stderr=true
+; stdout_logfile=/var/www/treck/storage/logs/horizon.log
+; stopwaitsecs=3600

@@ -1,0 +1,16 @@
+bin/
+obj/
+logs/
+publish/
+*.user
+appsettings.*.local.json
+
+# Environment-specific config carries per-deployment secrets (provisioning key,
+# employee code) — never commit it. Ship appsettings.Production.json.example
+# as the template instead.
+appsettings.Production.json
+
+# Stray local artifacts (service query dumps, restore/publish log redirects)
+query
+restore.log
+*.log
