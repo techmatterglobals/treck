@@ -8,6 +8,7 @@ use App\Enums\PresenceStatus;
 use App\Models\AgentEvent;
 use App\Models\Computer;
 use App\Models\ComputerPresence;
+use App\Services\Presence\ActivityLogProjector;
 use App\Services\Presence\ApplicationUsageProjector;
 use App\Services\Presence\FileDownloadProjector;
 use App\Services\Presence\PresenceBroadcaster;
@@ -50,6 +51,7 @@ class AgentEventIngestionService
         private readonly PresenceBroadcaster $broadcaster,
         private readonly ApplicationUsageProjector $appUsageProjector,
         private readonly FileDownloadProjector $fileDownloadProjector,
+        private readonly ActivityLogProjector $activityLogProjector,
         private readonly EmployeeResolver $resolver,
     ) {}
 
@@ -106,6 +108,12 @@ class AgentEventIngestionService
                         if ($presence !== null) {
                             $this->mirrorLiveness($computer, $presence);
                         }
+
+                        // Accumulate the per-day activity_log the reporting,
+                        // attendance and productivity layers read from (the
+                        // agent no longer calls the legacy session endpoints
+                        // that used to write it).
+                        $this->activityLogProjector->project($event);
                     }
                 }
 
