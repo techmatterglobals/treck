@@ -3,31 +3,5 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Treck Admin" Height="720" Width="1180" MinHeight="600" MinWidth="960"
         WindowStartupLocation="CenterScreen" Background="{StaticResource WindowBackground}">
-    <Grid Margin="32">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="24" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-        <DockPanel>
-            <StackPanel>
-                <TextBlock Text="Treck Admin" FontSize="28" FontWeight="SemiBold"
-                           Foreground="{StaticResource PrimaryText}" />
-                <TextBlock Text="Windows monitoring console" Margin="0,4,0,0"
-                           Foreground="{StaticResource SecondaryText}" />
-            </StackPanel>
-            <Button DockPanel.Dock="Right" Content="Check connection" Padding="18,10"
-                    Command="{Binding RefreshCommand}" />
-        </DockPanel>
-        <Border Grid.Row="2" Background="{StaticResource PanelBackground}" CornerRadius="12" Padding="32">
-            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                <TextBlock Text="Foundation ready" FontSize="24" FontWeight="SemiBold"
-                           Foreground="{StaticResource PrimaryText}" HorizontalAlignment="Center" />
-                <TextBlock Text="Authentication and live overview screens are delivered in the next milestone."
-                           Margin="0,12,0,0" Foreground="{StaticResource SecondaryText}" />
-                <TextBlock Text="{Binding Status}" Margin="0,20,0,0"
-                           Foreground="{StaticResource Accent}" HorizontalAlignment="Center" />
-            </StackPanel>
-        </Border>
-    </Grid>
+    <ContentControl Content="{Binding CurrentViewModel}" />
 </Window>

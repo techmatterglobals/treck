@@ -16,8 +16,8 @@ public sealed class DesktopContractTests
             "organization",
             DateTimeOffset.UtcNow);
 
-        Assert.Equal(28_800, overview.Activity.TrackedSeconds);
-        Assert.Equal(75, overview.Activity.ActivePercent);
+        Assert.Equal(28_800L, overview.Activity.TrackedSeconds);
+        Assert.Equal(75d, overview.Activity.ActivePercent);
         Assert.Equal("organization", overview.Scope);
     }
 }

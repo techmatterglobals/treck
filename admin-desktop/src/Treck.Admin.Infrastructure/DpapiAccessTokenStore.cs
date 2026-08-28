@@ -23,9 +23,19 @@ public sealed class DpapiAccessTokenStore : IAccessTokenStore
             return null;
         }
 
-        var encrypted = await File.ReadAllBytesAsync(_path, cancellationToken);
-        var clear = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
-        return Encoding.UTF8.GetString(clear);
+        try
+        {
+            var encrypted = await File.ReadAllBytesAsync(_path, cancellationToken);
+            var clear = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
+            return Encoding.UTF8.GetString(clear);
+        }
+        catch (CryptographicException)
+        {
+            // A token copied from another Windows profile or damaged on disk is
+            // not recoverable. Remove it and require a clean sign-in.
+            File.Delete(_path);
+            return null;
+        }
     }
 
     public async Task WriteAsync(string token, CancellationToken cancellationToken = default)

@@ -17,5 +17,7 @@ dotnet build Treck.Admin.Desktop.sln -c Release
 dotnet test Treck.Admin.Desktop.sln -c Release --no-build
 ```
 
-The foundation shell is intentionally unauthenticated. Sign-in, bearer-token
-injection, safe logout, and role-aware navigation belong to the next milestone.
+The client authenticates through the Laravel Sanctum API, validates every new or
+restored session through the desktop bootstrap contract, stores the bearer token
+with current-user DPAPI, and builds navigation from server permissions and
+feature flags. Passwords are never persisted.

@@ -68,6 +68,32 @@ class DesktopApiTest extends TestCase
             ]]);
     }
 
+    public function test_manager_login_token_can_bootstrap_but_employee_token_is_forbidden(): void
+    {
+        $manager = tap(User::factory()->create(), fn (User $user) => $user->assignRole('manager'));
+        $managerToken = $this->postJson('/api/v1/auth/login', [
+            'email' => $manager->email,
+            'password' => 'password',
+            'device_name' => 'Desktop API test',
+        ])->assertOk()->json('token');
+
+        $this->withToken($managerToken)
+            ->getJson('/api/v1/desktop/bootstrap')
+            ->assertOk()
+            ->assertJsonPath('data.user.id', $manager->id);
+
+        $employee = tap(User::factory()->create(), fn (User $user) => $user->assignRole('employee'));
+        $employeeToken = $this->postJson('/api/v1/auth/login', [
+            'email' => $employee->email,
+            'password' => 'password',
+            'device_name' => 'Desktop API test',
+        ])->assertOk()->json('token');
+
+        $this->withToken($employeeToken)
+            ->getJson('/api/v1/desktop/bootstrap')
+            ->assertForbidden();
+    }
+
     public function test_manager_overview_is_scoped_to_their_team(): void
     {
         $manager = tap(User::factory()->create(), fn (User $user) => $user->assignRole('manager'));

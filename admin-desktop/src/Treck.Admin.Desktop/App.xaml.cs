@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Windows;
 using Treck.Admin.Api;
+using Treck.Admin.Application;
 using Treck.Admin.Application.ViewModels;
 using Treck.Admin.Infrastructure;
 
@@ -24,13 +25,15 @@ public partial class App : System.Windows.Application
                     ?? throw new InvalidOperationException("Treck:BaseUrl is required.");
                 services.AddTreckDesktopApi(new Uri(baseUrl, UriKind.Absolute));
                 services.AddTreckAdminInfrastructure();
-                services.AddTransient<ShellViewModel>();
+                services.AddTreckAdminApplication();
                 services.AddTransient<MainWindow>();
             })
             .Build();
 
         await _host.StartAsync();
+        var root = _host.Services.GetRequiredService<RootViewModel>();
         _host.Services.GetRequiredService<MainWindow>().Show();
+        await root.InitializeAsync();
     }
 
     protected override async void OnExit(ExitEventArgs e)

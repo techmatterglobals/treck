@@ -1,11 +1,15 @@
 <Application x:Class="Treck.Admin.Desktop.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Treck.Admin.Application.ViewModels;assembly=Treck.Admin.Application"
+             xmlns:views="clr-namespace:Treck.Admin.Desktop.Views">
     <Application.Resources>
         <SolidColorBrush x:Key="WindowBackground" Color="#0F172A" />
         <SolidColorBrush x:Key="PanelBackground" Color="#1E293B" />
         <SolidColorBrush x:Key="PrimaryText" Color="#F8FAFC" />
         <SolidColorBrush x:Key="SecondaryText" Color="#94A3B8" />
         <SolidColorBrush x:Key="Accent" Color="#38BDF8" />
+        <DataTemplate DataType="{x:Type vm:LoginViewModel}"><views:LoginView /></DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ShellViewModel}"><views:ShellView /></DataTemplate>
     </Application.Resources>
 </Application>

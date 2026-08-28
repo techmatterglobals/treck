@@ -1,0 +1,35 @@
+<UserControl x:Class="Treck.Admin.Desktop.Views.ShellView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Background="{StaticResource WindowBackground}">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="250" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+        <Border Background="#111C31" Padding="24">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Bottom">
+                    <TextBlock Text="{Binding UserName}" Foreground="{StaticResource PrimaryText}" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding UserRole}" Margin="0,3,0,14" Foreground="{StaticResource SecondaryText}" />
+                    <Button Content="Sign out" Padding="12,8" Command="{Binding SignOutCommand}" />
+                </StackPanel>
+                <StackPanel>
+                    <TextBlock Text="Treck Admin" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource PrimaryText}" />
+                    <ItemsControl ItemsSource="{Binding Navigation}" Margin="0,28,0,0">
+                        <ItemsControl.ItemTemplate><DataTemplate><Border Padding="10,8" Margin="0,2"><TextBlock Text="{Binding Label}" Foreground="{StaticResource PrimaryText}" /></Border></DataTemplate></ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+        <Grid Grid.Column="1" Margin="32">
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="24" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+            <DockPanel>
+                <StackPanel><TextBlock Text="Overview" FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource PrimaryText}" /><TextBlock Text="{Binding Status}" Margin="0,4,0,0" Foreground="{StaticResource SecondaryText}" /></StackPanel>
+                <Button DockPanel.Dock="Right" Content="Refresh permissions" Padding="16,9" Command="{Binding RefreshCommand}" />
+            </DockPanel>
+            <Border Grid.Row="2" Background="{StaticResource PanelBackground}" CornerRadius="12" Padding="32">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <TextBlock Text="Secure session ready" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource PrimaryText}" />
+                    <TextBlock Text="Navigation is generated from your server permissions and enabled features." Margin="0,10,0,0" Foreground="{StaticResource SecondaryText}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

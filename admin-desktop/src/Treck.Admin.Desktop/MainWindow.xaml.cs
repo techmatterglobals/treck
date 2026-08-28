@@ -5,7 +5,7 @@ namespace Treck.Admin.Desktop;
 
 public partial class MainWindow : Window
 {
-    public MainWindow(ShellViewModel viewModel)
+    public MainWindow(RootViewModel viewModel)
     {
         InitializeComponent();
         DataContext = viewModel;
