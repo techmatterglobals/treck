@@ -40,6 +40,7 @@ directly to the area you need.
 | 30 | [Production Release](30-production-release.md) | Phase 10: final architecture, deployment/upgrade/DR runbook, retention enforcement, v1.0.0 release notes |
 | 31 | [Multi-User Computers & Manager Hierarchy](31-multi-user-computer-and-manager-hierarchy.md) | Phase 11: Super Admin→Manager→Employee hierarchy, shared computers, Windows-username resolution, role-scoped dashboards & reports |
 | 32 | [File Download Monitoring](32-file-download-monitoring.md) | Phase 12: opt-in download detection (metadata only), projector, role-scoped dashboard/reports/export, configurable alerts |
+| 33 | [Windows Desktop Applications](33-windows-desktop-applications.md) | Silent employee-agent improvements, separate WPF admin client, API/security boundaries, packaging, milestones, and acceptance criteria |
 
 ## Deployment artifacts
 

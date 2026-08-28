@@ -88,6 +88,7 @@ The full technical design lives in [`docs/`](docs/):
 30. [Production Release](docs/30-production-release.md) — final architecture, deployment, upgrade, operations, v1.0 release notes (Phase 10)
 31. [Multi-User Computers & Manager Hierarchy](docs/31-multi-user-computer-and-manager-hierarchy.md) — organization hierarchy, shared computers, Windows-username resolution, role-scoped dashboards (Phase 11)
 32. [File Download Monitoring](docs/32-file-download-monitoring.md) — opt-in download detection (metadata only), dashboard, reports, alerts (Phase 12)
+33. [Windows Desktop Applications](docs/33-windows-desktop-applications.md) — silent employee-agent improvements and separate WPF admin application
 
 ## Setup
 
