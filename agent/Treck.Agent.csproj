@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Treck.Agent</RootNamespace>
+    <AssemblyName>TreckAgent</AssemblyName>
+    <Version>1.0.0</Version>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+
+    <!-- Deliberately RID-agnostic. Development (restore / build / test / run) and
+         the default framework-dependent publish use the installed shared runtime,
+         so nothing has to download win-x64 runtime packs. A self-contained
+         release is an explicit opt-in that specifies the RID on the command line
+         (agent/deploy/publish.ps1 -SelfContained), which is the only build that
+         fetches Microsoft.NETCore.App.Runtime / Microsoft.WindowsDesktop.App.Runtime.
+         Do NOT add <RuntimeIdentifier(s)> here: it forces RID restore into every
+         `dotnet restore`, pulling those packs even for framework-dependent dev. -->
+
+    <!-- The test project lives under tests/; never compile it into this project. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests/**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="8.0.0" />
+    <!-- Screenshot capture/encoding (Phase 8). Windows-only, matching the TFM. -->
+    <PackageReference Include="System.Drawing.Common" Version="8.0.8" />
+    <PackageReference Include="Microsoft.Win32.SystemEvents" Version="8.0.0" />
+    <PackageReference Include="Polly.Extensions.Http" Version="3.0.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Serilog.Settings.Configuration" Version="8.0.4" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+    <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="appsettings.Development.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Production config is created per-deployment (gitignored); copy it to the
+         publish output only when it exists so `dotnet publish` never fails. -->
+    <None Update="appsettings.Production.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('appsettings.Production.json')" />
+  </ItemGroup>
+
+</Project>

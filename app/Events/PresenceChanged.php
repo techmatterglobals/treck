@@ -1,0 +1,67 @@
+<?php
+
+namespace App\Events;
+
+use App\Models\ComputerPresence;
+use Illuminate\Broadcasting\Channel;
+use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Foundation\Events\Dispatchable;
+use Illuminate\Queue\SerializesModels;
+
+/**
+ * Broadcast when a computer's presence changes (Phase 6). Carries a compact,
+ * secret-free snapshot so the admin dashboard updates live without polling.
+ *
+ * Broadcast on two private channels (admin-authorized in routes/channels.php):
+ *   - `presence`                    the board (all computers)
+ *   - `presence.computer.{id}`      the per-computer details page
+ *
+ * Device tokens, provisioning keys and other credentials are never included.
+ */
+class PresenceChanged implements ShouldBroadcast
+{
+    use Dispatchable, InteractsWithSockets, SerializesModels;
+
+    public function __construct(public readonly ComputerPresence $presence) {}
+
+    /** @return array<int, Channel> */
+    public function broadcastOn(): array
+    {
+        return [
+            new PrivateChannel('presence'),
+            new PrivateChannel('presence.computer.'.$this->presence->computer_id),
+        ];
+    }
+
+    public function broadcastAs(): string
+    {
+        return 'PresenceChanged';
+    }
+
+    /** @return array<string, mixed> */
+    public function broadcastWith(): array
+    {
+        $this->presence->loadMissing('computer.employee.department');
+
+        $computer = $this->presence->computer;
+        $employee = $computer?->employee;
+        $status = $this->presence->status;
+
+        return [
+            'computer_id' => $this->presence->computer_id,
+            'computer_name' => $computer?->hostname,
+            'employee' => $employee?->name,
+            'department' => $employee?->department?->name,
+            'status' => $status->value,
+            'status_label' => $status->label(),
+            'status_color' => $status->color(),
+            'is_online' => $status->isOnline(),
+            'idle_seconds' => $this->presence->idle_seconds,
+            'last_heartbeat_at' => $this->presence->last_heartbeat_at?->toIso8601String(),
+            'last_activity_at' => $this->presence->last_activity_at?->toIso8601String(),
+            'last_synced_at' => $this->presence->last_synced_at?->toIso8601String(),
+        ];
+    }
+}
