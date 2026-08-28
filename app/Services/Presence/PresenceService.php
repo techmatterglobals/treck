@@ -101,6 +101,7 @@ class PresenceService
 
                 return [
                     'computer_id' => $computer->id,
+                    'employee_id' => $computer->employee_id,
                     'computer_name' => $computer->hostname,
                     'employee' => $computer->employee?->name,
                     'department' => $computer->employee?->department?->name,

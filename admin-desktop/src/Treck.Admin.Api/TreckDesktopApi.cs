@@ -19,6 +19,12 @@ public sealed class TreckDesktopApi : ITreckDesktopApi
     public Task<DesktopOverview> GetOverviewAsync(CancellationToken cancellationToken = default) =>
         GetDataAsync<DesktopOverview>("api/v1/desktop/overview", cancellationToken);
 
+    public Task<DesktopPresence> GetPresenceAsync(CancellationToken cancellationToken = default) =>
+        GetDataAsync<DesktopPresence>("api/v1/desktop/presence", cancellationToken);
+
+    public Task<EmployeeDetail> GetEmployeeAsync(long employeeId, CancellationToken cancellationToken = default) =>
+        GetDataAsync<EmployeeDetail>($"api/v1/desktop/employees/{employeeId}", cancellationToken);
+
     private async Task<T> GetDataAsync<T>(string uri, CancellationToken cancellationToken)
     {
         using var response = await _client.GetAsync(uri, cancellationToken);

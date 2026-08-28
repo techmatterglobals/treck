@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Desktop\BootstrapController;
+use App\Http\Controllers\Api\V1\Desktop\EmployeeDetailController;
 use App\Http\Controllers\Api\V1\Desktop\OverviewController;
+use App\Http\Controllers\Api\V1\Desktop\PresenceController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -19,4 +21,6 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:user'])
     ->group(function () {
         Route::get('bootstrap', BootstrapController::class)->name('bootstrap');
         Route::get('overview', OverviewController::class)->name('overview');
+        Route::get('presence', PresenceController::class)->name('presence');
+        Route::get('employees/{employee}', EmployeeDetailController::class)->name('employees.show');
     });

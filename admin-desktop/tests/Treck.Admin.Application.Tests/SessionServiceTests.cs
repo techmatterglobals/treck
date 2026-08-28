@@ -109,8 +109,12 @@ public sealed class SessionServiceTests
     internal sealed class StubDesktopApi : ITreckDesktopApi
     {
         public DesktopBootstrap? Bootstrap { get; init; }
+        public DesktopOverview? Overview { get; init; }
+        public DesktopPresence? Presence { get; init; }
+        public EmployeeDetail? Employee { get; init; }
         public Exception? Exception { get; init; }
         public int BootstrapCalls { get; private set; }
+        public TaskCompletionSource<bool> OverviewCalled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Task<DesktopBootstrap> GetBootstrapAsync(CancellationToken cancellationToken = default)
         {
             BootstrapCalls++;
@@ -118,7 +122,17 @@ public sealed class SessionServiceTests
                 ? Task.FromResult(Bootstrap ?? SessionServiceTests.Bootstrap())
                 : Task.FromException<DesktopBootstrap>(Exception);
         }
-        public Task<DesktopOverview> GetOverviewAsync(CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+        public Task<DesktopOverview> GetOverviewAsync(CancellationToken cancellationToken = default)
+        {
+            OverviewCalled.TrySetResult(true);
+            return Task.FromResult(Overview ?? new DesktopOverview(
+                DateOnly.FromDateTime(DateTime.Today), new EmployeeOverview(0, 0, 0),
+                new PresenceOverview(0, 0, 0, 0, 0, 0, 0), new ActivityOverview(0, 0, 0, 0),
+                "organization", DateTimeOffset.UtcNow));
+        }
+        public Task<DesktopPresence> GetPresenceAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(Presence ?? new DesktopPresence([], new PresenceOverview(0, 0, 0, 0, 0, 0, 0), 30, DateTimeOffset.UtcNow));
+        public Task<EmployeeDetail> GetEmployeeAsync(long employeeId, CancellationToken cancellationToken = default) =>
+            Employee is null ? throw new NotSupportedException() : Task.FromResult(Employee);
     }
 }

@@ -36,8 +36,11 @@ class DesktopApiTest extends TestCase
 
     public function test_desktop_endpoints_require_authentication(): void
     {
+        $employee = Employee::factory()->create();
         $this->getJson('/api/v1/desktop/bootstrap')->assertUnauthorized();
         $this->getJson('/api/v1/desktop/overview')->assertUnauthorized();
+        $this->getJson('/api/v1/desktop/presence')->assertUnauthorized();
+        $this->getJson("/api/v1/desktop/employees/{$employee->id}")->assertUnauthorized();
     }
 
     public function test_employee_role_cannot_use_admin_desktop_api(): void
@@ -134,6 +137,40 @@ class DesktopApiTest extends TestCase
             ->assertJsonPath('data.presence.active', 1)
             ->assertJsonPath('data.presence.idle', 1)
             ->assertJsonPath('data.activity.tracked_seconds', 60);
+    }
+
+    public function test_manager_presence_contains_only_team_computers(): void
+    {
+        $manager = tap(User::factory()->create(), fn (User $user) => $user->assignRole('manager'));
+        $otherManager = tap(User::factory()->create(), fn (User $user) => $user->assignRole('manager'));
+        $this->teamMember($manager, 'VISIBLE-PC', PresenceStatus::Active, 30, 0);
+        $this->teamMember($otherManager, 'HIDDEN-PC', PresenceStatus::Idle, 0, 30);
+
+        $response = $this->actingAs($manager, 'sanctum')
+            ->getJson('/api/v1/desktop/presence')
+            ->assertOk()
+            ->assertJsonPath('data.summary.total', 1)
+            ->assertJsonPath('data.refresh_after_seconds', 30);
+
+        $this->assertSame(['VISIBLE-PC'], $response->json('data.items.*.computer_name'));
+    }
+
+    public function test_manager_can_open_team_employee_but_not_another_team(): void
+    {
+        $manager = tap(User::factory()->create(), fn (User $user) => $user->assignRole('manager'));
+        $otherManager = tap(User::factory()->create(), fn (User $user) => $user->assignRole('manager'));
+        [$visible] = $this->teamMember($manager, 'VISIBLE-PC', PresenceStatus::Active, 30, 0);
+        [$hidden] = $this->teamMember($otherManager, 'HIDDEN-PC', PresenceStatus::Idle, 0, 30);
+
+        $this->actingAs($manager, 'sanctum')
+            ->getJson("/api/v1/desktop/employees/{$visible->id}")
+            ->assertOk()
+            ->assertJsonPath('data.employee.id', $visible->id)
+            ->assertJsonPath('data.computers.0.computer_name', 'VISIBLE-PC');
+
+        $this->actingAs($manager, 'sanctum')
+            ->getJson("/api/v1/desktop/employees/{$hidden->id}")
+            ->assertForbidden();
     }
 
     /** @return array{0:Employee,1:Computer} */

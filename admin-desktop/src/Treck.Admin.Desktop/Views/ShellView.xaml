@@ -13,7 +13,13 @@
                 <StackPanel>
                     <TextBlock Text="Treck Admin" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource PrimaryText}" />
                     <ItemsControl ItemsSource="{Binding Navigation}" Margin="0,28,0,0">
-                        <ItemsControl.ItemTemplate><DataTemplate><Border Padding="10,8" Margin="0,2"><TextBlock Text="{Binding Label}" Foreground="{StaticResource PrimaryText}" /></Border></DataTemplate></ItemsControl.ItemTemplate>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Content="{Binding Label}" Padding="10,8" Margin="0,2"
+                                        HorizontalContentAlignment="Left" CommandParameter="{Binding}"
+                                        Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </StackPanel>
             </DockPanel>
@@ -24,12 +30,7 @@
                 <StackPanel><TextBlock Text="Overview" FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource PrimaryText}" /><TextBlock Text="{Binding Status}" Margin="0,4,0,0" Foreground="{StaticResource SecondaryText}" /></StackPanel>
                 <Button DockPanel.Dock="Right" Content="Refresh permissions" Padding="16,9" Command="{Binding RefreshCommand}" />
             </DockPanel>
-            <Border Grid.Row="2" Background="{StaticResource PanelBackground}" CornerRadius="12" Padding="32">
-                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                    <TextBlock Text="Secure session ready" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource PrimaryText}" />
-                    <TextBlock Text="Navigation is generated from your server permissions and enabled features." Margin="0,10,0,0" Foreground="{StaticResource SecondaryText}" />
-                </StackPanel>
-            </Border>
+            <ContentControl Grid.Row="2" Content="{Binding CurrentPage}" />
         </Grid>
     </Grid>
 </UserControl>

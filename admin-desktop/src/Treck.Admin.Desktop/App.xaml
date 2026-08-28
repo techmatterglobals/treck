@@ -11,5 +11,16 @@
         <SolidColorBrush x:Key="Accent" Color="#38BDF8" />
         <DataTemplate DataType="{x:Type vm:LoginViewModel}"><views:LoginView /></DataTemplate>
         <DataTemplate DataType="{x:Type vm:ShellViewModel}"><views:ShellView /></DataTemplate>
+        <DataTemplate DataType="{x:Type vm:OverviewViewModel}"><views:OverviewView /></DataTemplate>
+        <DataTemplate DataType="{x:Type vm:PresenceViewModel}"><views:PresenceView /></DataTemplate>
+        <DataTemplate DataType="{x:Type vm:EmployeeDetailViewModel}"><views:EmployeeDetailView /></DataTemplate>
+        <DataTemplate DataType="{x:Type vm:MessageViewModel}">
+            <Border Background="{StaticResource PanelBackground}" CornerRadius="12" Padding="32">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource PrimaryText}" />
+                    <TextBlock Text="{Binding Message}" Margin="0,10,0,0" Foreground="{StaticResource SecondaryText}" />
+                </StackPanel>
+            </Border>
+        </DataTemplate>
     </Application.Resources>
 </Application>

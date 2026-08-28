@@ -21,3 +21,8 @@ The client authenticates through the Laravel Sanctum API, validates every new or
 restored session through the desktop bootstrap contract, stores the bearer token
 with current-user DPAPI, and builds navigation from server permissions and
 feature flags. Passwords are never persisted.
+
+The first live screens are implemented: organization/team overview KPIs poll
+every 60 seconds, while the manager-scoped presence table polls every 30
+seconds. Polling is cancelled on navigation and sign-out. Double-clicking a
+presence row opens the authorized employee detail view.

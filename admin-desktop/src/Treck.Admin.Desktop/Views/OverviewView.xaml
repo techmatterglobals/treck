@@ -1,0 +1,23 @@
+<UserControl x:Class="Treck.Admin.Desktop.Views.OverviewView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel>
+            <DockPanel Margin="0,0,0,18">
+                <StackPanel><TextBlock Text="Live overview" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource PrimaryText}" /><TextBlock Text="{Binding ConnectionStatus}" Foreground="{StaticResource Accent}" /></StackPanel>
+                <Button DockPanel.Dock="Right" Content="Refresh now" Padding="14,8" Command="{Binding RefreshCommand}" />
+            </DockPanel>
+            <UniformGrid Columns="4">
+                <Border Margin="0,0,12,12" Padding="20" CornerRadius="10" Background="{StaticResource PanelBackground}"><StackPanel><TextBlock Text="Employees" Foreground="{StaticResource SecondaryText}" /><TextBlock Text="{Binding TotalEmployees}" FontSize="30" FontWeight="Bold" Foreground="{StaticResource PrimaryText}" /><TextBlock Text="{Binding PresentEmployees, StringFormat={}{0} present today}" Foreground="{StaticResource Accent}" /></StackPanel></Border>
+                <Border Margin="0,0,12,12" Padding="20" CornerRadius="10" Background="{StaticResource PanelBackground}"><StackPanel><TextBlock Text="Active computers" Foreground="{StaticResource SecondaryText}" /><TextBlock Text="{Binding ActiveComputers}" FontSize="30" FontWeight="Bold" Foreground="#86EFAC" /></StackPanel></Border>
+                <Border Margin="0,0,12,12" Padding="20" CornerRadius="10" Background="{StaticResource PanelBackground}"><StackPanel><TextBlock Text="Idle computers" Foreground="{StaticResource SecondaryText}" /><TextBlock Text="{Binding IdleComputers}" FontSize="30" FontWeight="Bold" Foreground="#FDE68A" /></StackPanel></Border>
+                <Border Margin="0,0,0,12" Padding="20" CornerRadius="10" Background="{StaticResource PanelBackground}"><StackPanel><TextBlock Text="Active ratio" Foreground="{StaticResource SecondaryText}" /><TextBlock Text="{Binding ActivePercent}" FontSize="30" FontWeight="Bold" Foreground="{StaticResource Accent}" /></StackPanel></Border>
+            </UniformGrid>
+            <UniformGrid Columns="2">
+                <Border Margin="0,0,12,0" Padding="24" CornerRadius="10" Background="{StaticResource PanelBackground}"><StackPanel><TextBlock Text="Active time today" Foreground="{StaticResource SecondaryText}" /><TextBlock Text="{Binding ActiveTime}" Margin="0,6,0,0" FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource PrimaryText}" /></StackPanel></Border>
+                <Border Padding="24" CornerRadius="10" Background="{StaticResource PanelBackground}"><StackPanel><TextBlock Text="Idle time today" Foreground="{StaticResource SecondaryText}" /><TextBlock Text="{Binding IdleTime}" Margin="0,6,0,0" FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource PrimaryText}" /></StackPanel></Border>
+            </UniformGrid>
+            <TextBlock Text="{Binding LastUpdatedAt, StringFormat={}Last updated: {0:G}}" Margin="0,16,0,0" Foreground="{StaticResource SecondaryText}" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

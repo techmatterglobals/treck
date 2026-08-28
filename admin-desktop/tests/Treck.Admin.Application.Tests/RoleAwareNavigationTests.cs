@@ -13,7 +13,11 @@ public sealed class RoleAwareNavigationTests
         var auth = new SessionServiceTests.StubAuthenticationApi();
         var tokens = new SessionServiceTests.MemoryTokenStore();
         var session = new SessionService(auth, api, tokens);
-        var shell = new ShellViewModel(api, session);
+        var polling = new PollingLoop();
+        var shell = new ShellViewModel(api, session,
+            new OverviewViewModel(api, polling),
+            new PresenceViewModel(api, polling),
+            new EmployeeDetailViewModel(api));
 
         shell.Initialize(SessionServiceTests.Bootstrap(screenshots: false, reports: true));
 
