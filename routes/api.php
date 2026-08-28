@@ -24,3 +24,6 @@ require __DIR__.'/modules/agent.php';
 
 // Activity read API (user tokens).
 require __DIR__.'/modules/activity.php';
+
+// Windows admin desktop API (role-scoped user tokens).
+require __DIR__.'/modules/desktop.php';
