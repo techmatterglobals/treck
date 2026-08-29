@@ -5,25 +5,24 @@ namespace App\Http\Requests\Agent;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Bootstraps a desktop agent. Protected by a shared provisioning key (not a
- * user token) since this is how the agent obtains its Sanctum token in the
- * first place. Set TRECK_AGENT_PROVISIONING_KEY and expose it via
- * config('treck.agent.provisioning_key').
+ * Bootstraps a desktop agent. Protected by a one-time enrollment secret
+ * supplied to the workstation at install/run time, since this is how the agent
+ * obtains its Sanctum token in the first place.
  */
 class RegisterDeviceRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        $expected = (string) config('treck.agent.provisioning_key');
+        $expected = (string) config('treck.agent.enrollment_secret');
 
         return $expected !== ''
-            && hash_equals($expected, (string) $this->input('provisioning_key'));
+            && hash_equals($expected, (string) $this->input('enrollment_secret'));
     }
 
     public function rules(): array
     {
         return [
-            'provisioning_key' => ['required', 'string'],
+            'enrollment_secret' => ['required', 'string'],
             'device_uuid' => ['required', 'string', 'max:64'],
             'employee_code' => ['required', 'string', 'exists:employees,employee_code'],
             'computer_name' => ['nullable', 'string', 'max:191'],

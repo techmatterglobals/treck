@@ -32,7 +32,7 @@ class BootstrapController extends Controller
                     'application_usage' => true,
                     'screenshots' => (bool) config('treck.screenshots.enabled'),
                     'downloads' => true,
-                    'agent_health' => false,
+                    'agent_health' => true,
                 ],
                 'server' => [
                     'version' => (string) config('treck.version'),

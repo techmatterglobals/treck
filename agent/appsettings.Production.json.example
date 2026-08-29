@@ -2,7 +2,6 @@
   "//": "Copy this file to appsettings.Production.json on the target machine and fill in real values. The real file is gitignored and MUST NOT be committed. The service loads it when DOTNET_ENVIRONMENT=Production (set by deploy/install-service.ps1). Values here layer on top of appsettings.json.",
   "Agent": {
     "BaseUrl": "https://treck.your-company.com",
-    "ProvisioningKey": "REPLACE_WITH_DEPLOYMENT_PROVISIONING_KEY",
     "EmployeeCode": "REPLACE_WITH_EMPLOYEE_CODE",
     "HeartbeatIntervalSeconds": 60,
     "IdleThresholdSeconds": 300,

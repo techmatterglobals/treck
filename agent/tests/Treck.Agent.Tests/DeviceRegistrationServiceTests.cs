@@ -15,15 +15,28 @@ public class DeviceRegistrationServiceTests
     private static IOptions<AgentOptions> Options() => Microsoft.Extensions.Options.Options.Create(new AgentOptions
     {
         BaseUrl = "https://treck.test",
-        ProvisioningKey = "PROV-KEY",
         EmployeeCode = "EMP-1",
     });
 
     private static DeviceRegistrationService Build(
         Mock<ITreckApiClient> api,
         Mock<IDeviceIdStore> ids,
-        Mock<ITokenStore> tokens) =>
-        new(api.Object, ids.Object, tokens.Object, Options(), NullLogger<DeviceRegistrationService>.Instance);
+        Mock<ITokenStore> tokens,
+        Mock<IEnrollmentSecretStore>? enrollment = null) =>
+        new(
+            api.Object,
+            ids.Object,
+            tokens.Object,
+            (enrollment ?? Enrollment("enroll-once")).Object,
+            Options(),
+            NullLogger<DeviceRegistrationService>.Instance);
+
+    private static Mock<IEnrollmentSecretStore> Enrollment(string? secret)
+    {
+        var enrollment = new Mock<IEnrollmentSecretStore>();
+        enrollment.Setup(e => e.TryLoad()).Returns(secret);
+        return enrollment;
+    }
 
     [Fact]
     public async Task EnsureRegistered_returns_stored_token_without_calling_the_api()
@@ -51,11 +64,16 @@ public class DeviceRegistrationServiceTests
 
         var tokens = new Mock<ITokenStore>();
         tokens.Setup(t => t.TryLoad()).Returns((string?)null);
+        var enrollment = Enrollment("enroll-once");
 
-        var token = await Build(api, ids, tokens).EnsureRegisteredAsync(CancellationToken.None);
+        var token = await Build(api, ids, tokens, enrollment).EnsureRegisteredAsync(CancellationToken.None);
 
         Assert.Equal("new-token", token);
         tokens.Verify(t => t.Save("new-token"), Times.Once);
+        enrollment.Verify(e => e.DeleteFileSecret(), Times.Once);
+        api.Verify(a => a.RegisterDeviceAsync(
+            It.Is<RegisterDeviceRequest>(request => request.EnrollmentSecret == "enroll-once"),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -69,11 +87,25 @@ public class DeviceRegistrationServiceTests
         ids.Setup(i => i.GetOrCreate()).Returns("uuid-1");
 
         var tokens = new Mock<ITokenStore>();
+        var enrollment = Enrollment("enroll-again");
 
-        var token = await Build(api, ids, tokens).ReRegisterAsync(CancellationToken.None);
+        var token = await Build(api, ids, tokens, enrollment).ReRegisterAsync(CancellationToken.None);
 
         Assert.Equal("fresh-token", token);
         tokens.Verify(t => t.Clear(), Times.Once);
         tokens.Verify(t => t.Save("fresh-token"), Times.Once);
+    }
+
+    [Fact]
+    public async Task EnsureRegistered_fails_without_an_enrollment_secret()
+    {
+        var api = new Mock<ITreckApiClient>();
+        var ids = new Mock<IDeviceIdStore>();
+        ids.Setup(i => i.GetOrCreate()).Returns("uuid-1");
+        var tokens = new Mock<ITokenStore>();
+        tokens.Setup(t => t.TryLoad()).Returns((string?)null);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => Build(api, ids, tokens, Enrollment(null)).EnsureRegisteredAsync(CancellationToken.None));
     }
 }

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Treck.Agent.Health;
 using Treck.Agent.Offline;
 
 namespace Treck.Agent.Sync;
@@ -9,17 +10,20 @@ public sealed class SyncService : ISyncService
     private readonly IOfflineEventStore _store;
     private readonly IEventUploader _uploader;
     private readonly OfflineStoreOptions _options;
+    private readonly AgentHealthState _health;
     private readonly ILogger<SyncService> _logger;
 
     public SyncService(
         IOfflineEventStore store,
         IEventUploader uploader,
         IOptions<OfflineStoreOptions> options,
+        AgentHealthState health,
         ILogger<SyncService> logger)
     {
         _store = store;
         _uploader = uploader;
         _options = options.Value;
+        _health = health;
         _logger = logger;
     }
 
@@ -83,6 +87,7 @@ public sealed class SyncService : ISyncService
         if (acknowledged.Count > 0)
         {
             _store.MarkSynced(acknowledged);
+            _health.MarkSyncSucceeded();
         }
 
         _store.Prune();
@@ -95,6 +100,11 @@ public sealed class SyncService : ISyncService
             _logger.LogInformation(
                 "Sync cycle: uploaded={Uploaded} failed={Failed} dropped={Dropped} pending={Pending}",
                 acknowledged.Count, failed, dropped, remaining);
+
+            if (failed > 0 || dropped > 0)
+            {
+                _health.MarkError(dropped > 0 ? "event_dropped" : "sync_failed");
+            }
         }
 
         return new SyncResult(acknowledged.Count, failed, remaining);

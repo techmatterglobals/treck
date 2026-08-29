@@ -10,5 +10,7 @@ public interface ITreckDesktopApi
 
     Task<DesktopPresence> GetPresenceAsync(CancellationToken cancellationToken = default);
 
+    Task<DesktopAgentHealth> GetAgentHealthAsync(CancellationToken cancellationToken = default);
+
     Task<EmployeeDetail> GetEmployeeAsync(long employeeId, CancellationToken cancellationToken = default);
 }

@@ -61,4 +61,29 @@ public sealed class LiveMonitoringViewModelTests
 
         Assert.Equal(1, calls);
     }
+
+    [Fact]
+    public async Task Agent_health_activation_refreshes_immediately_and_can_be_cancelled()
+    {
+        var expected = new DesktopAgentHealth(
+            [new AgentHealthRow(7, 9, "OPS-PC", "Employee", "Operations", "healthy", "1.0.0", "1.0.0",
+                "compliant", "rev-1", 2, true, 3, DateTimeOffset.UtcNow.AddHours(-1),
+                DateTimeOffset.UtcNow.AddMinutes(-2), DateTimeOffset.UtcNow.AddMinutes(-1), null,
+                DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)],
+            new AgentHealthSummary(1, 1, 0, 0, 0, 2),
+            60,
+            DateTimeOffset.UtcNow);
+        var api = new SessionServiceTests.StubDesktopApi { AgentHealth = expected };
+        var viewModel = new AgentHealthViewModel(api, new PollingLoop());
+
+        viewModel.Activate();
+        await api.AgentHealthCalled.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        for (var attempt = 0; attempt < 20 && viewModel.Summary is null; attempt++)
+            await Task.Delay(5);
+        viewModel.Deactivate();
+
+        Assert.Same(expected.Summary, viewModel.Summary);
+        Assert.Equal("Live", viewModel.ConnectionStatus);
+        Assert.Single(viewModel.Rows);
+    }
 }

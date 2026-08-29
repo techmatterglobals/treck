@@ -46,7 +46,7 @@ public sealed class TreckApiClient : ITreckApiClient
             request.ComputerName,
             request.Os,
             request.AgentVersion,
-            Mask(request.ProvisioningKey));
+            Mask(request.EnrollmentSecret));
 
         using var response = await _http.PostAsJsonAsync("api/agent/register", request, JsonOptions, cancellationToken);
 
@@ -69,6 +69,50 @@ public sealed class TreckApiClient : ITreckApiClient
 
         return envelope?.Data
             ?? throw new ApiException("Registration succeeded but the response body was empty.");
+    }
+
+    public async Task<AgentConfigResponse> GetAgentConfigAsync(string bearerToken, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/agent/config");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+
+        using var response = await _http.SendAsync(request, cancellationToken);
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            throw new UnauthorizedApiException();
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw ApiException.FromStatus((int)response.StatusCode);
+        }
+
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<AgentConfigResponse>>(JsonOptions, cancellationToken);
+
+        return envelope?.Data
+            ?? throw new ApiException("Config fetch succeeded but the response body was empty.");
+    }
+
+    public async Task<bool> ReportHealthAsync(
+        string bearerToken,
+        AgentHealthReportRequest request,
+        CancellationToken cancellationToken)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Post, "api/agent/health")
+        {
+            Content = JsonContent.Create(request, options: JsonOptions),
+        };
+        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
+
+        using var response = await _http.SendAsync(message, cancellationToken);
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            throw new UnauthorizedApiException();
+        }
+
+        return response.IsSuccessStatusCode;
     }
 
     public async Task<bool> UploadEventAsync(string bearerToken, OfflineEventPayload payload, CancellationToken cancellationToken)

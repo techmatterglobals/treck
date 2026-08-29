@@ -13,6 +13,7 @@
         <DataTemplate DataType="{x:Type vm:ShellViewModel}"><views:ShellView /></DataTemplate>
         <DataTemplate DataType="{x:Type vm:OverviewViewModel}"><views:OverviewView /></DataTemplate>
         <DataTemplate DataType="{x:Type vm:PresenceViewModel}"><views:PresenceView /></DataTemplate>
+        <DataTemplate DataType="{x:Type vm:AgentHealthViewModel}"><views:AgentHealthView /></DataTemplate>
         <DataTemplate DataType="{x:Type vm:EmployeeDetailViewModel}"><views:EmployeeDetailView /></DataTemplate>
         <DataTemplate DataType="{x:Type vm:MessageViewModel}">
             <Border Background="{StaticResource PanelBackground}" CornerRadius="12" Padding="32">

@@ -14,6 +14,7 @@ public partial class ShellViewModel : ObservableObject
     private readonly SessionService _session;
     private readonly OverviewViewModel _overview;
     private readonly PresenceViewModel _presence;
+    private readonly AgentHealthViewModel _agentHealth;
     private readonly EmployeeDetailViewModel _employeeDetail;
 
     [ObservableProperty] private string _status = "Connected";
@@ -28,15 +29,18 @@ public partial class ShellViewModel : ObservableObject
         SessionService session,
         OverviewViewModel overview,
         PresenceViewModel presence,
+        AgentHealthViewModel agentHealth,
         EmployeeDetailViewModel employeeDetail)
     {
         _api = api;
         _session = session;
         _overview = overview;
         _presence = presence;
+        _agentHealth = agentHealth;
         _employeeDetail = employeeDetail;
         _overview.AuthorizationLost += OnAuthorizationLost;
         _presence.AuthorizationLost += OnAuthorizationLost;
+        _agentHealth.AuthorizationLost += OnAuthorizationLost;
         _presence.EmployeeRequested += OnEmployeeRequested;
         _employeeDetail.AuthorizationLost += OnAuthorizationLost;
         _employeeDetail.BackRequested += OnEmployeeDetailBackRequested;
@@ -115,10 +119,11 @@ public partial class ShellViewModel : ObservableObject
         {
             "overview" => _overview,
             "presence" => _presence,
+            "health" => _agentHealth,
             _ => new MessageViewModel(item.Label, "This authorized module will be added in a later monitoring milestone."),
         };
 
-        if (item.Key is not ("overview" or "presence"))
+        if (item.Key is not ("overview" or "presence" or "health"))
         {
             Status = $"{item.Label} will be added in a later monitoring milestone.";
             return;

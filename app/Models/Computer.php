@@ -97,6 +97,12 @@ class Computer extends Model implements AuthenticatableContract
         return $this->hasOne(ComputerPresence::class);
     }
 
+    /** Latest operational health snapshot reported by the Windows agent. */
+    public function agentHealthReport(): HasOne
+    {
+        return $this->hasOne(AgentHealthReport::class);
+    }
+
     // ----------------------------------------------------------------
     // Accessors
     // ----------------------------------------------------------------

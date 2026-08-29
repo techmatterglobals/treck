@@ -22,19 +22,23 @@ public sealed class DeviceRegistrationService : IDeviceRegistrationService
     private readonly ITreckApiClient _api;
     private readonly IDeviceIdStore _deviceIdStore;
     private readonly ITokenStore _tokenStore;
+    private readonly IEnrollmentSecretStore _enrollmentSecretStore;
     private readonly AgentOptions _options;
     private readonly ILogger<DeviceRegistrationService> _logger;
+    private static readonly TimeSpan RegistrationLockTimeout = TimeSpan.FromSeconds(30);
 
     public DeviceRegistrationService(
         ITreckApiClient api,
         IDeviceIdStore deviceIdStore,
         ITokenStore tokenStore,
+        IEnrollmentSecretStore enrollmentSecretStore,
         IOptions<AgentOptions> options,
         ILogger<DeviceRegistrationService> logger)
     {
         _api = api;
         _deviceIdStore = deviceIdStore;
         _tokenStore = tokenStore;
+        _enrollmentSecretStore = enrollmentSecretStore;
         _options = options.Value;
         _logger = logger;
     }
@@ -64,10 +68,39 @@ public sealed class DeviceRegistrationService : IDeviceRegistrationService
 
     private async Task<string> RegisterAsync(CancellationToken cancellationToken)
     {
+        using var mutex = new Mutex(false, @"Global\TreckAgentRegistration");
+        var lockAcquired = await Task.Run(() => mutex.WaitOne(RegistrationLockTimeout), cancellationToken);
+        if (!lockAcquired)
+        {
+            throw new TimeoutException("Timed out waiting for the device registration lock.");
+        }
+
+        try
+        {
+            var existing = _tokenStore.TryLoad();
+            if (existing is not null)
+            {
+                _logger.LogInformation("Device was registered by another worker while waiting for the lock.");
+                return existing;
+            }
+
+            return await RegisterWithLockHeldAsync(cancellationToken);
+        }
+        finally
+        {
+            mutex.ReleaseMutex();
+        }
+    }
+
+    private async Task<string> RegisterWithLockHeldAsync(CancellationToken cancellationToken)
+    {
         var deviceUuid = _deviceIdStore.GetOrCreate();
+        var enrollmentSecret = _enrollmentSecretStore.TryLoad()
+            ?? throw new InvalidOperationException(
+                $"No enrollment secret was supplied. Set {EnrollmentSecretStore.EnvironmentVariable} or install {EnrollmentSecretStore.FileName} under %ProgramData%\\TreckAgent.");
 
         var request = new RegisterDeviceRequest(
-            ProvisioningKey: _options.ProvisioningKey,
+            EnrollmentSecret: enrollmentSecret,
             DeviceUuid: deviceUuid,
             EmployeeCode: _options.EmployeeCode,
             ComputerName: Environment.MachineName,
@@ -85,6 +118,7 @@ public sealed class DeviceRegistrationService : IDeviceRegistrationService
             var response = await _api.RegisterDeviceAsync(request, cancellationToken);
 
             _tokenStore.Save(response.Token);
+            _enrollmentSecretStore.DeleteFileSecret();
 
             _logger.LogInformation(
                 "Device registered: computerId={ComputerId} employeeId={EmployeeId}",

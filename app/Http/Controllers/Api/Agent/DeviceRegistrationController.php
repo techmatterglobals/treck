@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Agent\RegisterDeviceRequest;
 use App\Models\Computer;
 use App\Models\Employee;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -24,23 +26,41 @@ class DeviceRegistrationController extends Controller
     {
         $data = $request->validated();
 
-        $employee = Employee::where('employee_code', $data['employee_code'])->firstOrFail();
+        [$computer, $token] = DB::transaction(function () use ($data) {
+            $employee = Employee::where('employee_code', $data['employee_code'])->firstOrFail();
 
-        $computer = Computer::updateOrCreate(
-            ['device_uuid' => $data['device_uuid']],
-            [
+            $computer = Computer::query()
+                ->where('device_uuid', $data['device_uuid'])
+                ->lockForUpdate()
+                ->first();
+
+            if (! $computer) {
+                try {
+                    $computer = Computer::create(['device_uuid' => $data['device_uuid']]);
+                } catch (QueryException) {
+                    $computer = Computer::query()
+                        ->where('device_uuid', $data['device_uuid'])
+                        ->lockForUpdate()
+                        ->firstOrFail();
+                }
+            }
+
+            $computer->forceFill([
                 'employee_id' => $employee->id,
                 'hostname' => $data['computer_name'] ?? null,
                 'os' => $data['os'] ?? null,
                 'agent_version' => $data['agent_version'] ?? null,
                 'paired_at' => now(),
                 'status' => ComputerStatus::Offline,
-            ],
-        );
+            ])->save();
 
-        // One live token per device: revoke any previous, then mint a new one.
-        $computer->tokens()->delete();
-        $token = $computer->createToken('agent-'.$computer->device_uuid, ['agent:report']);
+            // One live token per device: revoke any previous, then mint a new one.
+            // The row lock serializes competing registrations for the same device.
+            $computer->tokens()->delete();
+            $token = $computer->createToken('agent-'.$computer->device_uuid, ['agent:report']);
+
+            return [$computer, $token];
+        });
 
         return response()->json([
             'message' => 'Device registered.',

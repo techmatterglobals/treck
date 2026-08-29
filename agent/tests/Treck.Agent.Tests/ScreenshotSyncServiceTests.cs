@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Treck.Agent.Api;
+using Treck.Agent.Health;
 using Treck.Agent.Models;
 using Treck.Agent.Screenshots;
 using Xunit;
@@ -27,6 +28,12 @@ public class ScreenshotSyncServiceTests
             => throw new NotSupportedException();
 
         public Task<bool> UploadEventAsync(string bearerToken, OfflineEventPayload payload, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public Task<AgentConfigResponse> GetAgentConfigAsync(string bearerToken, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public Task<bool> ReportHealthAsync(string bearerToken, AgentHealthReportRequest request, CancellationToken cancellationToken)
             => throw new NotSupportedException();
 
         public Task<bool> UploadScreenshotAsync(string bearerToken, ScreenshotMetadata metadata, byte[] imageBytes, CancellationToken cancellationToken)
@@ -62,7 +69,7 @@ public class ScreenshotSyncServiceTests
     {
         var path = WriteTemp("img");
         var api = new FakeApi(result: true);
-        var sut = new ScreenshotSyncService(api, NullLogger<ScreenshotSyncService>.Instance);
+        var sut = new ScreenshotSyncService(api, new AgentHealthState(), NullLogger<ScreenshotSyncService>.Instance);
 
         var ok = await sut.UploadAsync("token", MetadataFor(path), CancellationToken.None);
 
@@ -76,7 +83,7 @@ public class ScreenshotSyncServiceTests
     {
         var path = WriteTemp("img");
         var api = new FakeApi(result: false);
-        var sut = new ScreenshotSyncService(api, NullLogger<ScreenshotSyncService>.Instance);
+        var sut = new ScreenshotSyncService(api, new AgentHealthState(), NullLogger<ScreenshotSyncService>.Instance);
 
         try
         {
@@ -95,7 +102,7 @@ public class ScreenshotSyncServiceTests
     public async Task Missing_temp_file_is_treated_as_done_without_calling_the_api()
     {
         var api = new FakeApi(result: true);
-        var sut = new ScreenshotSyncService(api, NullLogger<ScreenshotSyncService>.Instance);
+        var sut = new ScreenshotSyncService(api, new AgentHealthState(), NullLogger<ScreenshotSyncService>.Instance);
 
         var ok = await sut.UploadAsync("token", MetadataFor("/no/such/file.jpg"), CancellationToken.None);
 
@@ -108,7 +115,7 @@ public class ScreenshotSyncServiceTests
     {
         var path = WriteTemp("hello-bytes");
         var api = new FakeApi(result: true);
-        var sut = new ScreenshotSyncService(api, NullLogger<ScreenshotSyncService>.Instance);
+        var sut = new ScreenshotSyncService(api, new AgentHealthState(), NullLogger<ScreenshotSyncService>.Instance);
 
         await sut.UploadAsync("token", MetadataFor(path), CancellationToken.None);
 

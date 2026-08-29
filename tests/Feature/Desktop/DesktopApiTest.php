@@ -5,6 +5,7 @@ namespace Tests\Feature\Desktop;
 use App\Enums\PresenceStatus;
 use App\Models\ActivityLog;
 use App\Models\AgentEvent;
+use App\Models\AgentHealthReport;
 use App\Models\Computer;
 use App\Models\ComputerPresence;
 use App\Models\Employee;
@@ -38,6 +39,7 @@ class DesktopApiTest extends TestCase
     {
         $employee = Employee::factory()->create();
         $this->getJson('/api/v1/desktop/bootstrap')->assertUnauthorized();
+        $this->getJson('/api/v1/desktop/agent-health')->assertUnauthorized();
         $this->getJson('/api/v1/desktop/overview')->assertUnauthorized();
         $this->getJson('/api/v1/desktop/presence')->assertUnauthorized();
         $this->getJson("/api/v1/desktop/employees/{$employee->id}")->assertUnauthorized();
@@ -62,6 +64,7 @@ class DesktopApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.user.id', $admin->id)
             ->assertJsonPath('data.features.screenshots', true)
+            ->assertJsonPath('data.features.agent_health', true)
             ->assertJsonPath('data.server.display_timezone', 'Asia/Karachi')
             ->assertJsonStructure(['data' => [
                 'user' => ['id', 'name', 'email'],
@@ -171,6 +174,61 @@ class DesktopApiTest extends TestCase
         $this->actingAs($manager, 'sanctum')
             ->getJson("/api/v1/desktop/employees/{$hidden->id}")
             ->assertForbidden();
+    }
+
+    public function test_manager_agent_health_contains_only_team_computers_and_uses_server_receipt_time(): void
+    {
+        config([
+            'treck.agent.minimum_version' => '1.0.0',
+            'treck.agent.health_stale_seconds' => 180,
+        ]);
+        $manager = tap(User::factory()->create(), fn (User $user) => $user->assignRole('manager'));
+        $otherManager = tap(User::factory()->create(), fn (User $user) => $user->assignRole('manager'));
+        [$ownEmployee, $ownComputer] = $this->teamMember($manager, 'VISIBLE-PC', PresenceStatus::Active, 30, 0);
+        [$otherEmployee, $otherComputer] = $this->teamMember($otherManager, 'HIDDEN-PC', PresenceStatus::Idle, 0, 30);
+
+        AgentHealthReport::factory()->for($ownComputer)->create([
+            'agent_version' => '1.0.0',
+            'pending_event_count' => 3,
+            'reported_at' => now()->subDay(),
+            'received_at' => now(),
+        ]);
+        AgentHealthReport::factory()->for($otherComputer)->create([
+            'agent_version' => '0.9.0',
+            'pending_event_count' => 99,
+            'received_at' => now(),
+        ]);
+
+        $response = $this->actingAs($manager, 'sanctum')
+            ->getJson('/api/v1/desktop/agent-health')
+            ->assertOk()
+            ->assertJsonPath('data.summary.total', 1)
+            ->assertJsonPath('data.summary.healthy', 1)
+            ->assertJsonPath('data.summary.pending_events', 3)
+            ->assertJsonPath('data.refresh_after_seconds', 60);
+
+        $this->assertSame(['VISIBLE-PC'], $response->json('data.items.*.computer_name'));
+        $this->assertSame('healthy', $response->json('data.items.0.status'));
+        $this->assertNotSame($otherEmployee->id, $ownEmployee->id);
+    }
+
+    public function test_agent_health_marks_stale_and_never_reported(): void
+    {
+        config(['treck.agent.health_stale_seconds' => 180]);
+        $admin = tap(User::factory()->create(), fn (User $user) => $user->assignRole('admin'));
+        $stale = Computer::factory()->create(['hostname' => 'STALE-PC']);
+        Computer::factory()->create(['hostname' => 'NEVER-PC']);
+        AgentHealthReport::factory()->for($stale)->create(['received_at' => now()->subMinutes(10)]);
+
+        $response = $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/desktop/agent-health')
+            ->assertOk()
+            ->assertJsonPath('data.summary.stale', 1)
+            ->assertJsonPath('data.summary.never_reported', 1);
+
+        $statuses = collect($response->json('data.items'))->pluck('status', 'computer_name');
+        $this->assertSame('stale', $statuses['STALE-PC']);
+        $this->assertSame('never_reported', $statuses['NEVER-PC']);
     }
 
     /** @return array{0:Employee,1:Computer} */

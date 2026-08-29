@@ -17,6 +17,7 @@ public sealed class RoleAwareNavigationTests
         var shell = new ShellViewModel(api, session,
             new OverviewViewModel(api, polling),
             new PresenceViewModel(api, polling),
+            new AgentHealthViewModel(api, polling),
             new EmployeeDetailViewModel(api));
 
         shell.Initialize(SessionServiceTests.Bootstrap(screenshots: false, reports: true));
@@ -24,5 +25,24 @@ public sealed class RoleAwareNavigationTests
         Assert.Contains(shell.Navigation, item => item.Key == "reports");
         Assert.DoesNotContain(shell.Navigation, item => item.Key == "screenshots");
         Assert.DoesNotContain(shell.Navigation, item => item.Key == "health");
+    }
+
+    [Fact]
+    public void Agent_health_navigation_is_enabled_by_feature_flag()
+    {
+        var api = new SessionServiceTests.StubDesktopApi();
+        var auth = new SessionServiceTests.StubAuthenticationApi();
+        var tokens = new SessionServiceTests.MemoryTokenStore();
+        var session = new SessionService(auth, api, tokens);
+        var polling = new PollingLoop();
+        var shell = new ShellViewModel(api, session,
+            new OverviewViewModel(api, polling),
+            new PresenceViewModel(api, polling),
+            new AgentHealthViewModel(api, polling),
+            new EmployeeDetailViewModel(api));
+
+        shell.Initialize(SessionServiceTests.Bootstrap(health: true));
+
+        Assert.Contains(shell.Navigation, item => item.Key == "health");
     }
 }

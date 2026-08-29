@@ -22,6 +22,9 @@ public sealed class TreckDesktopApi : ITreckDesktopApi
     public Task<DesktopPresence> GetPresenceAsync(CancellationToken cancellationToken = default) =>
         GetDataAsync<DesktopPresence>("api/v1/desktop/presence", cancellationToken);
 
+    public Task<DesktopAgentHealth> GetAgentHealthAsync(CancellationToken cancellationToken = default) =>
+        GetDataAsync<DesktopAgentHealth>("api/v1/desktop/agent-health", cancellationToken);
+
     public Task<EmployeeDetail> GetEmployeeAsync(long employeeId, CancellationToken cancellationToken = default) =>
         GetDataAsync<EmployeeDetail>($"api/v1/desktop/employees/{employeeId}", cancellationToken);
 

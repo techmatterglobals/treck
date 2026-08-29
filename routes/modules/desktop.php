@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Desktop\BootstrapController;
+use App\Http\Controllers\Api\V1\Desktop\AgentHealthController;
 use App\Http\Controllers\Api\V1\Desktop\EmployeeDetailController;
 use App\Http\Controllers\Api\V1\Desktop\OverviewController;
 use App\Http\Controllers\Api\V1\Desktop\PresenceController;
@@ -20,6 +21,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:user'])
     ->name('desktop.')
     ->group(function () {
         Route::get('bootstrap', BootstrapController::class)->name('bootstrap');
+        Route::get('agent-health', AgentHealthController::class)->name('agent-health');
         Route::get('overview', OverviewController::class)->name('overview');
         Route::get('presence', PresenceController::class)->name('presence');
         Route::get('employees/{employee}', EmployeeDetailController::class)->name('employees.show');
