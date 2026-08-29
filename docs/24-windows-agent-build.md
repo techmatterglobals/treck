@@ -180,7 +180,7 @@ sequenceDiagram
    (DPAPI round-trip [Windows], device-id persistence, registration client
    request/response + error mapping, registration-service orchestration).
 2. **Live registration (happy path):** with the Laravel API running and
-   `TRECK_AGENT_PROVISIONING_KEY` + a valid `EmployeeCode` set, `dotnet run` →
+   `TRECK_AGENT_ENROLLMENT_SECRET` + a valid `EmployeeCode` set, `dotnet run` →
    logs "Registering device …" then "Device registered: computerId=…". Confirm
    `%ProgramData%\TreckAgent\device.id` (plaintext UUID) and `token.dat`
    (unreadable ciphertext, **not** the bearer token) exist.
@@ -637,8 +637,8 @@ only build that pins `-r win-x64`, so build it on a host with connectivity.
 ```powershell
 cd agent\deploy
 Copy-Item ..\appsettings.Production.json.example ..\appsettings.Production.json
-notepad ..\appsettings.Production.json      # BaseUrl, ProvisioningKey, EmployeeCode
-./install-service.ps1 -Publish              # framework-dependent (RID-less) publish + install + start
+notepad ..\appsettings.Production.json      # BaseUrl, EmployeeCode
+./install-service.ps1 -Publish -EnrollmentSecret "REPLACE_WITH_ENROLLMENT_SECRET"
 # ./install-service.ps1 -Publish -SelfContained   # optional release: bundle the runtime
 ```
 

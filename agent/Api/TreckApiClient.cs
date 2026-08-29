@@ -35,12 +35,12 @@ public sealed class TreckApiClient : ITreckApiClient
         RegisterDeviceRequest request,
         CancellationToken cancellationToken)
     {
-        // Diagnostic: log the outgoing registration request with the provisioning
-        // key masked (never log the secret). This surfaces exactly which
+        // Diagnostic: log the outgoing registration request with the enrollment
+        // secret masked (never log the secret). This surfaces exactly which
         // EmployeeCode/DeviceUuid the agent is sending - e.g. a stale
         // appsettings value - without a server round-trip.
         _logger.LogInformation(
-            "Registering device: DeviceUuid={DeviceUuid} EmployeeCode={EmployeeCode} ComputerName={ComputerName} Os={Os} AgentVersion={AgentVersion} ProvisioningKey={KeyMask}",
+            "Registering device: DeviceUuid={DeviceUuid} EmployeeCode={EmployeeCode} ComputerName={ComputerName} Os={Os} AgentVersion={AgentVersion} EnrollmentSecret={SecretMask}",
             request.DeviceUuid,
             request.EmployeeCode,
             request.ComputerName,

@@ -99,8 +99,8 @@ QUEUE_CONNECTION=database     # or redis
 
 SANCTUM_STATEFUL_DOMAINS=localhost,localhost:8000,127.0.0.1,127.0.0.1:8000
 
-# Desktop agent registration (REQUIRED for the agent to obtain a token)
-TRECK_AGENT_PROVISIONING_KEY=change-me-to-a-strong-secret
+# Desktop agent enrollment (REQUIRED for the agent to obtain a token)
+TRECK_AGENT_ENROLLMENT_SECRET=change-me-to-a-strong-secret
 
 # Domain tunables (idle threshold, work hours, retention) — see config/treck.php
 TRECK_IDLE_THRESHOLD=300
@@ -184,8 +184,10 @@ Reference .NET 8 project in [`agent/`](agent/) (see
 [`docs/24-windows-agent-build.md`](docs/24-windows-agent-build.md) for the
 milestone build/install runbook). Bootstrap flow:
 
-1. Set `TRECK_AGENT_PROVISIONING_KEY` in `.env` and configure the agent's
-   `appsettings.json` (`BaseUrl`, `ProvisioningKey`, `EmployeeCode`).
+1. Set `TRECK_AGENT_ENROLLMENT_SECRET` in `.env`, configure the agent's
+   `appsettings.json` (`BaseUrl`, `EmployeeCode`), and provide the matching
+   one-time secret to the installer or `TRECK_AGENT_ENROLLMENT_SECRET`
+   process environment.
 2. The agent calls `POST /api/agent/register` once to obtain a device token,
    then `login` → `activity` (every ~60s) → `logout`. Heartbeat and session
    events are queued locally (SQLite) and drained to
@@ -205,7 +207,7 @@ from an **elevated PowerShell** on the target machine:
 cd agent\deploy
 # 1. Per-deployment config (git-ignored; no secrets in source control):
 Copy-Item ..\appsettings.Production.json.example ..\appsettings.Production.json
-notepad ..\appsettings.Production.json     # BaseUrl, ProvisioningKey, EmployeeCode
+notepad ..\appsettings.Production.json     # BaseUrl, EmployeeCode
 # 2. Publish (framework-dependent) and install + start the service:
 ./install-service.ps1 -Publish             # Service "TreckAgent" (display: "Treck Agent")
 # Air-gapped target with no runtime? Bundle it: ./install-service.ps1 -Publish -SelfContained
@@ -231,7 +233,7 @@ KEY=change-me-to-a-strong-secret
 # employee_code must exist — grab a real one after seeding demo data:
 CODE=$(php artisan tinker --execute="echo App\Models\Employee::value('employee_code');")
 curl -sX POST http://localhost:8000/api/agent/register -H 'Accept: application/json' \
-  -d provisioning_key=$KEY -d device_uuid=TEST -d employee_code=$CODE \
+  -d enrollment_secret=$KEY -d device_uuid=TEST -d employee_code=$CODE \
   -d computer_name=TEST-PC -d os='Windows 11'
 ```
 
@@ -445,7 +447,7 @@ release notes — see [`docs/30-production-release.md`](docs/30-production-relea
 | ------- | --- |
 | `No application encryption key` | `php artisan key:generate` |
 | Migrations fail on permission tables | ensure `config/permission.php` present (it is) and `php artisan config:clear` |
-| Agent registration returns 403 | `TRECK_AGENT_PROVISIONING_KEY` is unset/mismatched |
+| Agent registration returns 403 | `TRECK_AGENT_ENROLLMENT_SECRET` is unset/mismatched |
 | Agent calls return 401 | token missing/expired — re-register the device |
 | Dashboard shows zeros | seed `DemoDataSeeder` or let agents report, then run `treck:daily-rollup` |
 | Assets missing / unstyled | `npm run build` (and `php artisan storage:link`) |

@@ -66,31 +66,46 @@ public sealed class DeviceRegistrationService : IDeviceRegistrationService
         return await RegisterAsync(cancellationToken);
     }
 
-    private async Task<string> RegisterAsync(CancellationToken cancellationToken)
-    {
-        using var mutex = new Mutex(false, @"Global\TreckAgentRegistration");
-        var lockAcquired = await Task.Run(() => mutex.WaitOne(RegistrationLockTimeout), cancellationToken);
-        if (!lockAcquired)
+    private Task<string> RegisterAsync(CancellationToken cancellationToken) =>
+        Task.Run(() =>
         {
-            throw new TimeoutException("Timed out waiting for the device registration lock.");
-        }
+            using var mutex = new Mutex(false, @"Global\TreckAgentRegistration");
+            var lockAcquired = false;
 
-        try
-        {
-            var existing = _tokenStore.TryLoad();
-            if (existing is not null)
+            try
             {
-                _logger.LogInformation("Device was registered by another worker while waiting for the lock.");
-                return existing;
-            }
+                try
+                {
+                    lockAcquired = mutex.WaitOne(RegistrationLockTimeout);
+                }
+                catch (AbandonedMutexException ex)
+                {
+                    lockAcquired = true;
+                    _logger.LogWarning(ex, "Device registration lock was abandoned; continuing with ownership.");
+                }
 
-            return await RegisterWithLockHeldAsync(cancellationToken);
-        }
-        finally
-        {
-            mutex.ReleaseMutex();
-        }
-    }
+                if (!lockAcquired)
+                {
+                    throw new TimeoutException("Timed out waiting for the device registration lock.");
+                }
+
+                var existing = _tokenStore.TryLoad();
+                if (existing is not null)
+                {
+                    _logger.LogInformation("Device was registered by another worker while waiting for the lock.");
+                    return existing;
+                }
+
+                return RegisterWithLockHeldAsync(cancellationToken).GetAwaiter().GetResult();
+            }
+            finally
+            {
+                if (lockAcquired)
+                {
+                    mutex.ReleaseMutex();
+                }
+            }
+        }, cancellationToken);
 
     private async Task<string> RegisterWithLockHeldAsync(CancellationToken cancellationToken)
     {
@@ -108,7 +123,7 @@ public sealed class DeviceRegistrationService : IDeviceRegistrationService
             AgentVersion: AgentVersion);
 
         // Requirement 14: structured log for every registration attempt
-        // (never logs the provisioning key or the returned token).
+        // (never logs the enrollment secret or the returned token).
         _logger.LogInformation(
             "Registering device {DeviceUuid} as employee {EmployeeCode} ({ComputerName})",
             deviceUuid, _options.EmployeeCode, request.ComputerName);

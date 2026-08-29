@@ -12,6 +12,87 @@ namespace Treck.Agent.Tests;
 
 public class DeviceRegistrationServiceTests
 {
+    private sealed class StubDeviceIdStore : IDeviceIdStore
+    {
+        public string GetOrCreate() => "uuid-1";
+    }
+
+    private sealed class StubEnrollmentSecretStore : IEnrollmentSecretStore
+    {
+        public int DeleteCalls { get; private set; }
+        public string? TryLoad() => "enroll-once";
+        public void DeleteFileSecret() => DeleteCalls++;
+    }
+
+    private sealed class CoordinatedTokenStore : ITokenStore
+    {
+        private readonly object _gate = new();
+        private readonly CountdownEvent _outerLoads = new(2);
+        private string? _token;
+        private int _loadCalls;
+
+        public bool HasToken
+        {
+            get
+            {
+                lock (_gate) return _token is not null;
+            }
+        }
+
+        public string? TryLoad()
+        {
+            var call = Interlocked.Increment(ref _loadCalls);
+            if (call <= 2)
+            {
+                _outerLoads.Signal();
+                _outerLoads.Wait(TimeSpan.FromSeconds(2));
+            }
+
+            lock (_gate) return _token;
+        }
+
+        public void Save(string token)
+        {
+            lock (_gate) _token = token;
+        }
+
+        public void Clear()
+        {
+            lock (_gate) _token = null;
+        }
+    }
+
+    private sealed class CountingApiClient : ITreckApiClient
+    {
+        private int _registrationCalls;
+        public int RegistrationCalls => _registrationCalls;
+
+        public async Task<RegisterDeviceResponse> RegisterDeviceAsync(
+            RegisterDeviceRequest request,
+            CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _registrationCalls);
+            await Task.Delay(50, cancellationToken);
+            return new RegisterDeviceResponse(1, 2, "shared-token", "Bearer");
+        }
+
+        public Task<AgentConfigResponse> GetAgentConfigAsync(string bearerToken, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<bool> ReportHealthAsync(string bearerToken, AgentHealthReportRequest request, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<bool> UploadEventAsync(string bearerToken, OfflineEventPayload payload, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<bool> UploadScreenshotAsync(
+            string bearerToken,
+            Treck.Agent.Screenshots.ScreenshotMetadata metadata,
+            byte[] imageBytes,
+            CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+    }
+
     private static IOptions<AgentOptions> Options() => Microsoft.Extensions.Options.Options.Create(new AgentOptions
     {
         BaseUrl = "https://treck.test",
@@ -107,5 +188,28 @@ public class DeviceRegistrationServiceTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => Build(api, ids, tokens, Enrollment(null)).EnsureRegisteredAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Concurrent_EnsureRegistered_calls_share_one_registration_result()
+    {
+        var api = new CountingApiClient();
+        var tokens = new CoordinatedTokenStore();
+        var enrollment = new StubEnrollmentSecretStore();
+        var service = new DeviceRegistrationService(
+            api,
+            new StubDeviceIdStore(),
+            tokens,
+            enrollment,
+            Options(),
+            NullLogger<DeviceRegistrationService>.Instance);
+
+        var first = Task.Run(() => service.EnsureRegisteredAsync(CancellationToken.None));
+        var second = Task.Run(() => service.EnsureRegisteredAsync(CancellationToken.None));
+        var results = await Task.WhenAll(first, second);
+
+        Assert.Equal(["shared-token", "shared-token"], results);
+        Assert.Equal(1, api.RegistrationCalls);
+        Assert.Equal(1, enrollment.DeleteCalls);
     }
 }
