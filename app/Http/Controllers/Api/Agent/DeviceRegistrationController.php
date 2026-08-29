@@ -66,7 +66,7 @@ class DeviceRegistrationController extends Controller
             'message' => 'Device registered.',
             'data' => [
                 'computer_id' => $computer->id,
-                'employee_id' => $employee->id,
+                'employee_id' => $computer->employee_id,
                 'token' => $token->plainTextToken,
                 'token_type' => 'Bearer',
             ],

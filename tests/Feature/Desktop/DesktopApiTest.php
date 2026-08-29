@@ -109,7 +109,7 @@ class DesktopApiTest extends TestCase
         $this->teamMember($otherManager, 'OTHER-PC', PresenceStatus::Idle, 10, 50);
         ActivityLog::factory()->create(['employee_id' => $ownEmployee->id, 'computer_id' => $ownComputer->id, 'work_date' => today()]);
 
-        $this->actingAs($manager, 'sanctum')
+        $response = $this->actingAs($manager, 'sanctum')
             ->getJson('/api/v1/desktop/overview')
             ->assertOk()
             ->assertJsonPath('data.scope', 'team')
@@ -119,8 +119,9 @@ class DesktopApiTest extends TestCase
             ->assertJsonPath('data.presence.active', 1)
             ->assertJsonPath('data.presence.idle', 0)
             ->assertJsonPath('data.activity.active_seconds', 45)
-            ->assertJsonPath('data.activity.idle_seconds', 15)
-            ->assertJsonPath('data.activity.active_percent', 75.0);
+            ->assertJsonPath('data.activity.idle_seconds', 15);
+
+        $this->assertEquals(75.0, $response->json('data.activity.active_percent'));
     }
 
     public function test_admin_overview_is_organization_wide(): void

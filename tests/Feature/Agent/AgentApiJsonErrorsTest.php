@@ -21,7 +21,7 @@ class AgentApiJsonErrorsTest extends TestCase
     private function body(array $overrides = []): array
     {
         return array_merge([
-            'provisioning_key' => 'test-provisioning-key', // matches phpunit.xml
+            'enrollment_secret' => 'test-provisioning-key', // matches phpunit.xml
             'device_uuid' => '809c6089-a94a-4eb4-9226-5d53c80b2f54',
             'employee_code' => 'EMP-0001',
             'computer_name' => 'PC-100100105',
@@ -41,11 +41,11 @@ class AgentApiJsonErrorsTest extends TestCase
         $this->assertNull($response->headers->get('location'), 'must not redirect');
     }
 
-    public function test_register_bad_provisioning_key_returns_json_403_not_redirect(): void
+    public function test_register_bad_enrollment_secret_returns_json_403_not_redirect(): void
     {
         Employee::factory()->create(['employee_code' => 'EMP-0001']);
 
-        $response = $this->post('/api/agent/register', $this->body(['provisioning_key' => 'wrong-key']));
+        $response = $this->post('/api/agent/register', $this->body(['enrollment_secret' => 'wrong-secret']));
 
         $response->assertForbidden(); // 403
         $this->assertNull($response->headers->get('location'), 'must not redirect');
