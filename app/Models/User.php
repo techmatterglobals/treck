@@ -3,8 +3,11 @@
 namespace App\Models;
 
 use App\Enums\UserRole;
+use App\Enums\MembershipStatus;
+use App\Enums\OrganizationStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -63,6 +66,30 @@ class User extends Authenticatable
         return $this->hasMany(Employee::class, 'manager_user_id');
     }
 
+    /** Organization memberships for this login account. */
+    public function memberships(): HasMany
+    {
+        return $this->hasMany(OrganizationMembership::class);
+    }
+
+    /** Organizations this user belongs to. */
+    public function organizations(): BelongsToMany
+    {
+        return $this->belongsToMany(Organization::class)
+            ->using(OrganizationMembership::class)
+            ->withPivot(['id', 'status', 'role', 'is_owner', 'joined_at', 'invited_by_id'])
+            ->withTimestamps();
+    }
+
+    /** Active memberships whose organizations are not suspended. */
+    public function activeOrganizations(): BelongsToMany
+    {
+        return $this->organizations()
+            ->wherePivot('status', MembershipStatus::Active->value)
+            ->where('organizations.status', OrganizationStatus::Active->value)
+            ->whereNull('organizations.suspended_at');
+    }
+
     // ----------------------------------------------------------------
     // Scopes
     // ----------------------------------------------------------------
@@ -111,5 +138,38 @@ class User extends Authenticatable
     public function isEmployee(): bool
     {
         return $this->hasRole(UserRole::Employee->value);
+    }
+
+    public function membershipFor(Organization|int $organization): ?OrganizationMembership
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        if (! $organizationId) {
+            return null;
+        }
+
+        return $this->memberships()
+            ->where('organization_id', $organizationId)
+            ->first();
+    }
+
+    public function activeMembershipFor(Organization|int $organization): ?OrganizationMembership
+    {
+        $membership = $this->membershipFor($organization);
+
+        if (! $membership?->isActive()) {
+            return null;
+        }
+
+        if ($membership->organization?->isSuspended()) {
+            return null;
+        }
+
+        return $membership;
+    }
+
+    public function hasActiveMembership(Organization|int $organization): bool
+    {
+        return $this->activeMembershipFor($organization) !== null;
     }
 }

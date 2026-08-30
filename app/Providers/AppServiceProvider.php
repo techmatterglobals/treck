@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Contracts\CurrentOrganization;
 use App\Events\PresenceChanged;
 use App\Listeners\EvaluatePresenceNotifications;
 use App\Models\ApplicationUsage;
@@ -10,6 +11,7 @@ use App\Models\NotificationLog;
 use App\Observers\ApplicationUsageObserver;
 use App\Observers\FileDownloadObserver;
 use App\Policies\NotificationPolicy;
+use App\Services\Tenancy\RequestCurrentOrganization;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Blade;
@@ -23,7 +25,7 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->scoped(CurrentOrganization::class, RequestCurrentOrganization::class);
     }
 
     public function boot(): void
