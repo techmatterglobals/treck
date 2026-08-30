@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Treck.Agent.Health;
 using Treck.Agent.Offline;
 using Treck.Agent.Sync;
 using Xunit;
@@ -35,7 +36,7 @@ public class SyncServiceTests
     }
 
     private static SyncService NewSync(IOfflineEventStore store, IEventUploader uploader)
-        => new(store, uploader, Options.Create(new OfflineStoreOptions()), NullLogger<SyncService>.Instance);
+        => new(store, uploader, Options.Create(new OfflineStoreOptions()), new AgentHealthState(), NullLogger<SyncService>.Instance);
 
     private static void Seed(IOfflineEventStore store, int count)
     {
@@ -105,7 +106,7 @@ public class SyncServiceTests
 
         var options = Options.Create(new OfflineStoreOptions { MaxUploadAttempts = 3 });
         var uploader = new FakeUploader(e => e.Id != poisonId); // poison fails, good succeeds
-        var sync = new SyncService(store, uploader, options, NullLogger<SyncService>.Instance);
+        var sync = new SyncService(store, uploader, options, new AgentHealthState(), NullLogger<SyncService>.Instance);
 
         // First two cycles: the poison keeps failing and blocks the good event.
         for (var i = 0; i < 2; i++)

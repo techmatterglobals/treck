@@ -208,7 +208,7 @@ Admin-only (Spatie `admin` role) Livewire dashboards, all live over Reverb/Echo:
 3. **Environment** — copy [`deploy/.env.production.example`](../deploy/.env.production.example)
    to `.env`; set `APP_ENV=production`, `APP_DEBUG=false`, HTTPS `APP_URL`,
    DB/Redis, `SANCTUM_STATEFUL_DOMAINS`, mail transport, `BROADCAST_CONNECTION=reverb`
-   + `REVERB_*`, `TRECK_AGENT_PROVISIONING_KEY`, and the `TRECK_*` tunables;
+   + `REVERB_*`, `TRECK_AGENT_ENROLLMENT_SECRET`, and the `TRECK_*` tunables;
    `php artisan key:generate`.
 4. **Migrate + seed roles only** — `php artisan migrate --force`;
    `php artisan db:seed --class=RolePermissionSeeder --force` (never
@@ -227,8 +227,8 @@ Full guide: [`docs/19-production-deployment.md`](19-production-deployment.md).
 ### Windows agent
 
 1. `cd agent/deploy`; create `appsettings.Production.json` (BaseUrl,
-   ProvisioningKey, EmployeeCode, and optional Screenshots/ApplicationTracking).
-2. Publish + install: `./install-service.ps1 -Publish` (add `-SelfContained`
+   EmployeeCode, and optional Screenshots/ApplicationTracking).
+2. Publish + install: `./install-service.ps1 -Publish -EnrollmentSecret "REPLACE_WITH_ENROLLMENT_SECRET"` (add `-SelfContained`
    for air-gapped targets with no shared runtime).
 3. Verify: `Get-Service TreckAgent` → `Running`; check
    `%ProgramData%\TreckAgent\logs\treck-agent-*.jsonl`.
@@ -283,7 +283,7 @@ domain rows are untouched.
 
 - **Database**: nightly `mysqldump` (or managed snapshots); retain ≥14 days.
 - **Screenshot storage**: back up the configured disk (or rely on S3 versioning).
-- **Secrets**: back up `.env` (`APP_KEY`, `TRECK_AGENT_PROVISIONING_KEY`)
+- **Secrets**: back up `.env` (`APP_KEY`, `TRECK_AGENT_ENROLLMENT_SECRET`)
   **out of band** — losing `APP_KEY` invalidates encrypted data.
 - Test restores periodically.
 
@@ -390,7 +390,7 @@ No existing security control was weakened in Phase 10.
 - [ ] Supervisor running `queue:work` **and** `reverb:start`
 - [ ] Cron running `schedule:run` (rollups, sweeps, pruning)
 - [ ] Mail transport configured (notification email)
-- [ ] `TRECK_AGENT_PROVISIONING_KEY` set (and rotated from the example)
+- [ ] `TRECK_AGENT_ENROLLMENT_SECRET` set (and rotated from the example)
 - [ ] Agent `appsettings.Production.json` set; service `Running`
 - [ ] Backups scheduled and a restore tested
 

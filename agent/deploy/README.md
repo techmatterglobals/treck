@@ -43,7 +43,7 @@ Copy the template and fill in real values on the build/target machine:
 
 ```powershell
 Copy-Item ..\appsettings.Production.json.example ..\appsettings.Production.json
-notepad ..\appsettings.Production.json   # set BaseUrl, ProvisioningKey, EmployeeCode
+notepad ..\appsettings.Production.json   # set BaseUrl, EmployeeCode
 ```
 
 `appsettings.Production.json` is git-ignored. The service loads it because
@@ -58,6 +58,15 @@ on this machine):
 ```powershell
 # From an elevated PowerShell in this folder:
 ./install-service.ps1 -Publish
+```
+
+For first enrollment, pass the one-time secret supplied by the Treck server
+configuration. The installer stages it at
+`%ProgramData%\TreckAgent\enrollment.key`, restricts the file to SYSTEM and
+Administrators, and the agent deletes it after successful registration:
+
+```powershell
+./install-service.ps1 -Publish -EnrollmentSecret "REPLACE_WITH_ENROLLMENT_SECRET"
 ```
 
 Or publish once and install the output:
@@ -131,10 +140,10 @@ placeholder `REPLACE_WITH_EMPLOYEE_CODE`; set it to a real, existing employee
 code for the deployment.
 
 If registration fails, the agent log now prints the exact request it sent
-(provisioning key masked) and the server's HTTP status **and response body**, e.g.:
+(enrollment secret masked) and the server's HTTP status **and response body**, e.g.:
 
 ```
-Registering device: DeviceUuid=... EmployeeCode=EMP-0001 ... ProvisioningKey=***(17 chars)
+Registering device: DeviceUuid=... EmployeeCode=EMP-0001 ... EnrollmentSecret=***(17 chars)
 Device registration HTTP 422 ... Response: {"message":"The selected employee code is invalid.", ...}
 ```
 
@@ -143,5 +152,5 @@ That immediately shows the cause. Common cases:
 | Log shows | Fix |
 | --------- | --- |
 | `422 ... employee code is invalid` | `Agent:EmployeeCode` is not a real employee - set an existing code |
-| `403` | provisioning key mismatch - align `Agent:ProvisioningKey` with the server's `TRECK_AGENT_PROVISIONING_KEY` |
+| `403` | enrollment secret mismatch - align the installer/process `TRECK_AGENT_ENROLLMENT_SECRET` with the server's `TRECK_AGENT_ENROLLMENT_SECRET` |
 | the login HTML page | server was redirecting API errors (fixed server-side; ensure the server is up to date) |

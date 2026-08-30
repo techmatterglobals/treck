@@ -22,3 +22,7 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+# .NET Admin desktop build artifacts
+admin-desktop/**/bin/
+admin-desktop/**/obj/
+admin-desktop/**/TestResults/

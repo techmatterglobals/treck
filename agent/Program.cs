@@ -11,6 +11,7 @@ using Treck.Agent.Api;
 using Treck.Agent.Applications;
 using Treck.Agent.Configuration;
 using Treck.Agent.Downloads;
+using Treck.Agent.Health;
 using Treck.Agent.Offline;
 using Treck.Agent.Screenshots;
 using Treck.Agent.Security;
@@ -146,6 +147,9 @@ try
     builder.Services.AddSingleton<ITokenProtector, DpapiTokenProtector>();
     builder.Services.AddSingleton<IDeviceIdStore, FileDeviceIdStore>();
     builder.Services.AddSingleton<ITokenStore, DpapiTokenStore>();
+    builder.Services.AddSingleton<IEnrollmentSecretStore, EnrollmentSecretStore>();
+    builder.Services.AddSingleton<IAgentPolicyCache, AgentPolicyCache>();
+    builder.Services.AddSingleton<AgentHealthState>();
 
     // --- API client: IHttpClientFactory + Polly retry + TLS-validating handler ---
     builder.Services.AddHttpClient<ITreckApiClient, TreckApiClient>((serviceProvider, client) =>
@@ -220,6 +224,7 @@ try
         builder.Services.AddSingleton(EventSource.Current(EventSource.Service, "TreckAgent(service)"));
         builder.Services.AddHostedService<SyncWorker>();
         builder.Services.AddHostedService<Worker>();
+        builder.Services.AddHostedService<AgentHealthReporter>();
         builder.Services.AddHostedService<ScreenshotHelperSupervisor>();
         builder.Services.AddHostedService<AgentEventSpoolWorker>();
     }
@@ -233,6 +238,7 @@ try
         builder.Services.AddSingleton<IDownloadSink, OfflineQueueDownloadSink>();
         builder.Services.AddHostedService<SyncWorker>();
         builder.Services.AddHostedService<Worker>();
+        builder.Services.AddHostedService<AgentHealthReporter>();
         builder.Services.AddHostedService<ScreenshotWorker>();
         builder.Services.AddHostedService<FileDownloadMonitor>();
     }

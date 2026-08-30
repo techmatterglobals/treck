@@ -20,4 +20,20 @@ public sealed class DesktopContractTests
         Assert.Equal(75d, overview.Activity.ActivePercent);
         Assert.Equal("organization", overview.Scope);
     }
+
+    [Fact]
+    public void Agent_health_contract_preserves_queue_and_status_fields()
+    {
+        var health = new DesktopAgentHealth(
+            [new AgentHealthRow(1, 2, "PC-1", "Employee", "Ops", "stale", "0.9.0", "1.0.0",
+                "outdated", "rev-a", 12, false, null, null, null, null, "sync_failed",
+                DateTimeOffset.UtcNow.AddHours(-5), DateTimeOffset.UtcNow)],
+            new AgentHealthSummary(1, 0, 1, 0, 1, 12),
+            60,
+            DateTimeOffset.UtcNow);
+
+        Assert.Equal("stale", health.Items[0].Status);
+        Assert.Equal(12, health.Items[0].PendingEventCount);
+        Assert.Equal("sync_failed", health.Items[0].LastErrorCategory);
+    }
 }

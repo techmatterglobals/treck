@@ -71,11 +71,11 @@ public sealed class SessionServiceTests
         Assert.Equal(1, tokens.ClearCalls);
     }
 
-    internal static DesktopBootstrap Bootstrap(bool screenshots = true, bool reports = true) => new(
+    internal static DesktopBootstrap Bootstrap(bool screenshots = true, bool reports = true, bool health = false) => new(
         new DesktopUser(1, "Admin User", "admin@example.com"),
         ["admin"],
         ["view dashboard", "view attendance", "view reports"],
-        new DesktopFeatures(true, true, reports, true, screenshots, true, false),
+        new DesktopFeatures(true, true, reports, true, screenshots, true, health),
         new ServerInformation("1.0.0", "UTC", "Asia/Karachi", DateTimeOffset.UtcNow));
 
     internal sealed class MemoryTokenStore : IAccessTokenStore
@@ -111,10 +111,12 @@ public sealed class SessionServiceTests
         public DesktopBootstrap? Bootstrap { get; init; }
         public DesktopOverview? Overview { get; init; }
         public DesktopPresence? Presence { get; init; }
+        public DesktopAgentHealth? AgentHealth { get; init; }
         public EmployeeDetail? Employee { get; init; }
         public Exception? Exception { get; init; }
         public int BootstrapCalls { get; private set; }
         public TaskCompletionSource<bool> OverviewCalled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<bool> AgentHealthCalled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Task<DesktopBootstrap> GetBootstrapAsync(CancellationToken cancellationToken = default)
         {
             BootstrapCalls++;
@@ -132,6 +134,11 @@ public sealed class SessionServiceTests
         }
         public Task<DesktopPresence> GetPresenceAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(Presence ?? new DesktopPresence([], new PresenceOverview(0, 0, 0, 0, 0, 0, 0), 30, DateTimeOffset.UtcNow));
+        public Task<DesktopAgentHealth> GetAgentHealthAsync(CancellationToken cancellationToken = default)
+        {
+            AgentHealthCalled.TrySetResult(true);
+            return Task.FromResult(AgentHealth ?? new DesktopAgentHealth([], new AgentHealthSummary(0, 0, 0, 0, 0, 0), 60, DateTimeOffset.UtcNow));
+        }
         public Task<EmployeeDetail> GetEmployeeAsync(long employeeId, CancellationToken cancellationToken = default) =>
             Employee is null ? throw new NotSupportedException() : Task.FromResult(Employee);
     }

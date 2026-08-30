@@ -29,6 +29,6 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
-        <env name="TRECK_AGENT_PROVISIONING_KEY" value="test-provisioning-key"/>
+        <env name="TRECK_AGENT_ENROLLMENT_SECRET" value="test-provisioning-key"/>
     </php>
 </phpunit>

@@ -128,11 +128,18 @@ return [
     |--------------------------------------------------------------------------
     | Desktop agent
     |--------------------------------------------------------------------------
-    | Shared provisioning key used once per device to obtain a Sanctum token.
-    | Leave null to disable device registration entirely.
+    | Enrollment is a one-time bootstrap secret supplied to the workstation by
+    | the installer or process environment. It is not a persistent agent option.
     */
     'agent' => [
-        'provisioning_key' => env('TRECK_AGENT_PROVISIONING_KEY'),
+        'enrollment_secret' => env('TRECK_AGENT_ENROLLMENT_SECRET'),
+        'minimum_version' => env('TRECK_AGENT_MINIMUM_VERSION', env('TRECK_VERSION', '1.0.0')),
+        'health_stale_seconds' => (int) env('TRECK_AGENT_HEALTH_STALE_SECONDS', 180),
+        'health_report_interval_seconds' => (int) env('TRECK_AGENT_HEALTH_INTERVAL_SECONDS', 60),
+        'policy' => [
+            'revision' => env('TRECK_AGENT_POLICY_REVISION', 'default'),
+            'organization_id' => env('TRECK_ORGANIZATION_ID', 'default'),
+        ],
     ],
 
 ];

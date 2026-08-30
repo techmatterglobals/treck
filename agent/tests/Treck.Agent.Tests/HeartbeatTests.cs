@@ -57,7 +57,6 @@ public class HeartbeatSchedulerTests
         var options = Options.Create(new AgentOptions
         {
             BaseUrl = "https://treck.test",
-            ProvisioningKey = "k",
             EmployeeCode = "EMP-1",
             HeartbeatIntervalSeconds = 60,
             IdleThresholdSeconds = idleThreshold,

@@ -95,7 +95,7 @@ Use `->withoutOverlapping()` on long tasks and consider
   traces).
 - **Sanctum tokens** are hashed at rest and ability-scoped (`agent:report` for
   devices; role-derived for users). Revoke per device/user on loss.
-- **Rotate the agent provisioning key** (`TRECK_AGENT_PROVISIONING_KEY`) and
+- **Rotate the agent enrollment secret** (`TRECK_AGENT_ENROLLMENT_SECRET`) and
   keep all secrets in the environment, never in the repo.
 - **Validate everything** via Form Requests (already in place); authorize via
   Policies/permissions.
@@ -146,7 +146,7 @@ defense in depth and to shed abusive traffic before PHP.
 - [ ] `git pull` / deploy artifact to release dir
 - [ ] `composer install --no-dev --optimize-autoloader`
 - [ ] `npm ci && npm run build`
-- [ ] `.env` present & correct (`APP_ENV=production`, `APP_DEBUG=false`, HTTPS `APP_URL`, DB/Redis, `SANCTUM_STATEFUL_DOMAINS`, `TRECK_*`, `TRECK_AGENT_PROVISIONING_KEY`)
+- [ ] `.env` present & correct (`APP_ENV=production`, `APP_DEBUG=false`, HTTPS `APP_URL`, DB/Redis, `SANCTUM_STATEFUL_DOMAINS`, `TRECK_*`, `TRECK_AGENT_ENROLLMENT_SECRET`)
 - [ ] `php artisan key:generate` (first deploy only)
 - [ ] `php artisan migrate --force`
 - [ ] `php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan event:cache`
@@ -167,7 +167,7 @@ defense in depth and to shed abusive traffic before PHP.
 
 **Security sign-off**
 - [ ] `APP_DEBUG=false`, Telescope disabled, `/horizon` gated
-- [ ] Secrets only in env; provisioning key rotated from any default
+- [ ] Secrets only in env; enrollment secret rotated from any default
 - [ ] HTTPS forced + HSTS; security headers present
 - [ ] Rate limiters tuned; login throttle active
 

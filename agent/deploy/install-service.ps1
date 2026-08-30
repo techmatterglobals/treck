@@ -54,7 +54,8 @@ param(
     [string] $DisplayName = 'Treck Agent',
     [string] $Description = 'Treck employee productivity and PC activity monitoring agent. Captures workstation session and activity telemetry and syncs it to the Treck server.',
     [ValidateSet('Production', 'Staging', 'Development')]
-    [string] $Environment = 'Production'
+    [string] $Environment = 'Production',
+    [string] $EnrollmentSecret
 )
 
 $ErrorActionPreference = 'Stop'
@@ -98,6 +99,28 @@ function Wait-ServiceRemoved {
         Start-Sleep -Milliseconds 500
     }
     return (-not (Get-Service -Name $Name -ErrorAction SilentlyContinue))
+}
+
+function Set-EnrollmentSecretFile {
+    param(
+        [string] $DataDir,
+        [string] $Secret
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Secret)) {
+        return
+    }
+
+    New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
+    $path = Join-Path $DataDir 'enrollment.key'
+    [System.IO.File]::WriteAllText($path, $Secret.Trim(), [System.Text.Encoding]::UTF8)
+
+    & icacls.exe $path /inheritance:r /grant:r "*S-1-5-18:F" "*S-1-5-32-544:F" | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not restrict ACL on '$path'."
+    }
+
+    Write-Host "Enrollment secret staged at '$path' (ACL: SYSTEM + Administrators)." -ForegroundColor Cyan
 }
 
 # --- 1. Optionally publish a build ------------------------------------------
@@ -149,6 +172,7 @@ if (-not (Test-Path $exePath)) {
 $dataDir = Join-Path $env:ProgramData 'TreckAgent'
 $logDir  = Join-Path $dataDir 'logs'
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+Set-EnrollmentSecretFile -DataDir $dataDir -Secret $EnrollmentSecret
 Write-Host "Log directory: $logDir" -ForegroundColor Cyan
 
 # --- 5. Register the service ------------------------------------------------

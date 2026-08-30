@@ -12,6 +12,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<PollingLoop>();
         services.AddSingleton<OverviewViewModel>();
         services.AddSingleton<PresenceViewModel>();
+        services.AddSingleton<AgentHealthViewModel>();
         services.AddSingleton<EmployeeDetailViewModel>();
         services.AddSingleton<LoginViewModel>();
         services.AddSingleton<ShellViewModel>();

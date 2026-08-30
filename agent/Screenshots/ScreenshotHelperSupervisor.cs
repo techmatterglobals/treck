@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Treck.Agent.Spooling;
 using Treck.Agent.Storage;
+using Treck.Agent.Health;
 
 namespace Treck.Agent.Screenshots;
 
@@ -31,6 +32,7 @@ public sealed class ScreenshotHelperSupervisor : BackgroundService
     private readonly ScreenshotOptions _options;
     private readonly IInteractiveSessionLauncher _launcher;
     private readonly IStoragePathProvider _paths;
+    private readonly AgentHealthState _health;
 
     private ILaunchedProcess? _helper;
 
@@ -38,12 +40,14 @@ public sealed class ScreenshotHelperSupervisor : BackgroundService
         ILogger<ScreenshotHelperSupervisor> logger,
         IOptions<ScreenshotOptions> options,
         IInteractiveSessionLauncher launcher,
-        IStoragePathProvider paths)
+        IStoragePathProvider paths,
+        AgentHealthState health)
     {
         _logger = logger;
         _options = options.Value;
         _launcher = launcher;
         _paths = paths;
+        _health = health;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -56,6 +60,7 @@ public sealed class ScreenshotHelperSupervisor : BackgroundService
 
         if (!_options.Enabled)
         {
+            _health.UpdateHelper(false, null);
             _logger.LogInformation("Screenshot capture is disabled; helper supervisor idle.");
             return;
         }
@@ -76,6 +81,7 @@ public sealed class ScreenshotHelperSupervisor : BackgroundService
                 try
                 {
                     EnsureHelper();
+                    UpdateHelperHealth();
                 }
                 catch (Exception ex)
                 {
@@ -91,6 +97,7 @@ public sealed class ScreenshotHelperSupervisor : BackgroundService
         finally
         {
             StopHelper();
+            _health.UpdateHelper(false, null);
         }
 
         _logger.LogInformation("Screenshot helper supervisor stopped.");
@@ -111,6 +118,7 @@ public sealed class ScreenshotHelperSupervisor : BackgroundService
             {
                 _logger.LogInformation("Interactive session ended; stopping capture helper.");
                 StopHelper();
+                _health.UpdateHelper(false, null);
             }
             else
             {
@@ -133,12 +141,20 @@ public sealed class ScreenshotHelperSupervisor : BackgroundService
         {
             _logger.LogInformation("Launching capture helper into session {Session}…", activeSession);
             _helper = _launcher.Launch(ExecutablePath(), HelperArgument);
+            UpdateHelperHealth();
 
             if (_helper is null)
             {
                 _logger.LogWarning("Capture helper launch returned no process; will retry next cycle.");
             }
         }
+    }
+
+    private void UpdateHelperHealth()
+    {
+        _health.UpdateHelper(
+            _helper?.IsRunning ?? false,
+            _helper is null ? null : unchecked((int)_helper.SessionId));
     }
 
     private void StopHelper()

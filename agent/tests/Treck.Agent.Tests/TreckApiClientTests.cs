@@ -43,7 +43,7 @@ public class TreckApiClientTests
             NullLogger<TreckApiClient>.Instance);
 
     private static RegisterDeviceRequest SampleRequest() =>
-        new("PROV-KEY", "uuid-1", "EMP-1", "PC-1", "Windows 11", "1.0.0");
+        new("ENROLL-SECRET", "uuid-1", "EMP-1", "PC-1", "Windows 11", "1.0.0");
 
     [Fact]
     public async Task RegisterDeviceAsync_posts_snake_case_body_and_maps_the_response()
@@ -62,9 +62,9 @@ public class TreckApiClientTests
         Assert.Equal("Bearer", response.TokenType);
 
         Assert.Equal("api/agent/register", handler.LastRequest!.RequestUri!.AbsolutePath.TrimStart('/'));
-        Assert.Contains("provisioning_key", handler.LastBody);
+        Assert.Contains("enrollment_secret", handler.LastBody);
         Assert.Contains("device_uuid", handler.LastBody);
-        Assert.DoesNotContain("ProvisioningKey", handler.LastBody); // proves snake_case serialization
+        Assert.DoesNotContain("EnrollmentSecret", handler.LastBody); // proves snake_case serialization
     }
 
     [Fact]

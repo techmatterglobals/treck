@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Treck.Agent.Api;
+using Treck.Agent.Health;
 
 namespace Treck.Agent.Screenshots;
 
@@ -13,11 +14,13 @@ namespace Treck.Agent.Screenshots;
 public sealed class ScreenshotSyncService : IScreenshotSyncService
 {
     private readonly ITreckApiClient _api;
+    private readonly AgentHealthState _health;
     private readonly ILogger<ScreenshotSyncService> _logger;
 
-    public ScreenshotSyncService(ITreckApiClient api, ILogger<ScreenshotSyncService> logger)
+    public ScreenshotSyncService(ITreckApiClient api, AgentHealthState health, ILogger<ScreenshotSyncService> logger)
     {
         _api = api;
+        _health = health;
         _logger = logger;
     }
 
@@ -46,6 +49,7 @@ public sealed class ScreenshotSyncService : IScreenshotSyncService
 
         if (uploaded)
         {
+            _health.MarkCaptureSynced(metadata.CapturedAt);
             TryDeleteTempFile(metadata.LocalPath);
         }
 

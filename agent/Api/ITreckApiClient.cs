@@ -12,6 +12,10 @@ public interface ITreckApiClient
     /// </summary>
     Task<RegisterDeviceResponse> RegisterDeviceAsync(RegisterDeviceRequest request, CancellationToken cancellationToken);
 
+    Task<AgentConfigResponse> GetAgentConfigAsync(string bearerToken, CancellationToken cancellationToken);
+
+    Task<bool> ReportHealthAsync(string bearerToken, AgentHealthReportRequest request, CancellationToken cancellationToken);
+
     /// <summary>
     /// Uploads one queued event to <c>/api/agent/events</c> using the device
     /// bearer token. Returns true on any 2xx (stored or idempotent duplicate);

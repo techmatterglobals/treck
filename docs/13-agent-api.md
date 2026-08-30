@@ -8,7 +8,7 @@ tokenable is the `Computer` model.
 
 | Verb | Path | Auth | Purpose |
 | ---- | ---- | ---- | ------- |
-| POST | `/api/agent/register` | Provisioning key | Bootstrap: mint a device token |
+| POST | `/api/agent/register` | Enrollment secret | Bootstrap: mint a device token |
 | POST | `/api/agent/login` | Bearer (device) | Open a PC session (login time) |
 | POST | `/api/activity` | Bearer (device) | Report active/idle seconds |
 | POST | `/api/agent/logout` | Bearer (device) | Close the session (logout time) |
@@ -183,15 +183,15 @@ require __DIR__.'/modules/agent.php';
   `$request->user()` returns the **Computer**.
 - Tokens are **hashed at rest** (Sanctum default) and **revocable** per device
   (`$computer->tokens()->delete()`), so a lost/retired machine can be cut off.
-- `register` is the only public endpoint; it is gated by a shared
-  **provisioning key** (`TRECK_AGENT_PROVISIONING_KEY` →
-  `config('treck.agent.provisioning_key')`) checked in `RegisterDeviceRequest::authorize()`.
+- `register` is the only public endpoint; it is gated by a one-time
+  **enrollment secret** (`TRECK_AGENT_ENROLLMENT_SECRET` →
+  `config('treck.agent.enrollment_secret')`) checked in `RegisterDeviceRequest::authorize()`.
 
 Add to `config/treck.php`:
 
 ```php
 'agent' => [
-    'provisioning_key' => env('TRECK_AGENT_PROVISIONING_KEY'),
+    'enrollment_secret' => env('TRECK_AGENT_ENROLLMENT_SECRET'),
 ],
 ```
 
@@ -200,9 +200,9 @@ Add to `config/treck.php`:
 ### POST /api/agent/register
 
 ```jsonc
-// Request (no bearer token; provisioning key in the body)
+// Request (no bearer token; enrollment secret in the body)
 {
-  "provisioning_key": "<shared secret>",
+  "enrollment_secret": "<one-time enrollment secret>",
   "device_uuid": "5f3c...hardware-fingerprint",
   "employee_code": "EMP-0042",
   "computer_name": "HR-PC-07",
@@ -326,9 +326,9 @@ sequenceDiagram
     participant API as Laravel API
 
     Note over Agent: First run / provisioning
-    Agent->>API: POST /api/agent/register (provisioning_key, device_uuid, employee_code)
+    Agent->>API: POST /api/agent/register (enrollment_secret, device_uuid, employee_code)
     API-->>Agent: 201 { token }
-    Note over Agent: Store token in Windows Credential Manager (DPAPI)
+    Note over Agent: Store token encrypted with DPAPI
 
     Note over OS,Agent: User signs in to Windows (WTS session logon)
     Agent->>API: POST /api/agent/login (Bearer token, computer_name, login_time)
@@ -396,10 +396,10 @@ var res = await http.PostAsJsonAsync("/api/activity", body);
 ## 13.7 Try it with curl
 
 ```bash
-# 1. Register (needs TRECK_AGENT_PROVISIONING_KEY set and an existing employee code)
+# 1. Register (needs TRECK_AGENT_ENROLLMENT_SECRET set and an existing employee code)
 curl -sX POST https://treck.test/api/agent/register \
   -H 'Accept: application/json' \
-  -d provisioning_key=SECRET -d device_uuid=DEMO-UUID -d employee_code=EMP-0042 \
+  -d enrollment_secret=SECRET -d device_uuid=DEMO-UUID -d employee_code=EMP-0042 \
   -d computer_name=HR-PC-07 -d os='Windows 11'
 # → { "data": { "token": "12|..." } }
 

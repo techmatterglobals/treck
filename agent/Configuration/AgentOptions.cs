@@ -15,10 +15,6 @@ public sealed class AgentOptions
     [Url]
     public string BaseUrl { get; set; } = string.Empty;
 
-    /// <summary>Shared provisioning key used once to register the device (M2).</summary>
-    [Required]
-    public string ProvisioningKey { get; set; } = string.Empty;
-
     /// <summary>Employee code this workstation is assigned to.</summary>
     [Required]
     public string EmployeeCode { get; set; } = string.Empty;
