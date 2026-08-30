@@ -2,9 +2,9 @@
 
 namespace App\Livewire\Employees;
 
-use App\Models\Department;
 use App\Models\Employee;
 use App\Services\Presence\PresenceService;
+use App\Services\Tenancy\CoreTenantAccess;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Url;
@@ -36,8 +36,9 @@ class EmployeeIndex extends Component
         $this->resetPage();
     }
 
-    public function delete(Employee $employee): void
+    public function delete(Employee $employee, CoreTenantAccess $tenant): void
     {
+        $employee = $tenant->employee($employee, auth()->user());
         $this->authorize('delete', $employee);
 
         $employee->user?->update(['is_active' => false]);
@@ -47,14 +48,11 @@ class EmployeeIndex extends Component
         session()->flash('status', 'Employee deleted.');
     }
 
-    public function render(PresenceService $presence): View
+    public function render(PresenceService $presence, CoreTenantAccess $tenant): View
     {
         $this->authorize('viewAny', Employee::class);
 
-        // Role-scoped (Phase 11): Super Admin sees all; a Manager sees only their
-        // assigned team; an employee sees only their own row.
-        $employees = Employee::query()
-            ->visibleTo(auth()->user())
+        $employees = $tenant->visibleEmployees(auth()->user())
             ->with(['user', 'department', 'computers.presence'])
             ->search($this->search)
             ->when($this->department, fn ($q) => $q->inDepartment($this->department))
@@ -65,7 +63,7 @@ class EmployeeIndex extends Component
             'employees' => $employees,
             // Shared presence source, so the badge matches the presence board.
             'statuses' => $presence->employeeStatusMap($employees->getCollection()),
-            'departments' => Department::orderBy('name')->get(),
+            'departments' => $tenant->departments(auth()->user())->orderBy('name')->get(),
         ]);
     }
 }

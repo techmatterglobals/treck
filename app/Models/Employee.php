@@ -15,6 +15,7 @@ class Employee extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'organization_id',
         'user_id',
         'manager_user_id',
         'department_id',
@@ -37,6 +38,11 @@ class Employee extends Model
     // ----------------------------------------------------------------
 
     /** The login account for this employee (N:1, effectively 1:1). */
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -125,6 +131,13 @@ class Employee extends Model
     // ----------------------------------------------------------------
 
     /** Employees in a given department. */
+    public function scopeForOrganization(Builder $query, Organization|int $organization): Builder
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        return $query->where('organization_id', $organizationId);
+    }
+
     public function scopeInDepartment(Builder $query, int $departmentId): Builder
     {
         return $query->where('department_id', $departmentId);

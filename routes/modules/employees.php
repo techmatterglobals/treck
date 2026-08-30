@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Route;
 
 // Authenticated + active users only; per-action authorization is handled by
 // EmployeePolicy via the controller's HasMiddleware `can:` gates.
-Route::middleware(['auth', 'active'])->group(function () {
+Route::middleware(['auth', 'active', 'organization'])->group(function () {
     Route::resource('employees', EmployeeController::class);
 
     Route::post('employees/{employee}/computers', [EmployeeController::class, 'assignComputer'])

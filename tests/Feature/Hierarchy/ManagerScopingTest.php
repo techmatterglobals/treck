@@ -2,18 +2,23 @@
 
 namespace Tests\Feature\Hierarchy;
 
+use App\Enums\OrganizationRole;
 use App\Livewire\ApplicationUsage\ApplicationUsageDashboard;
 use App\Livewire\Employees\EmployeeIndex;
 use App\Livewire\Presence\PresenceBoard;
 use App\Models\ApplicationUsage;
 use App\Models\Computer;
 use App\Models\Employee;
+use App\Models\Organization;
+use App\Models\OrganizationMembership;
 use App\Models\User;
 use App\Services\Hierarchy\EmployeeVisibility;
+use App\Services\Tenancy\OrganizationAuthorization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 /**
@@ -25,10 +30,13 @@ class ManagerScopingTest extends TestCase
 {
     use RefreshDatabase;
 
+    private Organization $organization;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->withoutVite();
+        $this->organization = Organization::factory()->create();
         foreach (['view dashboard', 'view reports', 'view attendance', 'manage employees', 'view own data'] as $p) {
             Permission::findOrCreate($p, 'web');
         }
@@ -41,22 +49,47 @@ class ManagerScopingTest extends TestCase
 
     private function manager(): User
     {
-        return tap(User::factory()->create(), fn (User $u) => $u->assignRole('manager'));
+        app(PermissionRegistrar::class)->setPermissionsTeamId(null);
+        $user = tap(User::factory()->create(), fn (User $u) => $u->assignRole('manager'));
+        $this->addMembership($user, 'manager');
+        app(OrganizationAuthorization::class)->assignOrganizationRole($user, $this->organization, OrganizationRole::Manager);
+
+        app(PermissionRegistrar::class)->setPermissionsTeamId($this->organization->id);
+        $user->givePermissionTo('view own data');
+        app(PermissionRegistrar::class)->setPermissionsTeamId(null);
+
+        return $user;
     }
 
     private function superAdmin(): User
     {
-        return tap(User::factory()->create(), fn (User $u) => $u->assignRole('admin'));
+        $user = tap(User::factory()->create(), fn (User $u) => $u->assignRole('admin'));
+        $this->addMembership($user, 'admin');
+        app(OrganizationAuthorization::class)->assignOrganizationRole($user, $this->organization, OrganizationRole::Admin);
+        app(PermissionRegistrar::class)->setPermissionsTeamId(null);
+
+        return $user;
     }
 
     /** @return array{0:User,1:Employee,2:Computer} manager, their employee, their computer */
     private function team(User $manager, string $name): array
     {
         $user = User::factory()->create(['name' => $name]);
-        $employee = Employee::factory()->create(['user_id' => $user->id, 'manager_user_id' => $manager->id]);
-        $computer = Computer::factory()->create(['employee_id' => $employee->id, 'hostname' => "PC-{$name}"]);
+        $this->addMembership($user, 'employee');
+
+        $employee = Employee::factory()->forOrganization($this->organization)->create(['user_id' => $user->id, 'manager_user_id' => $manager->id]);
+        $computer = Computer::factory()->forEmployee($employee)->create(['hostname' => "PC-{$name}"]);
 
         return [$manager, $employee, $computer];
+    }
+
+    private function addMembership(User $user, string $role): void
+    {
+        OrganizationMembership::factory()->create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $user->id,
+            'role' => $role,
+        ]);
     }
 
     public function test_visibility_service_scopes_ids_by_role(): void

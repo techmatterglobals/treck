@@ -13,6 +13,7 @@ class Department extends Model
     use HasFactory;
 
     protected $fillable = [
+        'organization_id',
         'name',
         'description',
         'manager_id',
@@ -23,9 +24,21 @@ class Department extends Model
     // ----------------------------------------------------------------
 
     /** The user who manages this department (N:1). */
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
     public function manager(): BelongsTo
     {
         return $this->belongsTo(User::class, 'manager_id');
+    }
+
+    public function scopeForOrganization($query, Organization|int $organization)
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        return $query->where('organization_id', $organizationId);
     }
 
     /** Employees that belong to this department (1:N). */

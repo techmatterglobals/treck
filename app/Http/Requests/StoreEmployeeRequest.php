@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Contracts\CurrentOrganization;
 use App\Enums\UserRole;
+use App\Models\Employee;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -11,7 +13,7 @@ class StoreEmployeeRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can('manage employees') ?? false;
+        return $this->user()?->can('create', Employee::class) ?? false;
     }
 
     /**
@@ -21,6 +23,8 @@ class StoreEmployeeRequest extends FormRequest
      */
     public function rules(): array
     {
+        $organization = app(CurrentOrganization::class)->resolve($this->user());
+
         return [
             // User account
             'name' => ['required', 'string', 'max:255'],
@@ -32,7 +36,11 @@ class StoreEmployeeRequest extends FormRequest
             'employee_code' => ['required', 'string', 'max:40', 'unique:employees,employee_code'],
             'designation' => ['nullable', 'string', 'max:120'],
             'phone' => ['nullable', 'string', 'max:30'],
-            'department_id' => ['nullable', 'integer', 'exists:departments,id'],
+            'department_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('departments', 'id')->where(fn ($query) => $query->where('organization_id', $organization->id)),
+            ],
             'joined_on' => ['nullable', 'date'],
         ];
     }

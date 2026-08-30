@@ -17,7 +17,7 @@ class RequestCurrentOrganization implements CurrentOrganizationContract
 
     private ?OrganizationMembership $resolvedMembership = null;
 
-    public function __construct(private readonly Request $request) {}
+    private ?int $resolvedUserId = null;
 
     public function resolve(?User $user = null, int|string|null $selectedOrganizationId = null): Organization
     {
@@ -26,9 +26,11 @@ class RequestCurrentOrganization implements CurrentOrganizationContract
 
     public function membership(?User $user = null, int|string|null $selectedOrganizationId = null): OrganizationMembership
     {
-        $user ??= $this->request->user();
+        $user ??= $this->request()->user();
 
         if (! $user instanceof User) {
+            $this->clear();
+
             throw CurrentOrganizationException::unauthenticated();
         }
 
@@ -38,6 +40,7 @@ class RequestCurrentOrganization implements CurrentOrganizationContract
 
         if ($this->resolvedMembership !== null
             && $this->resolved !== null
+            && $this->resolvedUserId === $user->id
             && ($cacheKey === null || $this->resolved->id === $cacheKey)) {
             return $this->resolvedMembership;
         }
@@ -63,8 +66,8 @@ class RequestCurrentOrganization implements CurrentOrganizationContract
         $membership = $this->resolveSelected($user, (int) $organizationId);
         $resolved = $membership->organization;
 
-        if ($this->request->hasSession()) {
-            $this->request->session()->put(self::SESSION_KEY, $resolved->id);
+        if ($this->request()->hasSession()) {
+            $this->request()->session()->put(self::SESSION_KEY, $resolved->id);
         }
 
         return $resolved;
@@ -74,20 +77,21 @@ class RequestCurrentOrganization implements CurrentOrganizationContract
     {
         $this->resolved = null;
         $this->resolvedMembership = null;
+        $this->resolvedUserId = null;
         app(PermissionRegistrar::class)->setPermissionsTeamId(null);
 
-        if ($this->request->hasSession()) {
-            $this->request->session()->forget(self::SESSION_KEY);
+        if ($this->request()->hasSession()) {
+            $this->request()->session()->forget(self::SESSION_KEY);
         }
     }
 
     private function selectedOrganizationId(): ?int
     {
-        if (! $this->request->hasSession()) {
+        if (! $this->request()->hasSession()) {
             return null;
         }
 
-        $selected = $this->request->session()->get(self::SESSION_KEY);
+        $selected = $this->request()->session()->get(self::SESSION_KEY);
 
         if ($selected === null || $selected === '') {
             return null;
@@ -116,17 +120,21 @@ class RequestCurrentOrganization implements CurrentOrganizationContract
             ->values();
 
         if ($memberships->isEmpty()) {
+            $this->clear();
+
             throw CurrentOrganizationException::noMembership();
         }
 
         if ($memberships->count() > 1) {
+            $this->clear();
+
             throw CurrentOrganizationException::ambiguous();
         }
 
         $membership = $this->remember($memberships->first());
 
-        if ($this->request->hasSession()) {
-            $this->request->session()->put(self::SESSION_KEY, $membership->organization_id);
+        if ($this->request()->hasSession()) {
+            $this->request()->session()->put(self::SESSION_KEY, $membership->organization_id);
         }
 
         return $membership;
@@ -135,14 +143,20 @@ class RequestCurrentOrganization implements CurrentOrganizationContract
     private function validate(?OrganizationMembership $membership): OrganizationMembership
     {
         if ($membership === null) {
+            $this->clear();
+
             throw CurrentOrganizationException::noMembership();
         }
 
         if (! $membership->isActive()) {
+            $this->clear();
+
             throw CurrentOrganizationException::inactiveMembership();
         }
 
         if ($membership->organization?->isSuspended()) {
+            $this->clear();
+
             throw CurrentOrganizationException::suspendedOrganization();
         }
 
@@ -153,8 +167,14 @@ class RequestCurrentOrganization implements CurrentOrganizationContract
     {
         $this->resolvedMembership = $membership;
         $this->resolved = $membership->organization;
+        $this->resolvedUserId = $membership->user_id;
         app(PermissionRegistrar::class)->setPermissionsTeamId($membership->organization_id);
 
         return $membership;
+    }
+
+    private function request(): Request
+    {
+        return request();
     }
 }

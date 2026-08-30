@@ -2,14 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\MembershipStatus;
+use App\Enums\OrganizationRole;
 use App\Enums\UserRole;
 use App\Http\Requests\AssignComputerRequest;
 use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
 use App\Models\Computer;
-use App\Models\Department;
 use App\Models\Employee;
+use App\Models\Organization;
+use App\Models\OrganizationMembership;
 use App\Models\User;
+use App\Services\Tenancy\CoreTenantAccess;
+use App\Services\Tenancy\OrganizationAuthorization;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -37,10 +42,7 @@ class EmployeeController extends Controller implements HasMiddleware
     {
         return [
             new Middleware('can:viewAny,'.Employee::class, only: ['index']),
-            new Middleware('can:view,employee', only: ['show']),
             new Middleware('can:create,'.Employee::class, only: ['create', 'store']),
-            new Middleware('can:update,employee', only: ['edit', 'update']),
-            new Middleware('can:delete,employee', only: ['destroy']),
         ];
     }
 
@@ -50,21 +52,25 @@ class EmployeeController extends Controller implements HasMiddleware
         return view('employees.index');
     }
 
-    public function create(): View
+    public function create(CoreTenantAccess $tenant): View
     {
         return view('employees.create', [
             'employee' => new Employee,
-            'departments' => Department::orderBy('name')->get(),
+            'departments' => $tenant->departments()->orderBy('name')->get(),
             'roles' => UserRole::cases(),
             'isCreate' => true,
         ]);
     }
 
-    public function store(StoreEmployeeRequest $request): RedirectResponse
-    {
+    public function store(
+        StoreEmployeeRequest $request,
+        CoreTenantAccess $tenant,
+        OrganizationAuthorization $authorization,
+    ): RedirectResponse {
         $data = $request->validated();
+        $organization = $tenant->organization($request->user());
 
-        $employee = DB::transaction(function () use ($data) {
+        $employee = DB::transaction(function () use ($data, $organization, $authorization) {
             $user = User::create([
                 'name' => $data['name'],
                 'email' => $data['email'],
@@ -73,9 +79,10 @@ class EmployeeController extends Controller implements HasMiddleware
                 'is_active' => true,
             ]);
 
-            $user->assignRole($data['role']);
+            $this->ensureMembershipAndOrganizationRole($user, $organization, $data['role'], $authorization);
 
             return Employee::create([
+                'organization_id' => $organization->id,
                 'user_id' => $user->id,
                 'department_id' => $data['department_id'] ?? null,
                 'employee_code' => $data['employee_code'],
@@ -90,34 +97,46 @@ class EmployeeController extends Controller implements HasMiddleware
             ->with('status', 'Employee created successfully.');
     }
 
-    public function show(Employee $employee): View
+    public function show(Employee $employee, CoreTenantAccess $tenant): View
     {
+        $employee = $tenant->employee($employee);
+        $this->authorize('view', $employee);
+
         $employee->load(['user', 'department', 'computers']);
 
         return view('employees.show', [
             'employee' => $employee,
             // Unassigned, non-deleted computers available to attach.
-            'assignableComputers' => Computer::whereNull('employee_id')
-                ->orderBy('hostname')
-                ->get(),
+            'assignableComputers' => $tenant->assignableComputers()->get(),
         ]);
     }
 
-    public function edit(Employee $employee): View
+    public function edit(Employee $employee, CoreTenantAccess $tenant): View
     {
+        $employee = $tenant->employee($employee);
+        $this->authorize('update', $employee);
+
         return view('employees.edit', [
             'employee' => $employee->load('user'),
-            'departments' => Department::orderBy('name')->get(),
+            'departments' => $tenant->departments()->orderBy('name')->get(),
             'roles' => UserRole::cases(),
             'isCreate' => false,
         ]);
     }
 
-    public function update(UpdateEmployeeRequest $request, Employee $employee): RedirectResponse
-    {
-        $data = $request->validated();
+    public function update(
+        UpdateEmployeeRequest $request,
+        Employee $employee,
+        CoreTenantAccess $tenant,
+        OrganizationAuthorization $authorization,
+    ): RedirectResponse {
+        $employee = $tenant->employee($employee);
+        $this->authorize('update', $employee);
 
-        DB::transaction(function () use ($data, $employee) {
+        $data = $request->validated();
+        $organization = $tenant->organization($request->user());
+
+        DB::transaction(function () use ($data, $employee, $organization, $authorization) {
             $employee->user->update([
                 'name' => $data['name'],
                 'email' => $data['email'],
@@ -129,7 +148,7 @@ class EmployeeController extends Controller implements HasMiddleware
             }
 
             if (! empty($data['role'])) {
-                $employee->user->syncRoles([$data['role']]);
+                $this->ensureMembershipAndOrganizationRole($employee->user, $organization, $data['role'], $authorization);
             }
 
             $employee->update([
@@ -146,8 +165,11 @@ class EmployeeController extends Controller implements HasMiddleware
             ->with('status', 'Employee updated successfully.');
     }
 
-    public function destroy(Employee $employee): RedirectResponse
+    public function destroy(Employee $employee, CoreTenantAccess $tenant): RedirectResponse
     {
+        $employee = $tenant->employee($employee);
+        $this->authorize('delete', $employee);
+
         DB::transaction(function () use ($employee) {
             // Disable the login, release assigned computers, then soft-delete.
             $employee->user?->update(['is_active' => false]);
@@ -161,11 +183,14 @@ class EmployeeController extends Controller implements HasMiddleware
     }
 
     /** Assign an unassigned computer to this employee. */
-    public function assignComputer(AssignComputerRequest $request, Employee $employee): RedirectResponse
+    public function assignComputer(AssignComputerRequest $request, Employee $employee, CoreTenantAccess $tenant): RedirectResponse
     {
+        $employee = $tenant->employee($employee);
         $this->authorize('assignComputer', $employee);
 
-        $computer = Computer::findOrFail($request->validated()['computer_id']);
+        $computer = $tenant->assignableComputers()
+            ->whereKey($request->validated()['computer_id'])
+            ->firstOrFail();
 
         $computer->update([
             'employee_id' => $employee->id,
@@ -176,8 +201,10 @@ class EmployeeController extends Controller implements HasMiddleware
     }
 
     /** Release a computer from this employee. */
-    public function unassignComputer(Employee $employee, Computer $computer): RedirectResponse
+    public function unassignComputer(Employee $employee, Computer $computer, CoreTenantAccess $tenant): RedirectResponse
     {
+        $employee = $tenant->employee($employee);
+        $computer = $tenant->computer($computer);
         $this->authorize('assignComputer', $employee);
 
         abort_unless($computer->employee_id === $employee->id, 404);
@@ -185,5 +212,27 @@ class EmployeeController extends Controller implements HasMiddleware
         $computer->update(['employee_id' => null]);
 
         return back()->with('status', 'Computer unassigned.');
+    }
+
+    private function ensureMembershipAndOrganizationRole(
+        User $user,
+        Organization $organization,
+        string $role,
+        OrganizationAuthorization $authorization,
+    ): void {
+        OrganizationMembership::firstOrCreate(
+            [
+                'organization_id' => $organization->id,
+                'user_id' => $user->id,
+            ],
+            [
+                'status' => MembershipStatus::Active,
+                'role' => $role,
+                'is_owner' => false,
+                'joined_at' => now(),
+            ],
+        );
+
+        $authorization->syncOrganizationRole($user, $organization, OrganizationRole::from($role));
     }
 }

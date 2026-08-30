@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Contracts\CurrentOrganization;
 use App\Enums\UserRole;
 use App\Models\Employee;
 use Illuminate\Foundation\Http\FormRequest;
@@ -12,13 +13,14 @@ class UpdateEmployeeRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can('manage employees') ?? false;
+        return true;
     }
 
     public function rules(): array
     {
         /** @var Employee $employee */
         $employee = $this->route('employee');
+        $organization = app(CurrentOrganization::class)->resolve($this->user());
 
         return [
             // User account — password optional (blank = keep current).
@@ -37,7 +39,11 @@ class UpdateEmployeeRequest extends FormRequest
             ],
             'designation' => ['nullable', 'string', 'max:120'],
             'phone' => ['nullable', 'string', 'max:30'],
-            'department_id' => ['nullable', 'integer', 'exists:departments,id'],
+            'department_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('departments', 'id')->where(fn ($query) => $query->where('organization_id', $organization->id)),
+            ],
             'joined_on' => ['nullable', 'date'],
         ];
     }

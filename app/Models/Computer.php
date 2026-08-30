@@ -26,6 +26,7 @@ class Computer extends Model implements AuthenticatableContract
     use AuthenticatableTrait, HasApiTokens, HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'organization_id',
         'employee_id',
         'device_uuid',
         'hostname',
@@ -52,6 +53,11 @@ class Computer extends Model implements AuthenticatableContract
     // ----------------------------------------------------------------
 
     /** The employee this workstation is assigned to (N:1). */
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
@@ -120,6 +126,13 @@ class Computer extends Model implements AuthenticatableContract
     // ----------------------------------------------------------------
 
     /** Filter by a specific status. */
+    public function scopeForOrganization(Builder $query, Organization|int $organization): Builder
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        return $query->where('organization_id', $organizationId);
+    }
+
     public function scopeWithStatus(Builder $query, ComputerStatus $status): Builder
     {
         return $query->where('status', $status->value);

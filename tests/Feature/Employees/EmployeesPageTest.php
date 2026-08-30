@@ -2,10 +2,15 @@
 
 namespace Tests\Feature\Employees;
 
+use App\Enums\OrganizationRole;
 use App\Models\Employee;
+use App\Models\Organization;
+use App\Models\OrganizationMembership;
 use App\Models\User;
+use App\Services\Tenancy\OrganizationAuthorization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 /**
@@ -27,7 +32,19 @@ class EmployeesPageTest extends TestCase
 
     private function manager(): User
     {
-        return tap(User::factory()->create(), fn (User $u) => $u->givePermissionTo('manage employees'));
+        $organization = Organization::factory()->create();
+        $user = User::factory()->create();
+
+        OrganizationMembership::factory()->create([
+            'organization_id' => $organization->id,
+            'user_id' => $user->id,
+            'role' => OrganizationRole::Admin->value,
+        ]);
+
+        app(OrganizationAuthorization::class)->assignOrganizationRole($user, $organization, OrganizationRole::Admin);
+        app(PermissionRegistrar::class)->setPermissionsTeamId(null);
+
+        return $user;
     }
 
     public function test_guest_is_redirected_to_login(): void
@@ -37,22 +54,32 @@ class EmployeesPageTest extends TestCase
 
     public function test_authorized_user_can_load_employees_index(): void
     {
-        Employee::factory()->count(3)->create();
+        $user = $this->manager();
+        $organization = $user->memberships()->firstOrFail()->organization;
 
-        $this->actingAs($this->manager())->get('/employees')->assertOk();
+        Employee::factory()->count(3)->forOrganization($organization)->create();
+
+        $this->actingAs($user)->get('/employees')->assertOk();
     }
 
     public function test_user_without_permission_is_forbidden(): void
     {
+        $organization = Organization::factory()->create();
         $user = User::factory()->create(); // no permissions
+        OrganizationMembership::factory()->create([
+            'organization_id' => $organization->id,
+            'user_id' => $user->id,
+        ]);
 
         $this->actingAs($user)->get('/employees')->assertForbidden();
     }
 
     public function test_show_page_loads_for_manager(): void
     {
-        $employee = Employee::factory()->create();
+        $user = $this->manager();
+        $organization = $user->memberships()->firstOrFail()->organization;
+        $employee = Employee::factory()->forOrganization($organization)->create();
 
-        $this->actingAs($this->manager())->get(route('employees.show', $employee))->assertOk();
+        $this->actingAs($user)->get(route('employees.show', $employee))->assertOk();
     }
 }

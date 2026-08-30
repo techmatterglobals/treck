@@ -25,7 +25,9 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::patch('users/{user}/role', [UserRoleController::class, 'update'])->name('users.role');
 
         // Manager Management: create/promote/demote managers, assign/transfer employees.
-        Route::get('managers', [ManagerController::class, 'index'])->name('managers.index');
+        Route::get('managers', [ManagerController::class, 'index'])
+            ->middleware(['organization', 'organization.role:owner|admin'])
+            ->name('managers.index');
     });
 
     // Monitoring dashboards. Super Admin sees the whole organization; a Manager
