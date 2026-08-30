@@ -32,6 +32,26 @@
                 @endcan
             </div>
             <div class="flex items-center gap-4">
+                @auth
+                    @php
+                        $availableOrganizations = auth()->user()->activeOrganizations()->orderBy('name')->get();
+                        $selectedOrganizationId = session(\App\Contracts\CurrentOrganization::SESSION_KEY);
+                    @endphp
+                    @if ($availableOrganizations->isNotEmpty())
+                        <form method="POST" action="{{ route('organizations.switch') }}" class="flex items-center gap-2">
+                            @csrf
+                            <input type="hidden" name="redirect" value="{{ request()->getRequestUri() }}">
+                            <label for="layout_organization_id" class="sr-only">Organization</label>
+                            <select id="layout_organization_id" name="organization_id" class="rounded-md border-gray-300 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100" onchange="this.form.submit()">
+                                @foreach ($availableOrganizations as $organization)
+                                    <option value="{{ $organization->id }}" @selected((int) $selectedOrganizationId === $organization->id)>
+                                        {{ $organization->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </form>
+                    @endif
+                @endauth
                 @role('admin')
                     <livewire:notifications.notification-bell />
                 @endrole

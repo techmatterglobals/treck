@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
-use App\Enums\UserRole;
 use App\Enums\MembershipStatus;
+use App\Enums\OrganizationRole;
 use App\Enums\OrganizationStatus;
+use App\Enums\UserRole;
+use App\Exceptions\Tenancy\CurrentOrganizationException;
+use App\Services\Tenancy\OrganizationAuthorization;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -115,7 +118,8 @@ class User extends Authenticatable
     /** Whether this user can administer the system. */
     public function isAdministrator(): bool
     {
-        return $this->hasRole(UserRole::Admin->value);
+        return $this->hasOrganizationRoleSafely(OrganizationRole::Admin)
+            || $this->hasRole(UserRole::Admin->value);
     }
 
     /**
@@ -125,19 +129,27 @@ class User extends Authenticatable
      */
     public function isSuperAdmin(): bool
     {
-        return $this->isAdministrator();
+        return app(OrganizationAuthorization::class)->isPlatformSuperAdmin($this)
+            || $this->hasRole(UserRole::Admin->value);
     }
 
     /** Whether this user supervises employees as a Manager (Phase 11). */
     public function isManager(): bool
     {
-        return $this->hasRole(UserRole::Manager->value);
+        return $this->hasOrganizationRoleSafely(OrganizationRole::Manager)
+            || $this->hasRole(UserRole::Manager->value);
     }
 
     /** Convenience check for the employee (self-service) role. */
     public function isEmployee(): bool
     {
-        return $this->hasRole(UserRole::Employee->value);
+        return $this->hasOrganizationRoleSafely(OrganizationRole::Employee)
+            || $this->hasRole(UserRole::Employee->value);
+    }
+
+    public function isPlatformSuperAdmin(): bool
+    {
+        return app(OrganizationAuthorization::class)->isPlatformSuperAdmin($this);
     }
 
     public function membershipFor(Organization|int $organization): ?OrganizationMembership
@@ -171,5 +183,14 @@ class User extends Authenticatable
     public function hasActiveMembership(Organization|int $organization): bool
     {
         return $this->activeMembershipFor($organization) !== null;
+    }
+
+    private function hasOrganizationRoleSafely(OrganizationRole $role): bool
+    {
+        try {
+            return app(OrganizationAuthorization::class)->hasOrganizationRole($this, $role);
+        } catch (CurrentOrganizationException) {
+            return false;
+        }
     }
 }

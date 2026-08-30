@@ -23,16 +23,16 @@ return [
         'role_pivot_key' => null,
         'permission_pivot_key' => null,
         'model_morph_key' => 'model_id',
-        'team_foreign_key' => 'team_id',
+        'team_foreign_key' => 'organization_id',
     ],
 
     'register_permission_check_method' => true,
 
-    'register_octane_reset_listener' => false,
+    'register_octane_reset_listener' => true,
 
     'events_enabled' => false,
 
-    'teams' => false,
+    'teams' => true,
 
     'team_resolver' => DefaultTeamResolver::class,
 

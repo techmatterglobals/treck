@@ -1,7 +1,8 @@
 <?php
 
-use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\EnsureCurrentOrganization;
+use App\Http\Middleware\EnsureOrganizationRole;
+use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\ResetAuthGuards;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -41,6 +42,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => RoleOrPermissionMiddleware::class,
             'active' => EnsureUserIsActive::class,
             'organization' => EnsureCurrentOrganization::class,
+            'organization.role' => EnsureOrganizationRole::class,
 
             // Sanctum token ability gates.
             'abilities' => CheckAbilities::class,

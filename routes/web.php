@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FileDownloadController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\NotificationSettingsController;
+use App\Http\Controllers\OrganizationSelectionController;
 use App\Http\Controllers\PresenceController;
 use App\Http\Controllers\ScreenshotController;
 use Illuminate\Support\Facades\Route;
@@ -14,6 +15,9 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', fn () => redirect()->route('dashboard'));
 
 Route::middleware(['auth', 'active'])->group(function () {
+    Route::get('/organizations/select', [OrganizationSelectionController::class, 'index'])->name('organizations.select');
+    Route::post('/organizations/select', [OrganizationSelectionController::class, 'update'])->name('organizations.switch');
+
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Super-Admin-only management (role assignment + Manager Management, Phase 11).
