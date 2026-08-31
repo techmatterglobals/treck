@@ -12,6 +12,7 @@ use App\Services\Notifications\Rules\DownloadNotificationRule;
 use App\Services\Notifications\Rules\NotificationRuleContract;
 use App\Services\Notifications\Rules\PresenceNotificationRule;
 use App\Services\Notifications\Rules\ScreenshotNotificationRule;
+use App\Services\Tenancy\MonitoringTenantOwnership;
 
 /**
  * The centralized Notification Engine (Phase 9). Receives a source signal,
@@ -29,6 +30,7 @@ class NotificationEngine
     public function __construct(
         private readonly NotificationRuleService $ruleService,
         private readonly NotificationPreferenceResolver $recipients,
+        private readonly MonitoringTenantOwnership $ownership,
         PresenceNotificationRule $presence,
         ApplicationNotificationRule $application,
         ScreenshotNotificationRule $screenshot,
@@ -74,6 +76,9 @@ class NotificationEngine
             data: ['event' => $event] + $data,
             computer: $computer,
             employee: $employee ?? $computer?->employee,
+            organizationId: $computer !== null || $employee !== null
+                ? $this->ownership->resolve($computer, $employee ?? $computer?->employee, true)->organizationId
+                : null,
         ));
     }
 
@@ -94,9 +99,12 @@ class NotificationEngine
         $channels = (array) $rule->channels;
         $created = 0;
 
-        foreach ($this->recipients->recipients($severity, $channels) as $recipient) {
+        $organizationId = $this->ownership->resolve($draft->computer, $draft->employee, true)->organizationId;
+
+        foreach ($this->recipients->recipients($severity, $channels, $organizationId) as $recipient) {
             foreach ($recipient['channels'] as $channel) {
                 $log = NotificationLog::create([
+                    'organization_id' => $organizationId,
                     'recipient_id' => $recipient['user']->id,
                     'computer_id' => $draft->computer?->id,
                     'employee_id' => $draft->employee?->id,
@@ -110,7 +118,7 @@ class NotificationEngine
                     'metadata' => $draft->metadata,
                 ]);
 
-                SendNotificationJob::dispatch($log->id);
+                SendNotificationJob::dispatch($log->id, $organizationId);
                 $created++;
             }
         }
@@ -124,7 +132,10 @@ class NotificationEngine
             return false;
         }
 
+        $organizationId = $this->ownership->resolve($draft->computer, $draft->employee, true)->organizationId;
+
         return NotificationLog::where('dedupe_key', $draft->dedupeKey)
+            ->where('organization_id', $organizationId)
             ->where('created_at', '>=', now()->subSeconds($throttleSeconds))
             ->exists();
     }

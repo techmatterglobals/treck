@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\DataObjects\DownloadFilter;
 use App\Exports\FileDownloadExport;
 use App\Models\FileDownload;
-use App\Services\Hierarchy\EmployeeVisibility;
 use App\Services\Reporting\FileDownloadService;
+use App\Services\Tenancy\MonitoringTenantAccess;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -31,8 +31,9 @@ class FileDownloadController extends Controller
         return view('downloads.index');
     }
 
-    public function show(FileDownload $download): View
+    public function show(FileDownload $download, MonitoringTenantAccess $tenant): View
     {
+        $download = $tenant->fileDownload($download);
         $this->authorize('view', $download);
 
         $download->load(['employee.user', 'employee.manager', 'computer']);
@@ -41,12 +42,12 @@ class FileDownloadController extends Controller
     }
 
     /** Download reports grouped by employee/manager/computer/type/app/date. */
-    public function reports(Request $request, FileDownloadService $service, EmployeeVisibility $visibility): View
+    public function reports(Request $request, FileDownloadService $service, MonitoringTenantAccess $tenant): View
     {
         $this->authorize('viewAny', FileDownload::class);
 
         $dimension = (string) $request->query('dimension', 'employee');
-        $filter = $this->scopedFilter($request, $visibility);
+        $filter = $this->scopedFilter($request, $tenant);
 
         return view('downloads.reports', [
             'filter' => $filter,
@@ -56,11 +57,11 @@ class FileDownloadController extends Controller
     }
 
     /** Export the (scoped) download list to Excel/CSV via the shared infra. */
-    public function export(Request $request, FileDownloadService $service, EmployeeVisibility $visibility): BinaryFileResponse
+    public function export(Request $request, FileDownloadService $service, MonitoringTenantAccess $tenant): BinaryFileResponse
     {
         $this->authorize('viewAny', FileDownload::class);
 
-        $filter = $this->scopedFilter($request, $visibility);
+        $filter = $this->scopedFilter($request, $tenant);
         $rows = $service->query($filter)
             ->with(['employee.user', 'employee.manager', 'computer'])
             ->orderByDesc('downloaded_at')
@@ -72,9 +73,10 @@ class FileDownloadController extends Controller
     }
 
     /** Build a request filter clamped to the viewer's visible employees. */
-    private function scopedFilter(Request $request, EmployeeVisibility $visibility): DownloadFilter
+    private function scopedFilter(Request $request, MonitoringTenantAccess $tenant): DownloadFilter
     {
         return DownloadFilter::fromArray($request->all())
-            ->restrictToEmployees($visibility->employeeIds($request->user()));
+            ->restrictToEmployees($tenant->visibleEmployeeIds($request->user()))
+            ->forOrganization($tenant->organizationId($request->user()));
     }
 }

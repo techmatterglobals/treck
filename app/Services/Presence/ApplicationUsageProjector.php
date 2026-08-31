@@ -49,6 +49,7 @@ class ApplicationUsageProjector
                 'session_id' => $sessionId,
             ],
             [
+                'organization_id' => $event->organization_id,
                 'employee_id' => $event->employee_id,
                 'application_name' => $this->sanitize($applicationName, 191),
                 'executable' => $executable !== null ? $this->sanitize((string) $executable, 191) : null,

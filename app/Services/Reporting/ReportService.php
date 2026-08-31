@@ -44,6 +44,7 @@ class ReportService
             ->join('computers', 'computers.id', '=', 'activity_logs.computer_id')
             ->join('employees', 'employees.id', '=', 'activity_logs.employee_id')
             ->join('users', 'users.id', '=', 'employees.user_id')
+            ->when($filter->organizationId !== null, fn ($q) => $q->where('activity_logs.organization_id', $filter->organizationId))
             ->whereBetween('activity_logs.login_at', [
                 $filter->from->startOfDay()->toDateTimeString(),
                 $filter->to->endOfDay()->toDateTimeString(),
@@ -84,6 +85,7 @@ class ReportService
             ->join('employees', 'employees.id', '=', 'activity_logs.employee_id')
             ->join('users', 'users.id', '=', 'employees.user_id')
             ->leftJoin('departments', 'departments.id', '=', 'employees.department_id')
+            ->when($filter->organizationId !== null, fn ($q) => $q->where('activity_logs.organization_id', $filter->organizationId))
             // Day-bounded datetimes so the range is inclusive whether work_date is
             // stored as a pure date (MySQL DATE) or a datetime (SQLite).
             ->whereBetween('activity_logs.work_date', [
@@ -126,6 +128,7 @@ class ReportService
     {
         $agg = DB::table('activity_logs')
             ->join('employees', 'employees.id', '=', 'activity_logs.employee_id')
+            ->when($filter->organizationId !== null, fn ($q) => $q->where('activity_logs.organization_id', $filter->organizationId))
             ->whereBetween('activity_logs.work_date', [
                 $filter->from->startOfDay()->toDateTimeString(),
                 $filter->to->endOfDay()->toDateTimeString(),

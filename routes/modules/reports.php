@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Route;
 | Gated by the `view reports` permission.
 */
 
-Route::middleware(['auth', 'verified', 'active', 'permission:view reports'])->group(function () {
+Route::middleware(['auth', 'verified', 'active', 'organization', 'organization.role:owner|admin|manager'])->group(function () {
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('reports/export/excel', [ReportController::class, 'exportExcel'])->name('reports.export.excel');
     Route::get('reports/export/pdf', [ReportController::class, 'exportPdf'])->name('reports.export.pdf');

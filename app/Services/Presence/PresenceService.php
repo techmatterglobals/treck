@@ -36,9 +36,10 @@ class PresenceService
      * @param  list<int>|null  $computerIds
      * @return array{total:int,online:int,offline:int,active:int,idle:int,locked:int,logged_out:int}
      */
-    public function summary(?array $computerIds = null): array
+    public function summary(?array $computerIds = null, ?int $organizationId = null): array
     {
         $counts = ComputerPresence::query()
+            ->when($organizationId !== null, fn ($q) => $q->where('computer_presence.organization_id', $organizationId))
             ->when($computerIds !== null, fn ($q) => $q->whereIn('computer_id', $computerIds ?: [0]))
             ->selectRaw('status, COUNT(*) as c')
             ->groupBy('status')
@@ -47,6 +48,7 @@ class PresenceService
         $of = fn (PresenceStatus $s): int => (int) ($counts[$s->value] ?? 0);
 
         $total = Computer::query()
+            ->when($organizationId !== null, fn ($q) => $q->where('organization_id', $organizationId))
             ->when($computerIds !== null, fn ($q) => $q->whereIn('id', $computerIds ?: [0]))
             ->count();
         $withPresence = (int) $counts->sum();
@@ -79,14 +81,15 @@ class PresenceService
      * @param  list<int>|null  $computerIds
      * @return Collection<int, array<string, mixed>>
      */
-    public function rows(?array $computerIds = null): Collection
+    public function rows(?array $computerIds = null, ?int $organizationId = null): Collection
     {
         // Today's accumulated active/idle per computer, so the board shows the
         // same meaningful "Idle time" the dashboard does (the materialized
         // idle_seconds is only the current streak, and is reset to 0 on offline).
-        $activity = $this->todaysActivityByComputer();
+        $activity = $this->todaysActivityByComputer($organizationId);
 
         return Computer::query()
+            ->when($organizationId !== null, fn ($q) => $q->where('organization_id', $organizationId))
             ->when($computerIds !== null, fn ($q) => $q->whereIn('id', $computerIds ?: [0]))
             ->with(['employee.department', 'presence'])
             ->orderBy('hostname')
@@ -122,11 +125,13 @@ class PresenceService
      * Distinct employees with at least one computer currently online
      * (Active / Idle / Locked) - the same rule the presence board uses.
      */
-    public function onlineEmployeeCount(): int
+    public function onlineEmployeeCount(?int $organizationId = null): int
     {
         return (int) ComputerPresence::query()
             ->online()
+            ->when($organizationId !== null, fn ($q) => $q->where('computer_presence.organization_id', $organizationId))
             ->join('computers', 'computers.id', '=', 'computer_presence.computer_id')
+            ->when($organizationId !== null, fn ($q) => $q->where('computers.organization_id', $organizationId))
             ->whereNull('computers.deleted_at')
             ->whereNotNull('computers.employee_id')
             ->distinct()
@@ -140,11 +145,13 @@ class PresenceService
      *
      * @return Collection<int, array<string, mixed>>
      */
-    public function employeeRows(): Collection
+    public function employeeRows(?int $organizationId = null, ?array $employeeIds = null): Collection
     {
-        $activity = $this->todaysActivityByEmployee();
+        $activity = $this->todaysActivityByEmployee($organizationId);
 
         return Employee::query()
+            ->when($organizationId !== null, fn ($q) => $q->where('organization_id', $organizationId))
+            ->when($employeeIds !== null, fn ($q) => $q->whereIn('id', $employeeIds ?: [0]))
             ->with(['user', 'department', 'computers.presence'])
             ->orderBy('id')
             ->get()
@@ -216,9 +223,10 @@ class PresenceService
      *
      * @return Collection<int, object>
      */
-    public function todaysActivityByEmployee(): Collection
+    public function todaysActivityByEmployee(?int $organizationId = null): Collection
     {
         return DB::table('agent_events')
+            ->when($organizationId !== null, fn ($q) => $q->where('organization_id', $organizationId))
             ->where('kind', AgentEventKind::Heartbeat->value)
             ->whereDate('occurred_at', today())
             ->whereNotNull('employee_id')
@@ -237,9 +245,10 @@ class PresenceService
      *
      * @return Collection<int, object>
      */
-    public function todaysActivityByComputer(): Collection
+    public function todaysActivityByComputer(?int $organizationId = null): Collection
     {
         return DB::table('agent_events')
+            ->when($organizationId !== null, fn ($q) => $q->where('organization_id', $organizationId))
             ->where('kind', AgentEventKind::Heartbeat->value)
             ->whereDate('occurred_at', today())
             ->whereNotNull('computer_id')

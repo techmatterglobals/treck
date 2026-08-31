@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Enums\AgentEventKind;
 use App\Models\AgentEvent;
 use App\Models\Computer;
+use App\Models\Organization;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -18,6 +19,7 @@ class AgentEventFactory extends Factory
         $computer = Computer::factory();
 
         return [
+            'organization_id' => null,
             'computer_id' => $computer,
             'employee_id' => fn (array $attrs) => Computer::find($attrs['computer_id'])?->employee_id,
             'kind' => fake()->randomElement(AgentEventKind::cases()),
@@ -43,6 +45,22 @@ class AgentEventFactory extends Factory
         return $this->state(fn () => [
             'kind' => AgentEventKind::Session,
             'payload' => ['Type' => 'Logon', 'TimestampUtc' => now()->toIso8601String()],
+        ]);
+    }
+
+    public function forOrganization(Organization|int $organization): static
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        return $this->state(fn () => ['organization_id' => $organizationId]);
+    }
+
+    public function forComputer(Computer $computer): static
+    {
+        return $this->state(fn () => [
+            'organization_id' => $computer->organization_id,
+            'computer_id' => $computer->id,
+            'employee_id' => $computer->employee_id,
         ]);
     }
 }

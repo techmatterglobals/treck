@@ -3,6 +3,7 @@
 namespace App\Livewire\Notifications;
 
 use App\Models\NotificationLog;
+use App\Services\Tenancy\MonitoringTenantAccess;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
@@ -16,11 +17,17 @@ class NotificationBell extends Component
 {
     public int $userId;
 
+    public int $organizationId;
+
     public function mount(): void
     {
-        abort_unless(auth()->user()?->isAdministrator() ?? false, 403);
+        $user = auth()->user();
+        $tenant = app(MonitoringTenantAccess::class);
+
+        abort_unless($user && $tenant->canManageMonitoring($user), 403);
 
         $this->userId = (int) auth()->id();
+        $this->organizationId = $tenant->organizationId($user);
     }
 
     /** Echo pushes NotificationCreated on the recipient's private channel. */
@@ -33,12 +40,18 @@ class NotificationBell extends Component
 
     public function markAllRead(): void
     {
-        NotificationLog::forRecipient($this->userId)->inApp()->unread()->update(['read_at' => now()]);
+        NotificationLog::forRecipient($this->userId)
+            ->forOrganization($this->organizationId)
+            ->inApp()
+            ->unread()
+            ->update(['read_at' => now()]);
     }
 
     public function render(): View
     {
-        $base = NotificationLog::forRecipient($this->userId)->inApp();
+        $base = NotificationLog::forRecipient($this->userId)
+            ->forOrganization($this->organizationId)
+            ->inApp();
 
         return view('livewire.notifications.notification-bell', [
             'unreadCount' => (clone $base)->unread()->count(),

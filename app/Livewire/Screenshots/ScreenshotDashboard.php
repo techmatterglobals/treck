@@ -4,10 +4,10 @@ namespace App\Livewire\Screenshots;
 
 use App\DataObjects\ScreenshotFilter;
 use App\Livewire\Concerns\ScopesToViewer;
-use App\Models\Department;
 use App\Models\Screenshot;
 use App\Services\Screenshots\ScreenshotService;
 use App\Services\Screenshots\ScreenshotStorageService;
+use App\Services\Tenancy\MonitoringTenantAccess;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -74,10 +74,12 @@ class ScreenshotDashboard extends Component
             'computer_id' => $this->computerId,
             'department_id' => $this->departmentId,
             'search' => $this->search,
-        ])->restrictToEmployees($this->visibleEmployeeIds());
+        ])
+            ->restrictToEmployees($this->visibleEmployeeIds())
+            ->forOrganization($this->monitoringOrganizationId());
     }
 
-    public function render(ScreenshotService $service, ScreenshotStorageService $storage): View
+    public function render(ScreenshotService $service, ScreenshotStorageService $storage, MonitoringTenantAccess $tenant): View
     {
         $filter = $this->filter();
         $screenshots = $service->latest($filter);
@@ -93,7 +95,7 @@ class ScreenshotDashboard extends Component
             'status' => $service->status($filter),
             'employees' => $this->visibleEmployees(),
             'computers' => $this->visibleComputers(),
-            'departments' => Department::query()->orderBy('name')->get(),
+            'departments' => $tenant->departments(auth()->user()),
         ]);
     }
 }

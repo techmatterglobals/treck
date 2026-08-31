@@ -3,10 +3,12 @@
 namespace Tests\Feature\Screenshots;
 
 use App\DataObjects\ScreenshotFilter;
+use App\Enums\OrganizationRole;
 use App\Livewire\Screenshots\ScreenshotDashboard;
 use App\Livewire\Screenshots\ScreenshotViewer;
 use App\Models\Computer;
 use App\Models\Employee;
+use App\Models\Organization;
 use App\Models\Screenshot;
 use App\Models\User;
 use App\Services\Screenshots\ScreenshotService;
@@ -25,6 +27,8 @@ class ScreenshotAccessTest extends TestCase
 {
     use RefreshDatabase;
 
+    private Organization $organization;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -32,25 +36,34 @@ class ScreenshotAccessTest extends TestCase
         Storage::fake('local');
         Role::findOrCreate('admin', 'web');
         Role::findOrCreate('employee', 'web');
+        $this->organization = Organization::factory()->create();
     }
 
     private function admin(): User
     {
-        return tap(User::factory()->create(), fn (User $u) => $u->assignRole('admin'));
+        return tap(User::factory()->create(), function (User $u) {
+            $u->assignRole('admin');
+            $this->grantOrganizationRole($u, $this->organization, OrganizationRole::Admin);
+        });
     }
 
     private function employee(): User
     {
-        return tap(User::factory()->create(), fn (User $u) => $u->assignRole('employee'));
+        return tap(User::factory()->create(), function (User $u) {
+            $u->assignRole('employee');
+            $this->grantOrganizationRole($u, $this->organization, OrganizationRole::Employee);
+        });
     }
 
     /** A screenshot row with a backing file on the fake disk. */
     private function screenshot(array $attrs = []): Screenshot
     {
-        $computer = Computer::factory()->create(['employee_id' => Employee::factory()->create()->id]);
-        $shot = Screenshot::factory()->create(array_merge([
+        $employee = Employee::factory()->forOrganization($this->organization)->create();
+        $computer = Computer::factory()->forEmployee($employee)->create();
+        $shot = Screenshot::factory()->forComputer($computer)->create(array_merge([
             'computer_id' => $computer->id,
             'employee_id' => $computer->employee_id,
+            'organization_id' => $this->organization->id,
             'disk' => 'local',
         ], $attrs));
 
@@ -136,9 +149,15 @@ class ScreenshotAccessTest extends TestCase
 
     public function test_dashboard_never_exposes_device_tokens_or_paths(): void
     {
-        $computer = Computer::factory()->create(['employee_id' => Employee::factory()->create()->id, 'paired_at' => now()]);
+        $employee = Employee::factory()->forOrganization($this->organization)->create();
+        $computer = Computer::factory()->forEmployee($employee)->create(['paired_at' => now()]);
         $plain = $computer->createToken('agent', ['agent:report'])->plainTextToken;
-        $shot = $this->screenshot(['computer_id' => $computer->id, 'employee_id' => $computer->employee_id, 'captured_at' => now()]);
+        $shot = $this->screenshot([
+            'computer_id' => $computer->id,
+            'employee_id' => $computer->employee_id,
+            'organization_id' => $this->organization->id,
+            'captured_at' => now(),
+        ]);
 
         $response = $this->actingAs($this->admin())->get('/screenshots');
         $response->assertOk();

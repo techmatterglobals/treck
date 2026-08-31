@@ -13,6 +13,7 @@ use App\Services\Presence\ApplicationUsageProjector;
 use App\Services\Presence\FileDownloadProjector;
 use App\Services\Presence\PresenceBroadcaster;
 use App\Services\Presence\PresenceProjector;
+use App\Services\Tenancy\MonitoringTenantOwnership;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -53,6 +54,7 @@ class AgentEventIngestionService
         private readonly FileDownloadProjector $fileDownloadProjector,
         private readonly ActivityLogProjector $activityLogProjector,
         private readonly EmployeeResolver $resolver,
+        private readonly MonitoringTenantOwnership $ownership,
     ) {}
 
     /**
@@ -78,6 +80,7 @@ class AgentEventIngestionService
         $identity = $this->resolver->resolve($computer, $this->windowsUsername($payload));
 
         $values = [
+            'organization_id' => $this->ownership->resolve($computer, $identity->employeeId)->organizationId,
             'employee_id' => $identity->employeeId,
             'kind' => AgentEventKind::from($data['kind']),
             'payload' => $payload,

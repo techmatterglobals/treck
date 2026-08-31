@@ -4,6 +4,8 @@ namespace App\Policies;
 
 use App\Models\NotificationLog;
 use App\Models\User;
+use App\Services\Tenancy\MonitoringTenantAccess;
+use Throwable;
 
 /**
  * Authorization for the Notifications module (Phase 9). Notifications may contain
@@ -15,12 +17,25 @@ class NotificationPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->isAdministrator();
+        try {
+            return app(MonitoringTenantAccess::class)->canManageMonitoring($user);
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     public function view(User $user, NotificationLog $log): bool
     {
-        return $user->isAdministrator() && $log->recipient_id === $user->id;
+        try {
+            $access = app(MonitoringTenantAccess::class);
+
+            return $access->canManageMonitoring($user)
+                && $log->organization_id !== null
+                && (int) $log->organization_id === $access->organizationId($user)
+                && $log->recipient_id === $user->id;
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     /** Read/act on a specific notification (own inbox only). */
@@ -32,6 +47,6 @@ class NotificationPolicy
     /** Manage global notification settings/rules. */
     public function manage(User $user): bool
     {
-        return $user->isAdministrator();
+        return $this->viewAny($user);
     }
 }

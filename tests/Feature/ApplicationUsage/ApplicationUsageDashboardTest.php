@@ -3,11 +3,13 @@
 namespace Tests\Feature\ApplicationUsage;
 
 use App\DataObjects\AppUsageFilter;
+use App\Enums\OrganizationRole;
 use App\Livewire\ApplicationUsage\ApplicationUsageDashboard;
 use App\Models\ApplicationUsage;
 use App\Models\Computer;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\Organization;
 use App\Models\User;
 use App\Services\Reporting\ApplicationUsageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,22 +25,45 @@ class ApplicationUsageDashboardTest extends TestCase
 {
     use RefreshDatabase;
 
+    private Organization $organization;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->withoutVite();
         Role::findOrCreate('admin', 'web');
         Role::findOrCreate('employee', 'web');
+        $this->organization = Organization::factory()->create();
     }
 
     private function admin(): User
     {
-        return tap(User::factory()->create(), fn (User $u) => $u->assignRole('admin'));
+        return tap(User::factory()->create(), function (User $u) {
+            $u->assignRole('admin');
+            $this->grantOrganizationRole($u, $this->organization, OrganizationRole::Admin);
+        });
     }
 
     private function employee(): User
     {
-        return tap(User::factory()->create(), fn (User $u) => $u->assignRole('employee'));
+        return tap(User::factory()->create(), function (User $u) {
+            $u->assignRole('employee');
+            $this->grantOrganizationRole($u, $this->organization, OrganizationRole::Employee);
+        });
+    }
+
+    private function employeeRecord(array $attrs = []): Employee
+    {
+        return Employee::factory()->forOrganization($this->organization)->create($attrs);
+    }
+
+    private function computer(array $attrs = []): Computer
+    {
+        $employee = $attrs['employee_id'] ?? $this->employeeRecord()->id;
+
+        return Computer::factory()
+            ->forOrganization($this->organization)
+            ->create(array_merge(['employee_id' => $employee], $attrs));
     }
 
     private function usage(array $attrs): ApplicationUsage
@@ -168,8 +193,8 @@ class ApplicationUsageDashboardTest extends TestCase
     public function test_dashboard_renders_sessions_for_admin(): void
     {
         $this->actingAs($this->admin());
-        $computer = Computer::factory()->create(['employee_id' => Employee::factory()->create()->id]);
-        $this->usage(['computer_id' => $computer->id, 'employee_id' => $computer->employee_id, 'application_name' => 'MyEditor', 'used_at' => today()->setTime(9, 0), 'duration_seconds' => 300, 'session_id' => 'r1']);
+        $computer = $this->computer();
+        $this->usage(['organization_id' => $this->organization->id, 'computer_id' => $computer->id, 'employee_id' => $computer->employee_id, 'application_name' => 'MyEditor', 'used_at' => today()->setTime(9, 0), 'duration_seconds' => 300, 'session_id' => 'r1']);
 
         Livewire::test(ApplicationUsageDashboard::class)
             ->assertOk()
@@ -179,9 +204,9 @@ class ApplicationUsageDashboardTest extends TestCase
     public function test_dashboard_never_exposes_device_tokens(): void
     {
         $this->actingAs($this->admin());
-        $computer = Computer::factory()->create(['employee_id' => Employee::factory()->create()->id, 'paired_at' => now()]);
+        $computer = $this->computer(['paired_at' => now()]);
         $plain = $computer->createToken('agent', ['agent:report'])->plainTextToken;
-        $this->usage(['computer_id' => $computer->id, 'employee_id' => $computer->employee_id, 'used_at' => today()->setTime(9, 0), 'session_id' => 'tok1']);
+        $this->usage(['organization_id' => $this->organization->id, 'computer_id' => $computer->id, 'employee_id' => $computer->employee_id, 'used_at' => today()->setTime(9, 0), 'session_id' => 'tok1']);
 
         $response = $this->get('/application-usage');
         $response->assertOk();

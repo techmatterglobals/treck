@@ -4,6 +4,8 @@ namespace App\Policies;
 
 use App\Models\Screenshot;
 use App\Models\User;
+use App\Services\Tenancy\MonitoringTenantAccess;
+use Throwable;
 
 /**
  * Authorization for the Screenshot module (Phase 8). Auto-discovered by Laravel
@@ -15,7 +17,11 @@ class ScreenshotPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->isSuperAdmin() || $user->isManager();
+        try {
+            return app(MonitoringTenantAccess::class)->canViewMonitoring($user);
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     public function view(User $user, Screenshot $screenshot): bool
@@ -31,12 +37,22 @@ class ScreenshotPolicy
     /** Super Admin sees all; a Manager only their team's captures. */
     private function owns(User $user, Screenshot $screenshot): bool
     {
-        if ($user->isSuperAdmin()) {
-            return true;
-        }
+        try {
+            $access = app(MonitoringTenantAccess::class);
 
-        return $user->isManager()
-            && $screenshot->employee_id !== null
-            && $screenshot->employee?->manager_user_id === $user->id;
+            if ($screenshot->organization_id === null
+                || (int) $screenshot->organization_id !== $access->organizationId($user)) {
+                return false;
+            }
+
+            if ($access->canManageMonitoring($user)) {
+                return true;
+            }
+
+            return $screenshot->employee_id !== null
+                && $access->canSeeEmployee($user, (int) $screenshot->employee_id);
+        } catch (Throwable) {
+            return false;
+        }
     }
 }

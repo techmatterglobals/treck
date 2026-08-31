@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Enums\NotificationEventType;
 use App\Enums\NotificationSeverity;
 use App\Models\NotificationLog;
+use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -18,6 +19,7 @@ class NotificationLogFactory extends Factory
         $severity = $type->defaultSeverity();
 
         return [
+            'organization_id' => null,
             'recipient_id' => User::factory(),
             'computer_id' => null,
             'employee_id' => null,
@@ -47,5 +49,12 @@ class NotificationLogFactory extends Factory
     public function severity(NotificationSeverity $severity): static
     {
         return $this->state(fn () => ['severity' => $severity->value]);
+    }
+
+    public function forOrganization(Organization|int $organization): static
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        return $this->state(fn () => ['organization_id' => $organizationId]);
     }
 }

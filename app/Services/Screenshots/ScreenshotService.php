@@ -6,6 +6,7 @@ use App\DataObjects\ScreenshotFilter;
 use App\Models\Computer;
 use App\Models\Screenshot;
 use App\Services\Agent\EmployeeResolver;
+use App\Services\Tenancy\MonitoringTenantOwnership;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -27,6 +28,7 @@ class ScreenshotService
     public function __construct(
         private readonly ScreenshotStorageService $storage,
         private readonly EmployeeResolver $resolver,
+        private readonly MonitoringTenantOwnership $ownership,
     ) {}
 
     // ---- Ingest ------------------------------------------------------------
@@ -57,8 +59,10 @@ class ScreenshotService
         // username resolve to the computer's assigned employee.
         $windowsUsername = $data['windows_username'] ?? $data['source_user'] ?? null;
         $employeeId = $this->resolver->resolve($computer, $windowsUsername)->employeeId;
+        $organizationId = $this->ownership->resolve($computer, $employeeId)->organizationId;
 
         $attributes = [
+            'organization_id' => $organizationId,
             'employee_id' => $employeeId,
             'path' => $path,
             'disk' => $this->storage->disk(),
@@ -112,6 +116,7 @@ class ScreenshotService
     public function query(ScreenshotFilter $filter): Builder
     {
         return Screenshot::query()
+            ->when($filter->organizationId !== null, fn (Builder $q) => $q->where('organization_id', $filter->organizationId))
             ->between($filter->from, $filter->to)
             ->when($filter->employeeId, fn (Builder $q) => $q->forEmployee($filter->employeeId))
             ->when($filter->computerId, fn (Builder $q) => $q->forComputer($filter->computerId))
@@ -146,15 +151,15 @@ class ScreenshotService
             ->first();
 
         return [
-    'total' => (int) ($row->total ?? 0),
-    'computers' => (int) ($row->computers ?? 0),
+            'total' => (int) ($row->total ?? 0),
+            'computers' => (int) ($row->computers ?? 0),
 
-    // MAX() returns a raw DB datetime (stored in UTC); parse it as UTC and
-    // convert to the app timezone so diffForHumans()/format() are correct.
-    'last_capture_at' => $row?->last_capture_at
-        ? Carbon::parse($row->last_capture_at, 'UTC')->timezone(config('app.timezone'))
-        : null,
-];
+            // MAX() returns a raw DB datetime (stored in UTC); parse it as UTC and
+            // convert to the app timezone so diffForHumans()/format() are correct.
+            'last_capture_at' => $row?->last_capture_at
+                ? Carbon::parse($row->last_capture_at, 'UTC')->timezone(config('app.timezone'))
+                : null,
+        ];
     }
 
     /**

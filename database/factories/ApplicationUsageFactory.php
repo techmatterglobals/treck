@@ -6,6 +6,7 @@ use App\Enums\ProductivityRating;
 use App\Models\ApplicationUsage;
 use App\Models\Computer;
 use App\Models\Employee;
+use App\Models\Organization;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class ApplicationUsageFactory extends Factory
@@ -31,6 +32,7 @@ class ApplicationUsageFactory extends Factory
         $duration = fake()->numberBetween(300, 3600);
 
         return [
+            'organization_id' => null,
             'employee_id' => Employee::factory(),
             'computer_id' => Computer::factory(),
             'activity_log_id' => null,
@@ -44,5 +46,21 @@ class ApplicationUsageFactory extends Factory
             'duration_seconds' => $duration,
             'session_id' => (string) fake()->uuid(),
         ];
+    }
+
+    public function forOrganization(Organization|int $organization): static
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        return $this->state(fn () => ['organization_id' => $organizationId]);
+    }
+
+    public function forComputer(Computer $computer): static
+    {
+        return $this->state(fn () => [
+            'organization_id' => $computer->organization_id,
+            'computer_id' => $computer->id,
+            'employee_id' => $computer->employee_id,
+        ]);
     }
 }

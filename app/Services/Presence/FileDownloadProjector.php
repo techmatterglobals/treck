@@ -40,6 +40,7 @@ class FileDownloadProjector
                 'event_key' => $event->idempotency_key,
             ],
             [
+                'organization_id' => $event->organization_id,
                 'employee_id' => $event->employee_id,
                 'windows_username' => $this->string($this->value($payload, ['SourceUser', 'WindowsUsername', 'windows_username'], null), 191),
                 'application_name' => $this->string($this->value($payload, ['ApplicationName', 'application_name'], null), 255),

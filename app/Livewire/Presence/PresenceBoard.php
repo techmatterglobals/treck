@@ -3,8 +3,8 @@
 namespace App\Livewire\Presence;
 
 use App\Livewire\Concerns\ScopesToViewer;
-use App\Services\Hierarchy\EmployeeVisibility;
 use App\Services\Presence\PresenceService;
+use App\Services\Tenancy\MonitoringTenantAccess;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -35,15 +35,15 @@ class PresenceBoard extends Component
         // No state to merge: render() re-reads the presence table.
     }
 
-    public function render(PresenceService $presence, EmployeeVisibility $visibility): View
+    public function render(PresenceService $presence, MonitoringTenantAccess $tenant): View
     {
-        // Super Admin: null → whole organization. Manager: only their team's
-        // computers (Phase 11).
-        $computerIds = $visibility->computerIds(auth()->user());
+        $user = auth()->user();
+        $computerIds = $tenant->visibleComputerIds($user);
+        $organizationId = $tenant->organizationId($user);
 
         return view('livewire.presence.presence-board', [
-            'summary' => $presence->summary($computerIds),
-            'rows' => $presence->rows($computerIds),
+            'summary' => $presence->summary($computerIds, $organizationId),
+            'rows' => $presence->rows($computerIds, $organizationId),
         ]);
     }
 }

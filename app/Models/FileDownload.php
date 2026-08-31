@@ -18,6 +18,7 @@ class FileDownload extends Model
     use HasFactory;
 
     protected $fillable = [
+        'organization_id',
         'computer_id',
         'employee_id',
         'windows_username',
@@ -51,6 +52,11 @@ class FileDownload extends Model
         return $this->belongsTo(Computer::class);
     }
 
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
@@ -61,6 +67,13 @@ class FileDownload extends Model
     public function scopeForEmployee(Builder $query, int $employeeId): Builder
     {
         return $query->where('employee_id', $employeeId);
+    }
+
+    public function scopeForOrganization(Builder $query, Organization|int $organization): Builder
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        return $query->where('organization_id', $organizationId);
     }
 
     public function scopeForComputer(Builder $query, int $computerId): Builder

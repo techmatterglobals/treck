@@ -31,7 +31,7 @@ class ProductivityService
         foreach ($employeeIds as $employeeId) {
             $activity = ActivityLog::whereDate('work_date', $dateStr)
                 ->where('employee_id', $employeeId)
-                ->selectRaw('COALESCE(SUM(active_seconds),0) a, COALESCE(SUM(idle_seconds),0) i')
+                ->selectRaw('MAX(organization_id) as organization_id, COALESCE(SUM(active_seconds),0) a, COALESCE(SUM(idle_seconds),0) i')
                 ->first();
 
             $active = (int) $activity->a;
@@ -70,6 +70,7 @@ class ProductivityService
                     'period_date' => $dateStr,
                 ],
                 [
+                    'organization_id' => $activity->organization_id !== null ? (int) $activity->organization_id : null,
                     'active_seconds' => $active,
                     'productive_seconds' => $productive,
                     'unproductive_seconds' => $unproductive,

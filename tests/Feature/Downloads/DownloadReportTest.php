@@ -3,9 +3,11 @@
 namespace Tests\Feature\Downloads;
 
 use App\DataObjects\DownloadFilter;
+use App\Enums\OrganizationRole;
 use App\Models\Computer;
 use App\Models\Employee;
 use App\Models\FileDownload;
+use App\Models\Organization;
 use App\Models\User;
 use App\Services\Reporting\FileDownloadService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,26 +21,30 @@ class DownloadReportTest extends TestCase
 {
     use RefreshDatabase;
 
+    private Organization $organization;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->withoutVite();
         Role::findOrCreate('admin', 'web');
+        $this->organization = Organization::factory()->create();
     }
 
     private function admin(): User
     {
-        return tap(User::factory()->create(), fn (User $u) => $u->assignRole('admin'));
+        return tap(User::factory()->create(), function (User $u) {
+            $u->assignRole('admin');
+            $this->grantOrganizationRole($u, $this->organization, OrganizationRole::Admin);
+        });
     }
 
     private function seedDownloads(): void
     {
-        $employee = Employee::factory()->create();
-        $computer = Computer::factory()->create(['employee_id' => $employee->id]);
+        $employee = Employee::factory()->forOrganization($this->organization)->create();
+        $computer = Computer::factory()->forEmployee($employee)->create();
         foreach (['a.exe' => 'exe', 'b.exe' => 'exe', 'c.pdf' => 'pdf'] as $name => $ext) {
-            FileDownload::factory()->create([
-                'employee_id' => $employee->id,
-                'computer_id' => $computer->id,
+            FileDownload::factory()->forComputer($computer)->create([
                 'file_name' => $name,
                 'file_extension' => $ext,
                 'file_size' => 1000,

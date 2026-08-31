@@ -17,6 +17,7 @@ class Attendance extends Model
     protected $table = 'attendance';
 
     protected $fillable = [
+        'organization_id',
         'employee_id',
         'work_date',
         'first_in_at',
@@ -47,6 +48,11 @@ class Attendance extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
     }
 
     // ----------------------------------------------------------------
@@ -95,6 +101,13 @@ class Attendance extends Model
     public function scopeForDate(Builder $query, $date = null): Builder
     {
         return $query->whereDate('work_date', $date ?? today());
+    }
+
+    public function scopeForOrganization(Builder $query, Organization|int $organization): Builder
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        return $query->where('organization_id', $organizationId);
     }
 
     /** Records for a specific employee. */

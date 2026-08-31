@@ -3,10 +3,14 @@
 namespace App\Services\Notifications;
 
 use App\Enums\NotificationSeverity;
+use App\Enums\OrganizationRole;
 use App\Enums\UserRole;
 use App\Models\NotificationPreference;
+use App\Models\OrganizationMembership;
 use App\Models\User;
 use App\Services\Notifications\Channels\EmailChannel;
+use App\Services\Tenancy\OrganizationAuthorization;
+use Illuminate\Support\Collection;
 
 /**
  * Resolves who receives a notification and on which channels (Phase 9).
@@ -19,13 +23,17 @@ use App\Services\Notifications\Channels\EmailChannel;
  */
 class NotificationPreferenceResolver
 {
+    public function __construct(private readonly OrganizationAuthorization $authorization) {}
+
     /**
      * @param  list<string>  $ruleChannels  channels the rule is configured to use
      * @return list<array{user:User,channels:list<string>}>
      */
-    public function recipients(NotificationSeverity $severity, array $ruleChannels): array
+    public function recipients(NotificationSeverity $severity, array $ruleChannels, ?int $organizationId = null): array
     {
-        $admins = User::query()->active()->withRole(UserRole::Admin->value)->get();
+        $admins = $organizationId !== null
+            ? $this->organizationAdmins($organizationId)
+            : User::query()->active()->withRole(UserRole::Admin->value)->get();
         $prefs = NotificationPreference::whereIn('user_id', $admins->pluck('id'))->get()->keyBy('user_id');
 
         $recipients = [];
@@ -62,5 +70,25 @@ class NotificationPreferenceResolver
         }
 
         return $recipients;
+    }
+
+    /**
+     * @return Collection<int,User>
+     */
+    private function organizationAdmins(int $organizationId): Collection
+    {
+        return User::query()
+            ->active()
+            ->whereIn('id', OrganizationMembership::query()
+                ->where('organization_id', $organizationId)
+                ->where('status', 'active')
+                ->select('user_id'))
+            ->get()
+            ->filter(fn (User $user) => $this->authorization->hasOrganizationRole(
+                $user,
+                [OrganizationRole::Owner, OrganizationRole::Admin],
+                $organizationId,
+            ))
+            ->values();
     }
 }

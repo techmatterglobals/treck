@@ -16,6 +16,7 @@ class ActivityLog extends Model
     use HasFactory;
 
     protected $fillable = [
+        'organization_id',
         'employee_id',
         'computer_id',
         'login_at',
@@ -46,6 +47,11 @@ class ActivityLog extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
     }
 
     /** The computer this session ran on (N:1). */
@@ -97,6 +103,13 @@ class ActivityLog extends Model
     public function scopeOpen(Builder $query): Builder
     {
         return $query->whereNull('logout_at');
+    }
+
+    public function scopeForOrganization(Builder $query, Organization|int $organization): Builder
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        return $query->where('organization_id', $organizationId);
     }
 
     /** Sessions for a specific work date (defaults to today). */

@@ -23,6 +23,7 @@ class AppUsageFilter
         public readonly ?int $departmentId = null,
         public readonly ?string $application = null,
         public readonly ?array $employeeIds = null,
+        public readonly ?int $organizationId = null,
     ) {}
 
     /** Return a copy restricted to a visible-employee id set (null = unrestricted). */
@@ -30,7 +31,15 @@ class AppUsageFilter
     {
         return new self(
             $this->from, $this->to, $this->employeeId, $this->computerId,
-            $this->departmentId, $this->application, $employeeIds,
+            $this->departmentId, $this->application, $employeeIds, $this->organizationId,
+        );
+    }
+
+    public function forOrganization(?int $organizationId): self
+    {
+        return new self(
+            $this->from, $this->to, $this->employeeId, $this->computerId,
+            $this->departmentId, $this->application, $this->employeeIds, $organizationId,
         );
     }
 

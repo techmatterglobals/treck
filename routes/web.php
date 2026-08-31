@@ -18,7 +18,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/organizations/select', [OrganizationSelectionController::class, 'index'])->name('organizations.select');
     Route::post('/organizations/select', [OrganizationSelectionController::class, 'update'])->name('organizations.switch');
 
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->middleware('organization')->name('dashboard');
 
     // Super-Admin-only management (role assignment + Manager Management, Phase 11).
     Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function () {
@@ -33,7 +33,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     // Monitoring dashboards. Super Admin sees the whole organization; a Manager
     // is admitted to the same screens but every query is scoped to their team
     // (Phase 11). Scoping is enforced in the components/services/policies.
-    Route::middleware('role:admin|manager')->group(function () {
+    Route::middleware(['organization', 'organization.role:owner|admin|manager'])->group(function () {
         Route::get('/presence', [PresenceController::class, 'index'])->name('presence.index');
         Route::get('/presence/computers/{computer}', [PresenceController::class, 'show'])->name('presence.show');
 
@@ -58,7 +58,7 @@ Route::middleware(['auth', 'active'])->group(function () {
 
     // Notifications remain Super-Admin-only (the alert inbox + global settings
     // are organization-wide; per-manager notification routing is a future phase).
-    Route::middleware('role:admin')->group(function () {
+    Route::middleware(['organization', 'organization.role:owner|admin'])->group(function () {
         Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
         Route::get('/notifications/settings', [NotificationSettingsController::class, 'index'])->name('notifications.settings');
     });

@@ -68,6 +68,7 @@ class ActivityLogProjector
             ->where('occurred_at', '>=', $startUtc->format('Y-m-d H:i:s'))
             ->where('occurred_at', '<', $endUtc->format('Y-m-d H:i:s'))
             ->selectRaw("
+                MAX(organization_id) as organization_id,
                 COALESCE(SUM(json_extract(payload, '$.ActiveSeconds')), 0) as active,
                 COALESCE(SUM(json_extract(payload, '$.IdleSeconds')), 0) as idle,
                 MIN(occurred_at) as first_at,
@@ -87,6 +88,7 @@ class ActivityLogProjector
         $logout = Carbon::parse($agg->last_at, 'UTC')->timezone($tz);
 
         $values = [
+            'organization_id' => $agg->organization_id !== null ? (int) $agg->organization_id : null,
             'login_at' => $login,
             'logout_at' => $logout,
             'active_seconds' => (int) $agg->active,

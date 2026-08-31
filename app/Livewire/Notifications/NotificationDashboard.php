@@ -4,6 +4,7 @@ namespace App\Livewire\Notifications;
 
 use App\Enums\NotificationSeverity;
 use App\Models\NotificationLog;
+use App\Services\Tenancy\MonitoringTenantAccess;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\On;
@@ -23,6 +24,8 @@ class NotificationDashboard extends Component
 
     public int $userId;
 
+    public int $organizationId;
+
     #[Url]
     public string $severity = '';
 
@@ -40,9 +43,13 @@ class NotificationDashboard extends Component
 
     public function mount(): void
     {
-        abort_unless(auth()->user()?->isAdministrator() ?? false, 403);
+        $user = auth()->user();
+        $tenant = app(MonitoringTenantAccess::class);
+
+        abort_unless($user && $tenant->canManageMonitoring($user), 403);
 
         $this->userId = (int) auth()->id();
+        $this->organizationId = $tenant->organizationId($user);
         $this->from = $this->from ?: today()->subDays(6)->toDateString();
         $this->to = $this->to ?: today()->toDateString();
     }
@@ -60,17 +67,25 @@ class NotificationDashboard extends Component
 
     public function markRead(int $id): void
     {
-        NotificationLog::forRecipient($this->userId)->whereKey($id)->update(['read_at' => now()]);
+        NotificationLog::forRecipient($this->userId)
+            ->forOrganization($this->organizationId)
+            ->whereKey($id)
+            ->update(['read_at' => now()]);
     }
 
     public function markAllRead(): void
     {
-        NotificationLog::forRecipient($this->userId)->inApp()->unread()->update(['read_at' => now()]);
+        NotificationLog::forRecipient($this->userId)
+            ->forOrganization($this->organizationId)
+            ->inApp()
+            ->unread()
+            ->update(['read_at' => now()]);
     }
 
     private function baseQuery()
     {
         return NotificationLog::forRecipient($this->userId)
+            ->forOrganization($this->organizationId)
             ->inApp()
             ->when($this->severity, fn ($q) => $q->ofSeverity($this->severity))
             ->when($this->status === 'unread', fn ($q) => $q->unread())
@@ -81,7 +96,9 @@ class NotificationDashboard extends Component
 
     public function render(): View
     {
-        $inbox = NotificationLog::forRecipient($this->userId)->inApp();
+        $inbox = NotificationLog::forRecipient($this->userId)
+            ->forOrganization($this->organizationId)
+            ->inApp();
 
         return view('livewire.notifications.notification-dashboard', [
             'notifications' => $this->baseQuery()->latest()->paginate(20)->withQueryString(),

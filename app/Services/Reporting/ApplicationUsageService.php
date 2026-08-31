@@ -25,16 +25,17 @@ class ApplicationUsageService
     public function query(AppUsageFilter $filter): Builder
     {
         return ApplicationUsage::query()
+            ->when($filter->organizationId !== null, fn (Builder $q) => $q->where('application_usage.organization_id', $filter->organizationId))
             ->between($filter->from, $filter->to)
-            ->when($filter->employeeId, fn (Builder $q) => $q->forEmployee($filter->employeeId))
-            ->when($filter->computerId, fn (Builder $q) => $q->forComputer($filter->computerId))
+            ->when($filter->employeeId, fn (Builder $q) => $q->where('application_usage.employee_id', $filter->employeeId))
+            ->when($filter->computerId, fn (Builder $q) => $q->where('application_usage.computer_id', $filter->computerId))
             ->when($filter->application, fn (Builder $q) => $q->matchingApplication($filter->application))
             ->when($filter->departmentId, fn (Builder $q) => $q->whereHas(
                 'employee',
                 fn (Builder $e) => $e->where('department_id', $filter->departmentId),
             ))
             // Manager/employee visibility restriction (Phase 11); null = unrestricted.
-            ->when($filter->employeeIds !== null, fn (Builder $q) => $q->whereIn('employee_id', $filter->employeeIds ?: [0]));
+            ->when($filter->employeeIds !== null, fn (Builder $q) => $q->whereIn('application_usage.employee_id', $filter->employeeIds ?: [0]));
     }
 
     // ---- Summary / reporting ----------------------------------------------
@@ -131,19 +132,27 @@ class ApplicationUsageService
     /** The most recent (i.e. current) application session on a computer. */
     public function currentApplication(Computer $computer): ?ApplicationUsage
     {
-        return ApplicationUsage::forComputer($computer->id)->latest('used_at')->first();
+        return ApplicationUsage::forComputer($computer->id)
+            ->when($computer->organization_id !== null, fn (Builder $q) => $q->where('organization_id', $computer->organization_id))
+            ->latest('used_at')
+            ->first();
     }
 
     /** Recent application history for a computer. */
     public function recentForComputer(Computer $computer, int $limit = 15): Collection
     {
-        return ApplicationUsage::forComputer($computer->id)->latest('used_at')->limit($limit)->get();
+        return ApplicationUsage::forComputer($computer->id)
+            ->when($computer->organization_id !== null, fn (Builder $q) => $q->where('organization_id', $computer->organization_id))
+            ->latest('used_at')
+            ->limit($limit)
+            ->get();
     }
 
     /** Today's top applications for a computer. @return Collection<int,array<string,mixed>> */
     public function dailySummaryForComputer(Computer $computer, ?int $limit = 8): Collection
     {
         return ApplicationUsage::forComputer($computer->id)
+            ->when($computer->organization_id !== null, fn (Builder $q) => $q->where('organization_id', $computer->organization_id))
             ->forDate(today())
             ->groupBy('application_name')
             ->selectRaw('application_name, SUM(duration_seconds) secs')

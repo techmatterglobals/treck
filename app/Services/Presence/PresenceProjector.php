@@ -54,7 +54,10 @@ class PresenceProjector
                 ->where('computer_id', $event->computer_id)
                 ->lockForUpdate()
                 ->first()
-                ?? new ComputerPresence(['computer_id' => $event->computer_id]);
+                ?? new ComputerPresence([
+                    'computer_id' => $event->computer_id,
+                    'organization_id' => $event->organization_id,
+                ]);
 
             // Reject stale/out-of-order events: never let an older event overwrite
             // a newer materialized state.
@@ -75,6 +78,7 @@ class PresenceProjector
 
             $presence->last_event_at = $event->occurred_at;
             $presence->last_synced_at = $event->received_at;
+            $presence->organization_id ??= $event->organization_id;
             $presence->save();
 
             return $presence;

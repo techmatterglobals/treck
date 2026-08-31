@@ -25,6 +25,7 @@ class FileDownloadObserver
                 'file_size' => (int) $download->file_size,
                 'application_name' => $download->application_name,
             ],
+            organizationId: $download->organization_id,
         );
     }
 }

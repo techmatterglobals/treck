@@ -23,6 +23,7 @@ class ScreenshotFilter
         public readonly ?int $departmentId = null,
         public readonly ?string $search = null,
         public readonly ?array $employeeIds = null,
+        public readonly ?int $organizationId = null,
     ) {}
 
     /** Return a copy restricted to a visible-employee id set (null = unrestricted). */
@@ -30,7 +31,15 @@ class ScreenshotFilter
     {
         return new self(
             $this->from, $this->to, $this->employeeId, $this->computerId,
-            $this->departmentId, $this->search, $employeeIds,
+            $this->departmentId, $this->search, $employeeIds, $this->organizationId,
+        );
+    }
+
+    public function forOrganization(?int $organizationId): self
+    {
+        return new self(
+            $this->from, $this->to, $this->employeeId, $this->computerId,
+            $this->departmentId, $this->search, $this->employeeIds, $organizationId,
         );
     }
 

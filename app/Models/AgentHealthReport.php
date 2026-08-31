@@ -12,6 +12,7 @@ class AgentHealthReport extends Model
     use HasFactory;
 
     protected $fillable = [
+        'organization_id',
         'computer_id',
         'agent_version',
         'config_revision',
@@ -43,5 +44,10 @@ class AgentHealthReport extends Model
     public function computer(): BelongsTo
     {
         return $this->belongsTo(Computer::class);
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
     }
 }

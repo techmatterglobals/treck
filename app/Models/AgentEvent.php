@@ -23,6 +23,7 @@ class AgentEvent extends Model
     use HasFactory;
 
     protected $fillable = [
+        'organization_id',
         'computer_id',
         'employee_id',
         'kind',
@@ -54,6 +55,11 @@ class AgentEvent extends Model
         return $this->belongsTo(Computer::class);
     }
 
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
     /** The employee the submitting computer was assigned to at ingest time. */
     public function employee(): BelongsTo
     {
@@ -68,5 +74,12 @@ class AgentEvent extends Model
     public function scopeOfKind(Builder $query, AgentEventKind $kind): Builder
     {
         return $query->where('kind', $kind->value);
+    }
+
+    public function scopeForOrganization(Builder $query, Organization|int $organization): Builder
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        return $query->where('organization_id', $organizationId);
     }
 }

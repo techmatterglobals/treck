@@ -4,8 +4,8 @@ namespace App\Livewire\ApplicationUsage;
 
 use App\DataObjects\AppUsageFilter;
 use App\Livewire\Concerns\ScopesToViewer;
-use App\Models\Department;
 use App\Services\Reporting\ApplicationUsageService;
+use App\Services\Tenancy\MonitoringTenantAccess;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -76,10 +76,12 @@ class ApplicationUsageDashboard extends Component
             'computer_id' => $this->computerId,
             'department_id' => $this->departmentId,
             'application' => $this->application,
-        ])->restrictToEmployees($this->visibleEmployeeIds());
+        ])
+            ->restrictToEmployees($this->visibleEmployeeIds())
+            ->forOrganization($this->monitoringOrganizationId());
     }
 
-    public function render(ApplicationUsageService $usage): View
+    public function render(ApplicationUsageService $usage, MonitoringTenantAccess $tenant): View
     {
         $filter = $this->filter();
 
@@ -92,7 +94,7 @@ class ApplicationUsageDashboard extends Component
             'sessions' => $usage->recent($filter),
             'employees' => $this->visibleEmployees(),
             'computers' => $this->visibleComputers(),
-            'departments' => Department::query()->orderBy('name')->get(),
+            'departments' => $tenant->departments(auth()->user()),
         ]);
     }
 }

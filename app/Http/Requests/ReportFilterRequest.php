@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\ReportPeriod;
+use App\Services\Tenancy\MonitoringTenantAccess;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -10,7 +11,9 @@ class ReportFilterRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can('view reports') ?? false;
+        $user = $this->user();
+
+        return $user !== null && app(MonitoringTenantAccess::class)->canViewMonitoring($user);
     }
 
     public function rules(): array

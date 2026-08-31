@@ -6,6 +6,7 @@ use App\Enums\NotificationEventType;
 use App\Enums\NotificationSeverity;
 use App\Models\NotificationPreference;
 use App\Models\NotificationRule;
+use App\Services\Tenancy\MonitoringTenantAccess;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
@@ -42,7 +43,8 @@ class NotificationSettings extends Component
 
     public function mount(): void
     {
-        abort_unless(auth()->user()?->isAdministrator() ?? false, 403);
+        $user = auth()->user();
+        abort_unless($user && app(MonitoringTenantAccess::class)->canManageMonitoring($user), 403);
 
         foreach (NotificationRule::orderBy('event_type')->get() as $rule) {
             $this->rules[] = [
@@ -82,7 +84,8 @@ class NotificationSettings extends Component
 
     public function save(): void
     {
-        abort_unless(auth()->user()?->isAdministrator() ?? false, 403);
+        $user = auth()->user();
+        abort_unless($user && app(MonitoringTenantAccess::class)->canManageMonitoring($user), 403);
 
         foreach ($this->rules as $row) {
             $channels = array_values(array_filter([

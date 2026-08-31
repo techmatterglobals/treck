@@ -4,18 +4,14 @@ namespace App\Http\Controllers;
 
 use App\DataObjects\ReportFilter;
 use App\Enums\ReportPeriod;
-use App\Enums\UserRole;
 use App\Exports\ProductivityReportExport;
 use App\Http\Requests\ReportFilterRequest;
-use App\Models\Department;
 use App\Models\Employee;
-use App\Models\User;
-use App\Services\Hierarchy\EmployeeVisibility;
 use App\Services\Reporting\ReportService;
+use App\Services\Tenancy\MonitoringTenantAccess;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -28,9 +24,9 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class ReportController extends Controller
 {
-    public function index(ReportFilterRequest $request, ReportService $service, EmployeeVisibility $visibility): View
+    public function index(ReportFilterRequest $request, ReportService $service, MonitoringTenantAccess $tenant): View
     {
-        $filter = $this->scopedFilter($request, $visibility);
+        $filter = $this->scopedFilter($request, $tenant);
         $rows = $service->paginate($filter, 50);
 
         return view('reports.index', [
@@ -38,18 +34,16 @@ class ReportController extends Controller
             'rows' => $rows,
             'totals' => $service->totalsFor($filter, $rows->total()),
             'periods' => ReportPeriod::cases(),
-            'employees' => $this->visibleEmployees($visibility),
-            'departments' => Department::orderBy('name')->get(),
+            'employees' => $tenant->employees($request->user()),
+            'departments' => $tenant->departments($request->user()),
             // Managers filter is only meaningful for the Super Admin.
-            'managers' => $request->user()->isSuperAdmin()
-                ? User::query()->withRole(UserRole::Manager)->orderBy('name')->get()
-                : collect(),
+            'managers' => collect(),
         ]);
     }
 
-    public function exportExcel(ReportFilterRequest $request, ReportService $service, EmployeeVisibility $visibility): BinaryFileResponse
+    public function exportExcel(ReportFilterRequest $request, ReportService $service, MonitoringTenantAccess $tenant): BinaryFileResponse
     {
-        $filter = $this->scopedFilter($request, $visibility);
+        $filter = $this->scopedFilter($request, $tenant);
         $rows = $service->build($filter);
 
         return Excel::download(
@@ -58,9 +52,9 @@ class ReportController extends Controller
         );
     }
 
-    public function exportPdf(ReportFilterRequest $request, ReportService $service, EmployeeVisibility $visibility): Response
+    public function exportPdf(ReportFilterRequest $request, ReportService $service, MonitoringTenantAccess $tenant): Response
     {
-        $filter = $this->scopedFilter($request, $visibility);
+        $filter = $this->scopedFilter($request, $tenant);
         $rows = $service->build($filter);
 
         $pdf = Pdf::loadView('reports.pdf', [
@@ -73,10 +67,11 @@ class ReportController extends Controller
     }
 
     /** Computer Usage History (Phase 11): who used each computer, and when. */
-    public function computerUsage(Request $request, ReportService $service, EmployeeVisibility $visibility): View
+    public function computerUsage(Request $request, ReportService $service, MonitoringTenantAccess $tenant): View
     {
         $filter = ReportFilter::fromArray($request->all())
-            ->restrictToEmployees($visibility->employeeIds($request->user()));
+            ->restrictToEmployees($tenant->visibleEmployeeIds($request->user()))
+            ->forOrganization($tenant->organizationId($request->user()));
 
         return view('reports.computer-usage', [
             'filter' => $filter,
@@ -90,19 +85,10 @@ class ReportController extends Controller
      * Applied to the index AND exports so a scoped user can never export
      * out-of-scope data.
      */
-    private function scopedFilter(ReportFilterRequest $request, EmployeeVisibility $visibility): ReportFilter
+    private function scopedFilter(ReportFilterRequest $request, MonitoringTenantAccess $tenant): ReportFilter
     {
         return ReportFilter::fromArray($request->validated())
-            ->restrictToEmployees($visibility->employeeIds($request->user()));
-    }
-
-    private function visibleEmployees(EmployeeVisibility $visibility): Collection
-    {
-        $ids = $visibility->employeeIds(request()->user());
-
-        return Employee::query()
-            ->with('user')
-            ->when($ids !== null, fn ($q) => $q->whereIn('id', $ids ?: [0]))
-            ->get();
+            ->restrictToEmployees($tenant->visibleEmployeeIds($request->user()))
+            ->forOrganization($tenant->organizationId($request->user()));
     }
 }

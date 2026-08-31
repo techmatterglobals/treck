@@ -2,10 +2,8 @@
 
 namespace App\Livewire\Concerns;
 
-use App\Models\Computer;
-use App\Models\Employee;
 use App\Models\User;
-use App\Services\Hierarchy\EmployeeVisibility;
+use App\Services\Tenancy\MonitoringTenantAccess;
 use Illuminate\Support\Collection;
 
 /**
@@ -23,7 +21,10 @@ trait ScopesToViewer
     {
         $user = auth()->user();
 
-        abort_unless($user instanceof User && ($user->isSuperAdmin() || $user->isManager()), 403);
+        abort_unless(
+            $user instanceof User && app(MonitoringTenantAccess::class)->canViewMonitoring($user),
+            403,
+        );
 
         return $user;
     }
@@ -36,7 +37,12 @@ trait ScopesToViewer
      */
     protected function visibleEmployeeIds(): ?array
     {
-        return app(EmployeeVisibility::class)->employeeIds(auth()->user());
+        return app(MonitoringTenantAccess::class)->visibleEmployeeIds(auth()->user());
+    }
+
+    protected function monitoringOrganizationId(): int
+    {
+        return app(MonitoringTenantAccess::class)->organizationId(auth()->user());
     }
 
     /** Employees the viewer may pick in a filter dropdown (scoped). */
@@ -44,22 +50,12 @@ trait ScopesToViewer
     {
         $ids = $this->visibleEmployeeIds();
 
-        return Employee::query()
-            ->with('user')
-            ->when($ids !== null, fn ($q) => $q->whereIn('id', $ids ?: [0]))
-            ->get()
-            ->sortBy('name')
-            ->values();
+        return app(MonitoringTenantAccess::class)->employees(auth()->user());
     }
 
     /** Computers the viewer may pick in a filter dropdown (scoped). */
     protected function visibleComputers(): Collection
     {
-        $ids = app(EmployeeVisibility::class)->computerIds(auth()->user());
-
-        return Computer::query()
-            ->when($ids !== null, fn ($q) => $q->whereIn('id', $ids ?: [0]))
-            ->orderBy('hostname')
-            ->get();
+        return app(MonitoringTenantAccess::class)->computers(auth()->user());
     }
 }

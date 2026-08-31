@@ -4,6 +4,8 @@ namespace App\Policies;
 
 use App\Models\FileDownload;
 use App\Models\User;
+use App\Services\Tenancy\MonitoringTenantAccess;
+use Throwable;
 
 /**
  * Authorization for File Download Monitoring (Phase 12). Auto-discovered
@@ -15,17 +17,31 @@ class FileDownloadPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->isSuperAdmin() || $user->isManager();
+        try {
+            return app(MonitoringTenantAccess::class)->canViewMonitoring($user);
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     public function view(User $user, FileDownload $download): bool
     {
-        if ($user->isSuperAdmin()) {
-            return true;
-        }
+        try {
+            $access = app(MonitoringTenantAccess::class);
 
-        return $user->isManager()
-            && $download->employee_id !== null
-            && $download->employee?->manager_user_id === $user->id;
+            if ($download->organization_id === null
+                || (int) $download->organization_id !== $access->organizationId($user)) {
+                return false;
+            }
+
+            if ($access->canManageMonitoring($user)) {
+                return true;
+            }
+
+            return $download->employee_id !== null
+                && $access->canSeeEmployee($user, (int) $download->employee_id);
+        } catch (Throwable) {
+            return false;
+        }
     }
 }

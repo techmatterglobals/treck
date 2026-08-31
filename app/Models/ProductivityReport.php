@@ -13,6 +13,7 @@ class ProductivityReport extends Model
     use HasFactory;
 
     protected $fillable = [
+        'organization_id',
         'employee_id',
         'period_type',
         'period_date',
@@ -37,9 +38,21 @@ class ProductivityReport extends Model
         return $this->belongsTo(Employee::class);
     }
 
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
     public function scopeOfType(Builder $query, ReportPeriod $type): Builder
     {
         return $query->where('period_type', $type->value);
+    }
+
+    public function scopeForOrganization(Builder $query, Organization|int $organization): Builder
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        return $query->where('organization_id', $organizationId);
     }
 
     public function scopeForEmployee(Builder $query, int $employeeId): Builder

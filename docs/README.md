@@ -41,6 +41,10 @@ directly to the area you need.
 | 31 | [Multi-User Computers & Manager Hierarchy](31-multi-user-computer-and-manager-hierarchy.md) | Phase 11: Super Admin→Manager→Employee hierarchy, shared computers, Windows-username resolution, role-scoped dashboards & reports |
 | 32 | [File Download Monitoring](32-file-download-monitoring.md) | Phase 12: opt-in download detection (metadata only), projector, role-scoped dashboard/reports/export, configurable alerts |
 | 33 | [Windows Desktop Applications](33-windows-desktop-applications.md) | Silent employee-agent improvements, separate WPF admin client, API/security boundaries, packaging, milestones, and acceptance criteria |
+| 34 | [SaaS Tenancy Phase A1](34-saas-tenancy-phase-a1.md) | Organization and membership foundation |
+| 35 | [SaaS Tenancy Phase A2](35-saas-tenancy-phase-a2.md) | Organization-scoped authorization foundation |
+| 36 | [SaaS Tenancy Phase B1](36-saas-tenancy-phase-b1.md) | Core tenant data ownership |
+| 37 | [SaaS Tenancy Phase B2](37-saas-tenancy-phase-b2.md) | Monitoring and reporting tenant isolation |
 
 ## Deployment artifacts
 

@@ -6,9 +6,9 @@ use App\Enums\AgentEventKind;
 use App\Enums\PresenceStatus;
 use App\Models\AgentEvent;
 use App\Models\Computer;
-use App\Services\Hierarchy\EmployeeVisibility;
 use App\Services\Presence\PresenceService;
 use App\Services\Reporting\ApplicationUsageService;
+use App\Services\Tenancy\MonitoringTenantAccess;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
@@ -23,17 +23,13 @@ class ComputerPresenceDetail extends Component
 {
     public int $computerId;
 
-    public function mount(Computer $computer): void
+    public function mount(Computer $computer, MonitoringTenantAccess $tenant): void
     {
         $user = auth()->user();
-        abort_unless($user && ($user->isSuperAdmin() || $user->isManager()), 403);
+        abort_unless($user && $tenant->canViewMonitoring($user), 403);
 
-        // A Manager may only open a computer belonging to one of their employees
-        // (Phase 11); the Super Admin may open any.
-        abort_unless(
-            app(EmployeeVisibility::class)->canSeeComputer($user, $computer->id),
-            403,
-        );
+        $computer = $tenant->computer($computer, $user);
+        abort_unless($tenant->canSeeComputer($user, $computer->id), 403);
 
         $this->computerId = $computer->id;
     }
@@ -57,11 +53,10 @@ class ComputerPresenceDetail extends Component
         return app(PresenceService::class)->duration($seconds);
     }
 
-    public function render(ApplicationUsageService $appUsage): View
+    public function render(ApplicationUsageService $appUsage, MonitoringTenantAccess $tenant): View
     {
-        $computer = Computer::query()
-            ->with(['employee.department', 'presence'])
-            ->findOrFail($this->computerId);
+        $computer = $tenant->computer($this->computerId, auth()->user())
+            ->load(['employee.department', 'presence']);
 
         // Application usage (Phase 7): the most recent completed session is the
         // "current" application, plus recent history and today's per-app summary.
@@ -70,6 +65,7 @@ class ComputerPresenceDetail extends Component
         $dailyApps = $appUsage->dailySummaryForComputer($computer);
 
         $recentSessions = AgentEvent::query()
+            ->forOrganization($computer->organization_id)
             ->where('computer_id', $computer->id)
             ->where('kind', AgentEventKind::Session->value)
             ->latest('occurred_at')
@@ -77,6 +73,7 @@ class ComputerPresenceDetail extends Component
             ->get();
 
         $recentHeartbeats = AgentEvent::query()
+            ->forOrganization($computer->organization_id)
             ->where('computer_id', $computer->id)
             ->where('kind', AgentEventKind::Heartbeat->value)
             ->latest('occurred_at')

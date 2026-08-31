@@ -9,6 +9,7 @@ use App\Http\Requests\Agent\AgentLoginRequest;
 use App\Http\Requests\Agent\AgentLogoutRequest;
 use App\Models\ActivityLog;
 use App\Models\Computer;
+use App\Services\Tenancy\MonitoringTenantOwnership;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\Response;
@@ -24,7 +25,7 @@ use Symfony\Component\HttpFoundation\Response;
 class WorkSessionController extends Controller
 {
     /** POST /api/agent/login */
-    public function login(AgentLoginRequest $request): JsonResponse
+    public function login(AgentLoginRequest $request, MonitoringTenantOwnership $ownership): JsonResponse
     {
         /** @var Computer $computer */
         $computer = $request->user();
@@ -50,6 +51,7 @@ class WorkSessionController extends Controller
 
         // Idempotent: reuse an already-open session instead of duplicating.
         $session = $computer->openSession() ?? ActivityLog::create([
+            'organization_id' => $ownership->resolve($computer, $computer->employee_id)->organizationId,
             'employee_id' => $computer->employee_id,
             'computer_id' => $computer->id,
             'login_at' => $loginAt,

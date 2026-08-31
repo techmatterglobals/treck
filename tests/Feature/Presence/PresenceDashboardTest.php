@@ -2,12 +2,14 @@
 
 namespace Tests\Feature\Presence;
 
+use App\Enums\OrganizationRole;
 use App\Enums\PresenceStatus;
 use App\Livewire\Presence\ComputerPresenceDetail;
 use App\Livewire\Presence\PresenceBoard;
 use App\Models\Computer;
 use App\Models\ComputerPresence;
 use App\Models\Employee;
+use App\Models\Organization;
 use App\Models\User;
 use App\Services\Presence\PresenceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,32 +24,41 @@ class PresenceDashboardTest extends TestCase
 {
     use RefreshDatabase;
 
+    private Organization $organization;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->withoutVite();
         Role::findOrCreate('admin', 'web');
         Role::findOrCreate('employee', 'web');
+        $this->organization = Organization::factory()->create();
     }
 
     private function admin(): User
     {
-        return tap(User::factory()->create(), fn (User $u) => $u->assignRole('admin'));
+        return tap(User::factory()->create(), function (User $u) {
+            $u->assignRole('admin');
+            $this->grantOrganizationRole($u, $this->organization, OrganizationRole::Admin);
+        });
     }
 
     private function employee(): User
     {
-        return tap(User::factory()->create(), fn (User $u) => $u->assignRole('employee'));
+        return tap(User::factory()->create(), function (User $u) {
+            $u->assignRole('employee');
+            $this->grantOrganizationRole($u, $this->organization, OrganizationRole::Employee);
+        });
     }
 
     private function presence(PresenceStatus $status): ComputerPresence
     {
-        $computer = Computer::factory()->create([
-            'employee_id' => Employee::factory()->create()->id,
+        $employee = Employee::factory()->forOrganization($this->organization)->create();
+        $computer = Computer::factory()->forEmployee($employee)->create([
             'paired_at' => now(),
         ]);
 
-        return ComputerPresence::factory()->status($status)->for($computer)->create();
+        return ComputerPresence::factory()->forComputer($computer)->status($status)->create();
     }
 
     // ---- Authorization -----------------------------------------------------
@@ -83,7 +94,8 @@ class PresenceDashboardTest extends TestCase
         $this->presence(PresenceStatus::LoggedOut);
         $this->presence(PresenceStatus::Offline);
         // A computer with no presence row counts as offline.
-        Computer::factory()->create(['employee_id' => Employee::factory()->create()->id]);
+        $employee = Employee::factory()->forOrganization($this->organization)->create();
+        Computer::factory()->forEmployee($employee)->create();
 
         $summary = app(PresenceService::class)->summary();
 
@@ -120,9 +132,10 @@ class PresenceDashboardTest extends TestCase
     public function test_presence_never_exposes_device_tokens(): void
     {
         $this->actingAs($this->admin());
-        $computer = Computer::factory()->create(['employee_id' => Employee::factory()->create()->id, 'paired_at' => now()]);
+        $employee = Employee::factory()->forOrganization($this->organization)->create();
+        $computer = Computer::factory()->forEmployee($employee)->create(['paired_at' => now()]);
         $plain = $computer->createToken('agent', ['agent:report'])->plainTextToken;
-        ComputerPresence::factory()->for($computer)->create();
+        ComputerPresence::factory()->forComputer($computer)->create();
 
         $response = $this->get('/presence');
         $response->assertOk();

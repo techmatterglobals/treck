@@ -49,6 +49,56 @@ class Organization extends Model
         return $this->hasMany(Computer::class);
     }
 
+    public function activityLogs(): HasMany
+    {
+        return $this->hasMany(ActivityLog::class);
+    }
+
+    public function agentEvents(): HasMany
+    {
+        return $this->hasMany(AgentEvent::class);
+    }
+
+    public function agentHealthReports(): HasMany
+    {
+        return $this->hasMany(AgentHealthReport::class);
+    }
+
+    public function applicationUsage(): HasMany
+    {
+        return $this->hasMany(ApplicationUsage::class);
+    }
+
+    public function attendance(): HasMany
+    {
+        return $this->hasMany(Attendance::class);
+    }
+
+    public function computerPresence(): HasMany
+    {
+        return $this->hasMany(ComputerPresence::class);
+    }
+
+    public function fileDownloads(): HasMany
+    {
+        return $this->hasMany(FileDownload::class);
+    }
+
+    public function notificationLogs(): HasMany
+    {
+        return $this->hasMany(NotificationLog::class);
+    }
+
+    public function productivityReports(): HasMany
+    {
+        return $this->hasMany(ProductivityReport::class);
+    }
+
+    public function screenshots(): HasMany
+    {
+        return $this->hasMany(Screenshot::class);
+    }
+
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class)

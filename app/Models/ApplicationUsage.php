@@ -18,6 +18,7 @@ class ApplicationUsage extends Model
     protected $table = 'application_usage';
 
     protected $fillable = [
+        'organization_id',
         'employee_id',
         'computer_id',
         'activity_log_id',
@@ -52,6 +53,11 @@ class ApplicationUsage extends Model
         return $this->belongsTo(Employee::class);
     }
 
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
     /** The computer the application ran on (N:1). */
     public function computer(): BelongsTo
     {
@@ -84,6 +90,13 @@ class ApplicationUsage extends Model
     public function scopeRated(Builder $query, ProductivityRating $rating): Builder
     {
         return $query->where('productivity', $rating->value);
+    }
+
+    public function scopeForOrganization(Builder $query, Organization|int $organization): Builder
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        return $query->where('organization_id', $organizationId);
     }
 
     /** Only productive usage. */

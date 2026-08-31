@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Computer;
 use App\Models\Employee;
+use App\Models\Organization;
 use App\Models\Screenshot;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -29,6 +30,7 @@ class ScreenshotFactory extends Factory
         $height = fake()->randomElement([1080, 1440, 768]);
 
         return [
+            'organization_id' => null,
             'employee_id' => Employee::factory(),
             'computer_id' => Computer::factory(),
             'activity_log_id' => null,
@@ -46,5 +48,21 @@ class ScreenshotFactory extends Factory
             'active_window_title' => $title,
             'session_id' => (string) fake()->uuid(),
         ];
+    }
+
+    public function forOrganization(Organization|int $organization): static
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        return $this->state(fn () => ['organization_id' => $organizationId]);
+    }
+
+    public function forComputer(Computer $computer): static
+    {
+        return $this->state(fn () => [
+            'organization_id' => $computer->organization_id,
+            'computer_id' => $computer->id,
+            'employee_id' => $computer->employee_id,
+        ]);
     }
 }

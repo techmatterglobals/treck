@@ -22,6 +22,7 @@ class ComputerPresence extends Model
     protected $table = 'computer_presence';
 
     protected $fillable = [
+        'organization_id',
         'computer_id',
         'status',
         'last_heartbeat_at',
@@ -54,6 +55,11 @@ class ComputerPresence extends Model
         return $this->belongsTo(Computer::class);
     }
 
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
     /**
      * Rows currently counted as "online" (Active / Idle / Locked). The column is
      * table-qualified so the scope is safe when joined to `computers` (which also
@@ -66,5 +72,12 @@ class ComputerPresence extends Model
             PresenceStatus::Idle->value,
             PresenceStatus::Locked->value,
         ]);
+    }
+
+    public function scopeForOrganization(Builder $query, Organization|int $organization): Builder
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        return $query->where('computer_presence.organization_id', $organizationId);
     }
 }

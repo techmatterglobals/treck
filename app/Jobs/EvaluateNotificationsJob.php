@@ -28,6 +28,7 @@ class EvaluateNotificationsJob implements ShouldQueue
         public readonly ?int $computerId = null,
         public readonly ?int $employeeId = null,
         public readonly array $data = [],
+        public readonly ?int $organizationId = null,
     ) {}
 
     public function handle(NotificationEngine $engine): void
@@ -42,6 +43,7 @@ class EvaluateNotificationsJob implements ShouldQueue
             data: $this->data,
             computer: $computer,
             employee: $employee,
+            organizationId: $this->organizationId,
         ));
     }
 }

@@ -20,6 +20,7 @@ class NotificationContext
         public readonly ?Computer $computer = null,
         public readonly ?Employee $employee = null,
         public readonly ?Carbon $occurredAt = null,
+        public readonly ?int $organizationId = null,
     ) {}
 
     public function get(string $key, mixed $default = null): mixed

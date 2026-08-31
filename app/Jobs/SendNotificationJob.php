@@ -24,11 +24,17 @@ class SendNotificationJob implements ShouldQueue
 
     public int $backoff = 30;
 
-    public function __construct(public readonly int $notificationLogId) {}
+    public function __construct(
+        public readonly int $notificationLogId,
+        public readonly ?int $organizationId = null,
+    ) {}
 
     public function handle(NotificationDeliveryService $delivery): void
     {
-        $log = NotificationLog::find($this->notificationLogId);
+        $log = NotificationLog::query()
+            ->whereKey($this->notificationLogId)
+            ->when($this->organizationId !== null, fn ($query) => $query->where('organization_id', $this->organizationId))
+            ->first();
 
         if ($log === null || $log->status === 'delivered') {
             return; // deleted, or already delivered by a prior attempt
@@ -40,6 +46,7 @@ class SendNotificationJob implements ShouldQueue
     public function failed(\Throwable $e): void
     {
         NotificationLog::where('id', $this->notificationLogId)
+            ->when($this->organizationId !== null, fn ($query) => $query->where('organization_id', $this->organizationId))
             ->where('status', '!=', 'delivered')
             ->update(['status' => 'failed']);
     }

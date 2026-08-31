@@ -137,11 +137,13 @@ class ManagerScopingTest extends TestCase
         [, $e2, $c2] = $this->team($m2, 'Zain');
 
         ApplicationUsage::factory()->create([
+            'organization_id' => $this->organization->id,
             'employee_id' => $e1->id, 'computer_id' => $c1->id,
             'application_name' => 'AlphaApp', 'used_at' => today()->setTime(9, 0),
             'duration_seconds' => 600, 'session_id' => 's1',
         ]);
         ApplicationUsage::factory()->create([
+            'organization_id' => $this->organization->id,
             'employee_id' => $e2->id, 'computer_id' => $c2->id,
             'application_name' => 'BetaApp', 'used_at' => today()->setTime(9, 0),
             'duration_seconds' => 600, 'session_id' => 's2',
@@ -167,6 +169,7 @@ class ManagerScopingTest extends TestCase
     public function test_employee_without_role_is_denied_dashboards(): void
     {
         $employee = tap(User::factory()->create(), fn (User $u) => $u->assignRole('employee'));
+        $this->grantOrganizationRole($employee, $this->organization, OrganizationRole::Employee);
 
         Livewire::actingAs($employee)->test(PresenceBoard::class)->assertForbidden();
         Livewire::actingAs($employee)->test(ApplicationUsageDashboard::class)->assertForbidden();

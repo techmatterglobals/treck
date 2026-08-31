@@ -21,9 +21,10 @@ class FileDownloadService
     public function query(DownloadFilter $filter): Builder
     {
         return FileDownload::query()
+            ->when($filter->organizationId !== null, fn (Builder $q) => $q->where('file_downloads.organization_id', $filter->organizationId))
             ->whereBetween('downloaded_at', [$filter->from, $filter->to])
-            ->when($filter->employeeId, fn (Builder $q) => $q->where('employee_id', $filter->employeeId))
-            ->when($filter->computerId, fn (Builder $q) => $q->where('computer_id', $filter->computerId))
+            ->when($filter->employeeId, fn (Builder $q) => $q->where('file_downloads.employee_id', $filter->employeeId))
+            ->when($filter->computerId, fn (Builder $q) => $q->where('file_downloads.computer_id', $filter->computerId))
             ->when($filter->extension, fn (Builder $q) => $q->where('file_extension', $filter->extension))
             ->when($filter->application, fn (Builder $q) => $q->where('application_name', 'like', "%{$filter->application}%"))
             ->when($filter->search, fn (Builder $q) => $q->matching($filter->search))
@@ -32,7 +33,7 @@ class FileDownloadService
                 fn (Builder $e) => $e->where('manager_user_id', $filter->managerUserId),
             ))
             // Manager/employee visibility restriction (Phase 11); null = unrestricted.
-            ->when($filter->employeeIds !== null, fn (Builder $q) => $q->whereIn('employee_id', $filter->employeeIds ?: [0]));
+            ->when($filter->employeeIds !== null, fn (Builder $q) => $q->whereIn('file_downloads.employee_id', $filter->employeeIds ?: [0]));
     }
 
     /** Paginated, sortable list, newest first by default. */

@@ -28,6 +28,7 @@ class ApplicationUsageObserver
                 'executable' => $usage->executable,
                 'duration_seconds' => (int) $usage->duration_seconds,
             ],
+            organizationId: $usage->organization_id,
         );
     }
 }

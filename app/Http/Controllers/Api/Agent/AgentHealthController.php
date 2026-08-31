@@ -5,11 +5,12 @@ namespace App\Http\Controllers\Api\Agent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Agent\StoreAgentHealthRequest;
 use App\Models\AgentHealthReport;
+use App\Services\Tenancy\MonitoringTenantOwnership;
 use Illuminate\Http\JsonResponse;
 
 class AgentHealthController extends Controller
 {
-    public function __invoke(StoreAgentHealthRequest $request): JsonResponse
+    public function __invoke(StoreAgentHealthRequest $request, MonitoringTenantOwnership $ownership): JsonResponse
     {
         $computer = $request->user();
         $data = $request->validated();
@@ -18,6 +19,7 @@ class AgentHealthController extends Controller
         $report = AgentHealthReport::updateOrCreate(
             ['computer_id' => $computer->id],
             [
+                'organization_id' => $ownership->forComputer($computer),
                 'agent_version' => $data['agent_version'],
                 'config_revision' => $data['config_revision'],
                 'pending_event_count' => $data['pending_event_count'],

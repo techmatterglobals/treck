@@ -19,7 +19,7 @@ class NotificationLog extends Model
     use HasFactory;
 
     protected $fillable = [
-        'recipient_id', 'computer_id', 'employee_id', 'event_type', 'severity',
+        'organization_id', 'recipient_id', 'computer_id', 'employee_id', 'event_type', 'severity',
         'title', 'message', 'channel', 'dedupe_key', 'status', 'delivered_at',
         'read_at', 'metadata',
     ];
@@ -38,6 +38,11 @@ class NotificationLog extends Model
     public function recipient(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recipient_id');
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
     }
 
     public function computer(): BelongsTo
@@ -69,6 +74,13 @@ class NotificationLog extends Model
     public function scopeForRecipient(Builder $query, int $userId): Builder
     {
         return $query->where('recipient_id', $userId);
+    }
+
+    public function scopeForOrganization(Builder $query, Organization|int $organization): Builder
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        return $query->where('organization_id', $organizationId);
     }
 
     public function scopeInApp(Builder $query): Builder

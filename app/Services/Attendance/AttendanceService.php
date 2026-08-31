@@ -22,6 +22,7 @@ class AttendanceService
 
         $sessions = ActivityLog::whereDate('work_date', $dateStr)
             ->selectRaw('employee_id,
+                MAX(organization_id) as organization_id,
                 MIN(login_at)  as first_in,
                 MAX(logout_at) as last_out,
                 SUM(active_seconds) as active,
@@ -47,6 +48,7 @@ class AttendanceService
 
             if ($row === null) {
                 $attendance->fill([
+                    'organization_id' => $employee->organization_id,
                     'first_in_at' => null,
                     'last_out_at' => null,
                     'work_seconds' => 0,
@@ -69,6 +71,7 @@ class AttendanceService
             $firstIn = Carbon::parse($row->first_in, 'UTC')->timezone($tz);
 
             $attendance->fill([
+                'organization_id' => $row->organization_id !== null ? (int) $row->organization_id : $employee->organization_id,
                 'first_in_at' => $firstIn,
                 'last_out_at' => $row->last_out ? Carbon::parse($row->last_out, 'UTC')->timezone($tz) : null,
                 'work_seconds' => $work,

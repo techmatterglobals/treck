@@ -4,12 +4,14 @@ namespace Tests\Feature\Notifications;
 
 use App\Enums\NotificationEventType;
 use App\Enums\NotificationSeverity;
+use App\Enums\OrganizationRole;
 use App\Livewire\Notifications\NotificationBell;
 use App\Livewire\Notifications\NotificationDashboard;
 use App\Livewire\Notifications\NotificationSettings;
 use App\Models\NotificationLog;
 use App\Models\NotificationPreference;
 use App\Models\NotificationRule;
+use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -25,27 +27,37 @@ class NotificationDashboardTest extends TestCase
 {
     use RefreshDatabase;
 
+    private Organization $organization;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->withoutVite();
         Role::findOrCreate('admin', 'web');
         Role::findOrCreate('employee', 'web');
+        $this->organization = Organization::factory()->create();
     }
 
     private function admin(): User
     {
-        return tap(User::factory()->create(), fn (User $u) => $u->assignRole('admin'));
+        return tap(User::factory()->create(), function (User $u) {
+            $u->assignRole('admin');
+            $this->grantOrganizationRole($u, $this->organization, OrganizationRole::Admin);
+        });
     }
 
     private function employee(): User
     {
-        return tap(User::factory()->create(), fn (User $u) => $u->assignRole('employee'));
+        return tap(User::factory()->create(), function (User $u) {
+            $u->assignRole('employee');
+            $this->grantOrganizationRole($u, $this->organization, OrganizationRole::Employee);
+        });
     }
 
     private function inApp(User $user, array $attrs = []): NotificationLog
     {
         return NotificationLog::factory()->create(array_merge([
+            'organization_id' => $this->organization->id,
             'recipient_id' => $user->id,
             'channel' => 'in_app',
         ], $attrs));

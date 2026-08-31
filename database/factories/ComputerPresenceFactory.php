@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Enums\PresenceStatus;
 use App\Models\Computer;
 use App\Models\ComputerPresence;
+use App\Models\Organization;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class ComputerPresenceFactory extends Factory
@@ -16,6 +17,7 @@ class ComputerPresenceFactory extends Factory
         $now = now();
 
         return [
+            'organization_id' => null,
             'computer_id' => Computer::factory(),
             'status' => PresenceStatus::Active,
             'last_heartbeat_at' => $now,
@@ -41,6 +43,21 @@ class ComputerPresenceFactory extends Factory
             'last_heartbeat_at' => $old,
             'last_event_at' => $old,
             'last_synced_at' => $old,
+        ]);
+    }
+
+    public function forOrganization(Organization|int $organization): static
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        return $this->state(fn () => ['organization_id' => $organizationId]);
+    }
+
+    public function forComputer(Computer $computer): static
+    {
+        return $this->state(fn () => [
+            'organization_id' => $computer->organization_id,
+            'computer_id' => $computer->id,
         ]);
     }
 }

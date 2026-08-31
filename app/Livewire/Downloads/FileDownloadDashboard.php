@@ -3,9 +3,7 @@
 namespace App\Livewire\Downloads;
 
 use App\DataObjects\DownloadFilter;
-use App\Enums\UserRole;
 use App\Livewire\Concerns\ScopesToViewer;
-use App\Models\User;
 use App\Services\Reporting\FileDownloadService;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Url;
@@ -96,7 +94,9 @@ class FileDownloadDashboard extends Component
             'extension' => $this->extension,
             'application' => $this->application,
             'search' => $this->search,
-        ])->restrictToEmployees($this->visibleEmployeeIds());
+        ])
+            ->restrictToEmployees($this->visibleEmployeeIds())
+            ->forOrganization($this->monitoringOrganizationId());
     }
 
     public function render(FileDownloadService $service): View
@@ -108,10 +108,7 @@ class FileDownloadDashboard extends Component
             'summary' => $service->summary($filter),
             'employees' => $this->visibleEmployees(),
             'computers' => $this->visibleComputers(),
-            // Manager filter is only meaningful for the Super Admin.
-            'managers' => auth()->user()->isSuperAdmin()
-                ? User::query()->withRole(UserRole::Manager)->orderBy('name')->get()
-                : collect(),
+            'managers' => collect(),
         ]);
     }
 }

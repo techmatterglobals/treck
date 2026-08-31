@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\OrganizationRole;
+use App\Services\Tenancy\CoreTenantAccess;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 
@@ -12,18 +14,22 @@ use Illuminate\Http\Request;
  */
 class DashboardController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, CoreTenantAccess $tenant): View
     {
         $user = $request->user();
 
-        if ($user->isSuperAdmin()) {
+        if ($tenant->hasAnyOrganizationRole($user, [OrganizationRole::Owner, OrganizationRole::Admin])) {
             return view('dashboard.admin');
         }
 
-        if ($user->isManager()) {
+        if ($tenant->hasAnyOrganizationRole($user, [OrganizationRole::Manager])) {
             return view('dashboard.manager');
         }
 
-        return view('dashboard.employee');
+        if ($tenant->hasAnyOrganizationRole($user, [OrganizationRole::Employee])) {
+            return view('dashboard.employee');
+        }
+
+        abort(403);
     }
 }

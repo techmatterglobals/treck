@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\AgentHealthReport;
 use App\Models\Computer;
+use App\Models\Organization;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class AgentHealthReportFactory extends Factory
@@ -13,6 +14,7 @@ class AgentHealthReportFactory extends Factory
     public function definition(): array
     {
         return [
+            'organization_id' => null,
             'computer_id' => Computer::factory(),
             'agent_version' => '1.0.0',
             'config_revision' => 'default',
@@ -26,5 +28,20 @@ class AgentHealthReportFactory extends Factory
             'reported_at' => now(),
             'received_at' => now(),
         ];
+    }
+
+    public function forOrganization(Organization|int $organization): static
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        return $this->state(fn () => ['organization_id' => $organizationId]);
+    }
+
+    public function forComputer(Computer $computer): static
+    {
+        return $this->state(fn () => [
+            'organization_id' => $computer->organization_id,
+            'computer_id' => $computer->id,
+        ]);
     }
 }

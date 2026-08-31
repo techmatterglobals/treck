@@ -2,10 +2,12 @@
 
 namespace Tests\Feature\Downloads;
 
+use App\Enums\OrganizationRole;
 use App\Livewire\Downloads\FileDownloadDashboard;
 use App\Models\Computer;
 use App\Models\Employee;
 use App\Models\FileDownload;
+use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -21,6 +23,8 @@ class FileDownloadDashboardTest extends TestCase
 {
     use RefreshDatabase;
 
+    private Organization $organization;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -31,26 +35,31 @@ class FileDownloadDashboardTest extends TestCase
         Role::findOrCreate('admin', 'web');
         Role::findOrCreate('manager', 'web');
         Role::findOrCreate('employee', 'web');
+        $this->organization = Organization::factory()->create();
     }
 
     private function superAdmin(): User
     {
-        return tap(User::factory()->create(), fn (User $u) => $u->assignRole('admin'));
+        return tap(User::factory()->create(), function (User $u) {
+            $u->assignRole('admin');
+            $this->grantOrganizationRole($u, $this->organization, OrganizationRole::Admin);
+        });
     }
 
     private function manager(): User
     {
-        return tap(User::factory()->create(), fn (User $u) => $u->assignRole('manager'));
+        return tap(User::factory()->create(), function (User $u) {
+            $u->assignRole('manager');
+            $this->grantOrganizationRole($u, $this->organization, OrganizationRole::Manager);
+        });
     }
 
     private function download(User $manager, string $file): FileDownload
     {
-        $employee = Employee::factory()->create(['manager_user_id' => $manager->id]);
-        $computer = Computer::factory()->create(['employee_id' => $employee->id]);
+        $employee = Employee::factory()->forOrganization($this->organization)->create(['manager_user_id' => $manager->id]);
+        $computer = Computer::factory()->forEmployee($employee)->create();
 
-        return FileDownload::factory()->create([
-            'employee_id' => $employee->id,
-            'computer_id' => $computer->id,
+        return FileDownload::factory()->forComputer($computer)->create([
             'file_name' => $file,
         ]);
     }
@@ -64,7 +73,10 @@ class FileDownloadDashboardTest extends TestCase
 
     public function test_employee_is_forbidden(): void
     {
-        $employee = tap(User::factory()->create(), fn (User $u) => $u->assignRole('employee'));
+        $employee = tap(User::factory()->create(), function (User $u) {
+            $u->assignRole('employee');
+            $this->grantOrganizationRole($u, $this->organization, OrganizationRole::Employee);
+        });
         $this->actingAs($employee)->get('/downloads')->assertForbidden();
     }
 
@@ -103,10 +115,10 @@ class FileDownloadDashboardTest extends TestCase
     public function test_extension_filter_narrows_results(): void
     {
         $admin = $this->superAdmin();
-        $employee = Employee::factory()->create();
-        $computer = Computer::factory()->create(['employee_id' => $employee->id]);
-        FileDownload::factory()->create(['employee_id' => $employee->id, 'computer_id' => $computer->id, 'file_name' => 'setup.exe', 'file_extension' => 'exe']);
-        FileDownload::factory()->create(['employee_id' => $employee->id, 'computer_id' => $computer->id, 'file_name' => 'doc.pdf', 'file_extension' => 'pdf']);
+        $employee = Employee::factory()->forOrganization($this->organization)->create();
+        $computer = Computer::factory()->forEmployee($employee)->create();
+        FileDownload::factory()->forComputer($computer)->create(['file_name' => 'setup.exe', 'file_extension' => 'exe']);
+        FileDownload::factory()->forComputer($computer)->create(['file_name' => 'doc.pdf', 'file_extension' => 'pdf']);
 
         Livewire::actingAs($admin)->test(FileDownloadDashboard::class)
             ->set('extension', 'exe')
@@ -116,7 +128,10 @@ class FileDownloadDashboardTest extends TestCase
 
     public function test_non_admin_cannot_mount_component(): void
     {
-        $employee = tap(User::factory()->create(), fn (User $u) => $u->assignRole('employee'));
+        $employee = tap(User::factory()->create(), function (User $u) {
+            $u->assignRole('employee');
+            $this->grantOrganizationRole($u, $this->organization, OrganizationRole::Employee);
+        });
         Livewire::actingAs($employee)->test(FileDownloadDashboard::class)->assertForbidden();
     }
 
@@ -136,11 +151,9 @@ class FileDownloadDashboardTest extends TestCase
     public function test_detail_page_shows_metadata_only(): void
     {
         $admin = $this->superAdmin();
-        $employee = Employee::factory()->create();
-        $computer = Computer::factory()->create(['employee_id' => $employee->id]);
-        $download = FileDownload::factory()->create([
-            'employee_id' => $employee->id,
-            'computer_id' => $computer->id,
+        $employee = Employee::factory()->forOrganization($this->organization)->create();
+        $computer = Computer::factory()->forEmployee($employee)->create();
+        $download = FileDownload::factory()->forComputer($computer)->create([
             'file_name' => 'secret.pdf',
             'local_path' => 'C:\\Users\\x\\Downloads\\secret.pdf',
         ]);

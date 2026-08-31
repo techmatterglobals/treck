@@ -24,6 +24,7 @@ class Screenshot extends Model
     use HasFactory;
 
     protected $fillable = [
+        'organization_id',
         'employee_id',
         'computer_id',
         'activity_log_id',
@@ -67,6 +68,11 @@ class Screenshot extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
     }
 
     /** The computer the screenshot was captured on (N:1). */
@@ -117,6 +123,13 @@ class Screenshot extends Model
     public function scopeForEmployee(Builder $query, int $employeeId): Builder
     {
         return $query->where('employee_id', $employeeId);
+    }
+
+    public function scopeForOrganization(Builder $query, Organization|int $organization): Builder
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        return $query->where('organization_id', $organizationId);
     }
 
     /** Screenshots for a specific computer. */

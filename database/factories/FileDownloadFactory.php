@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Models\Computer;
 use App\Models\Employee;
 use App\Models\FileDownload;
+use App\Models\Organization;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class FileDownloadFactory extends Factory
@@ -17,6 +18,7 @@ class FileDownloadFactory extends Factory
         $name = fake()->word().'.'.$ext;
 
         return [
+            'organization_id' => null,
             'computer_id' => Computer::factory(),
             'employee_id' => Employee::factory(),
             'windows_username' => fake()->userName(),
@@ -33,5 +35,21 @@ class FileDownloadFactory extends Factory
             'session_id' => (string) fake()->uuid(),
             'event_key' => (string) fake()->unique()->uuid(),
         ];
+    }
+
+    public function forOrganization(Organization|int $organization): static
+    {
+        $organizationId = $organization instanceof Organization ? $organization->id : $organization;
+
+        return $this->state(fn () => ['organization_id' => $organizationId]);
+    }
+
+    public function forComputer(Computer $computer): static
+    {
+        return $this->state(fn () => [
+            'organization_id' => $computer->organization_id,
+            'computer_id' => $computer->id,
+            'employee_id' => $computer->employee_id,
+        ]);
     }
 }

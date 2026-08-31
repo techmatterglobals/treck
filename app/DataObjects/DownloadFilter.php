@@ -25,6 +25,7 @@ class DownloadFilter
         public readonly ?string $application = null,
         public readonly ?string $search = null,
         public readonly ?array $employeeIds = null,
+        public readonly ?int $organizationId = null,
     ) {}
 
     public static function fromArray(array $data): self
@@ -46,7 +47,15 @@ class DownloadFilter
     {
         return new self(
             $this->from, $this->to, $this->employeeId, $this->managerUserId,
-            $this->computerId, $this->extension, $this->application, $this->search, $employeeIds,
+            $this->computerId, $this->extension, $this->application, $this->search, $employeeIds, $this->organizationId,
+        );
+    }
+
+    public function forOrganization(?int $organizationId): self
+    {
+        return new self(
+            $this->from, $this->to, $this->employeeId, $this->managerUserId,
+            $this->computerId, $this->extension, $this->application, $this->search, $this->employeeIds, $organizationId,
         );
     }
 }

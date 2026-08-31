@@ -6,9 +6,11 @@ use App\Models\ActivityLog;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Services\Presence\PresenceService;
+use App\Services\Tenancy\MonitoringTenantAccess;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * Central source for all admin-dashboard metrics. Keeps query logic out of the
@@ -21,13 +23,21 @@ use Illuminate\Support\Facades\DB;
  */
 class DashboardMetricsService
 {
-    public function __construct(private readonly PresenceService $presence) {}
+    public function __construct(
+        private readonly PresenceService $presence,
+        private readonly MonitoringTenantAccess $tenant,
+    ) {}
 
     // ---- Cards -------------------------------------------------------------
 
     public function totalEmployees(): int
     {
-        return Employee::count();
+        [$organizationId, $employeeIds] = $this->tenantContext();
+
+        return Employee::query()
+            ->when($organizationId !== null, fn ($query) => $query->where('organization_id', $organizationId))
+            ->when($employeeIds !== null, fn ($query) => $query->whereIn('id', $employeeIds ?: [0]))
+            ->count();
     }
 
     /**
@@ -36,13 +46,19 @@ class DashboardMetricsService
      */
     public function onlineEmployees(): int
     {
-        return $this->presence->onlineEmployeeCount();
+        [$organizationId] = $this->tenantContext();
+
+        return $this->presence->onlineEmployeeCount($organizationId);
     }
 
     /** Present today = distinct employees with a session today. */
     public function todaysAttendance(): array
     {
+        [$organizationId, $employeeIds] = $this->tenantContext();
+
         $present = (int) ActivityLog::whereDate('work_date', today())
+            ->when($organizationId !== null, fn ($query) => $query->where('organization_id', $organizationId))
+            ->when($employeeIds !== null, fn ($query) => $query->whereIn('employee_id', $employeeIds ?: [0]))
             ->distinct()
             ->count('employee_id');
 
@@ -60,7 +76,11 @@ class DashboardMetricsService
     {
         $date = $date ? Carbon::parse($date) : today();
 
+        [$organizationId, $employeeIds] = $this->tenantContext();
+
         $row = ActivityLog::whereDate('work_date', $date)
+            ->when($organizationId !== null, fn ($query) => $query->where('organization_id', $organizationId))
+            ->when($employeeIds !== null, fn ($query) => $query->whereIn('employee_id', $employeeIds ?: [0]))
             ->selectRaw('COALESCE(SUM(active_seconds),0) a, COALESCE(SUM(idle_seconds),0) i')
             ->first();
 
@@ -77,7 +97,9 @@ class DashboardMetricsService
      */
     public function employeeStatusRows(): Collection
     {
-        return $this->presence->employeeRows();
+        [$organizationId, $employeeIds] = $this->tenantContext();
+
+        return $this->presence->employeeRows($organizationId, $employeeIds);
     }
 
     // ---- Charts ------------------------------------------------------------
@@ -87,7 +109,11 @@ class DashboardMetricsService
     {
         $from = today()->subDays($days - 1);
 
+        [$organizationId, $employeeIds] = $this->tenantContext();
+
         $rows = ActivityLog::whereBetween('work_date', [$from, today()])
+            ->when($organizationId !== null, fn ($query) => $query->where('organization_id', $organizationId))
+            ->when($employeeIds !== null, fn ($query) => $query->whereIn('employee_id', $employeeIds ?: [0]))
             ->groupBy('work_date')
             ->selectRaw('work_date, SUM(active_seconds) a, SUM(idle_seconds) i')
             ->get()
@@ -111,25 +137,57 @@ class DashboardMetricsService
     {
         $date = $date ? Carbon::parse($date) : today();
 
+        [$organizationId, $employeeIds] = $this->tenantContext();
+
         $grouped = DB::table('activity_logs')
             ->join('employees', 'employees.id', '=', 'activity_logs.employee_id')
+            ->when($organizationId !== null, fn ($query) => $query
+                ->where('activity_logs.organization_id', $organizationId)
+                ->where('employees.organization_id', $organizationId))
+            ->when($employeeIds !== null, fn ($query) => $query->whereIn('employees.id', $employeeIds ?: [0]))
             ->whereDate('activity_logs.work_date', $date)
             ->groupBy('employees.department_id')
             ->selectRaw('employees.department_id, SUM(active_seconds) a, SUM(idle_seconds) i')
             ->get()
             ->keyBy('department_id');
 
-        return Department::orderBy('name')->get()->map(function (Department $dept) use ($grouped) {
-            $row = $grouped->get($dept->id);
+        return Department::query()
+            ->when($organizationId !== null, fn ($query) => $query->where('organization_id', $organizationId))
+            ->orderBy('name')
+            ->get()
+            ->map(function (Department $dept) use ($grouped) {
+                $row = $grouped->get($dept->id);
 
-            return [
-                'department' => $dept->name,
-                'ratio' => $this->ratio((int) ($row->a ?? 0), (int) ($row->i ?? 0)),
-            ];
-        })->all();
+                return [
+                    'department' => $dept->name,
+                    'ratio' => $this->ratio((int) ($row->a ?? 0), (int) ($row->i ?? 0)),
+                ];
+            })->all();
     }
 
     // ---- Helpers -----------------------------------------------------------
+
+    /**
+     * @return array{0:int|null,1:list<int>|null}
+     */
+    private function tenantContext(): array
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return [null, null];
+        }
+
+        try {
+            if (! $this->tenant->canViewMonitoring($user)) {
+                return [null, []];
+            }
+
+            return [$this->tenant->organizationId($user), $this->tenant->visibleEmployeeIds($user)];
+        } catch (Throwable) {
+            return [null, []];
+        }
+    }
 
     private function ratio(int $active, int $idle): float
     {

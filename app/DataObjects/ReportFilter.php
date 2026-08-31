@@ -23,6 +23,7 @@ class ReportFilter
         public readonly Carbon $to,
         public readonly ?int $managerUserId = null,
         public readonly ?array $employeeIds = null,
+        public readonly ?int $organizationId = null,
     ) {}
 
     /** Return a copy restricted to a visible-employee id set (null = unrestricted). */
@@ -30,7 +31,15 @@ class ReportFilter
     {
         return new self(
             $this->period, $this->employeeId, $this->departmentId,
-            $this->from, $this->to, $this->managerUserId, $employeeIds,
+            $this->from, $this->to, $this->managerUserId, $employeeIds, $this->organizationId,
+        );
+    }
+
+    public function forOrganization(?int $organizationId): self
+    {
+        return new self(
+            $this->period, $this->employeeId, $this->departmentId,
+            $this->from, $this->to, $this->managerUserId, $this->employeeIds, $organizationId,
         );
     }
 

@@ -31,6 +31,7 @@ class EvaluatePresenceNotifications implements ShouldQueue
             computer: $computer,
             employee: $computer?->employee,
             occurredAt: $presence->last_synced_at,
+            organizationId: $presence->organization_id,
         ));
     }
 }
