@@ -35,6 +35,7 @@ use App\Services\Reporting\ApplicationUsageService;
 use App\Services\Reporting\FileDownloadService;
 use App\Services\Reporting\ReportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
@@ -225,22 +226,48 @@ class PhaseB2MonitoringTenantIsolationTest extends TestCase
 
     public function test_dashboard_kpis_reports_and_download_exports_are_organization_scoped(): void
     {
-        [$organization, , $computer] = $this->ownedComputer();
-        [, , $foreignComputer] = $this->ownedComputer();
-        $this->actingAsOrganizationRole($organization, OrganizationRole::Admin);
+        Carbon::setTestNow(Carbon::parse('2026-09-01 18:00:00', 'UTC'));
 
-        ActivityLog::factory()->forComputer($computer)->create(['active_seconds' => 100, 'idle_seconds' => 50]);
-        ActivityLog::factory()->forComputer($foreignComputer)->create(['active_seconds' => 999, 'idle_seconds' => 999]);
-        FileDownload::factory()->forComputer($computer)->create(['file_name' => 'visible-export.pdf']);
-        FileDownload::factory()->forComputer($foreignComputer)->create(['file_name' => 'hidden-export.pdf']);
+        try {
+            [$organization, , $computer] = $this->ownedComputer();
+            [, , $foreignComputer] = $this->ownedComputer();
+            $this->actingAsOrganizationRole($organization, OrganizationRole::Admin);
 
-        $reportFilter = ReportFilter::fromArray([])
-            ->forOrganization($organization->id);
-        $downloadFilter = DownloadFilter::fromArray([])
-            ->forOrganization($organization->id);
+            $reportDate = '2026-08-31';
 
-        $this->assertCount(1, app(ReportService::class)->build($reportFilter));
-        $this->assertSame(1, app(FileDownloadService::class)->query($downloadFilter)->count());
+            ActivityLog::factory()->forComputer($computer)->create([
+                'active_seconds' => 100,
+                'idle_seconds' => 50,
+                'login_at' => "{$reportDate} 09:00:00",
+                'logout_at' => "{$reportDate} 09:02:30",
+                'work_date' => $reportDate,
+            ]);
+            ActivityLog::factory()->forComputer($foreignComputer)->create([
+                'active_seconds' => 999,
+                'idle_seconds' => 999,
+                'login_at' => "{$reportDate} 10:00:00",
+                'logout_at' => "{$reportDate} 10:33:18",
+                'work_date' => $reportDate,
+            ]);
+            FileDownload::factory()->forComputer($computer)->create([
+                'file_name' => 'visible-export.pdf',
+                'downloaded_at' => "{$reportDate} 09:05:00",
+            ]);
+            FileDownload::factory()->forComputer($foreignComputer)->create([
+                'file_name' => 'hidden-export.pdf',
+                'downloaded_at' => "{$reportDate} 10:05:00",
+            ]);
+
+            $reportFilter = ReportFilter::fromArray(['from' => $reportDate, 'to' => $reportDate])
+                ->forOrganization($organization->id);
+            $downloadFilter = DownloadFilter::fromArray(['from' => $reportDate, 'to' => $reportDate])
+                ->forOrganization($organization->id);
+
+            $this->assertCount(1, app(ReportService::class)->build($reportFilter));
+            $this->assertSame(1, app(FileDownloadService::class)->query($downloadFilter)->count());
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_notification_inbox_is_current_organization_scoped(): void
