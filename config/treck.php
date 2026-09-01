@@ -133,6 +133,7 @@ return [
     */
     'agent' => [
         'enrollment_secret' => env('TRECK_AGENT_ENROLLMENT_SECRET'),
+        'legacy_token_compatibility' => (bool) env('TRECK_AGENT_LEGACY_TOKEN_COMPATIBILITY', true),
         'minimum_version' => env('TRECK_AGENT_MINIMUM_VERSION', env('TRECK_VERSION', '1.0.0')),
         'health_stale_seconds' => (int) env('TRECK_AGENT_HEALTH_STALE_SECONDS', 180),
         'health_report_interval_seconds' => (int) env('TRECK_AGENT_HEALTH_INTERVAL_SECONDS', 60),

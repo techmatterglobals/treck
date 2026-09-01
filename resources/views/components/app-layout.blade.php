@@ -20,6 +20,9 @@
                     <a href="{{ route('screenshots.index') }}" class="text-sm hover:underline">Screenshots</a>
                     <a href="{{ route('downloads.index') }}" class="text-sm hover:underline">Downloads</a>
                 @endhasanyrole
+                @hasanyrole('owner|admin')
+                    <a href="{{ route('agent-enrollment-credentials.index') }}" class="text-sm hover:underline">Agent Enrollment</a>
+                @endhasanyrole
                 @role('admin')
                     <a href="{{ route('notifications.index') }}" class="text-sm hover:underline">Notifications</a>
                     <a href="{{ route('admin.managers.index') }}" class="text-sm hover:underline">Managers</a>

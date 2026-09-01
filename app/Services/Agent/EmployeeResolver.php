@@ -4,6 +4,7 @@ namespace App\Services\Agent;
 
 use App\Models\Computer;
 use App\Models\ComputerUser;
+use App\Models\Employee;
 use App\Services\Notifications\NotificationEngine;
 
 /**
@@ -38,7 +39,10 @@ class EmployeeResolver
         'nt authority', 'defaultapppool',
     ];
 
-    public function __construct(private readonly NotificationEngine $engine) {}
+    public function __construct(
+        private readonly NotificationEngine $engine,
+        private readonly AgentSecurityLogger $security,
+    ) {}
 
     public function resolve(Computer $computer, ?string $windowsUsername): ResolvedIdentity
     {
@@ -46,7 +50,7 @@ class EmployeeResolver
 
         // Legacy / non-interactive account → attribute to the computer's owner.
         if ($username === null) {
-            return new ResolvedIdentity($computer->employee_id);
+            return new ResolvedIdentity($this->tenantEmployeeId($computer, $computer->employee_id));
         }
 
         $mapping = ComputerUser::firstOrNew([
@@ -61,8 +65,8 @@ class EmployeeResolver
             // stays pending until the Super Admin maps it.
             $firstOnComputer = ! ComputerUser::where('computer_id', $computer->id)->exists();
 
-            if ($firstOnComputer && $computer->employee_id !== null) {
-                $mapping->employee_id = $computer->employee_id;
+            if ($firstOnComputer) {
+                $mapping->employee_id = $this->tenantEmployeeId($computer, $computer->employee_id);
             }
         }
 
@@ -76,7 +80,35 @@ class EmployeeResolver
             return new ResolvedIdentity(null, $mapping);
         }
 
+        if ($this->tenantEmployeeId($computer, $mapping->employee_id) === null) {
+            $this->security->event('agent_employee_mapping_organization_mismatch', $computer->organization, $computer, context: [
+                'computer_user_id' => $mapping->id,
+            ]);
+
+            return new ResolvedIdentity(null, $mapping);
+        }
+
         return new ResolvedIdentity($mapping->employee_id, $mapping);
+    }
+
+    private function tenantEmployeeId(Computer $computer, ?int $employeeId): ?int
+    {
+        if ($employeeId === null) {
+            return null;
+        }
+
+        $belongsToComputerOrganization = Employee::query()
+            ->whereKey($employeeId)
+            ->where('organization_id', $computer->organization_id)
+            ->exists();
+
+        if (! $belongsToComputerOrganization) {
+            $this->security->event('agent_employee_organization_mismatch', $computer->organization, $computer);
+
+            return null;
+        }
+
+        return $employeeId;
     }
 
     /**

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\ManagerController;
 use App\Http\Controllers\Admin\UserRoleController;
+use App\Http\Controllers\AgentEnrollmentCredentialController;
 use App\Http\Controllers\ApplicationUsageController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FileDownloadController;
@@ -59,6 +60,13 @@ Route::middleware(['auth', 'active'])->group(function () {
     // Notifications remain Super-Admin-only (the alert inbox + global settings
     // are organization-wide; per-manager notification routing is a future phase).
     Route::middleware(['organization', 'organization.role:owner|admin'])->group(function () {
+        Route::get('/agent-enrollment-credentials', [AgentEnrollmentCredentialController::class, 'index'])
+            ->name('agent-enrollment-credentials.index');
+        Route::post('/agent-enrollment-credentials', [AgentEnrollmentCredentialController::class, 'store'])
+            ->name('agent-enrollment-credentials.store');
+        Route::post('/agent-enrollment-credentials/{credential}/revoke', [AgentEnrollmentCredentialController::class, 'revoke'])
+            ->name('agent-enrollment-credentials.revoke');
+
         Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
         Route::get('/notifications/settings', [NotificationSettingsController::class, 'index'])->name('notifications.settings');
     });

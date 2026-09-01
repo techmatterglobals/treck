@@ -11,6 +11,7 @@ class AgentConfigController extends Controller
     public function __invoke(Request $request): JsonResponse
     {
         $computer = $request->user();
+        $organizationId = $computer->organization_id;
 
         return response()->json([
             'data' => [
@@ -18,7 +19,7 @@ class AgentConfigController extends Controller
                 'revision' => (string) config('treck.agent.policy.revision'),
                 'server_time' => now()->utc()->toIso8601String(),
                 'policy' => [
-                    'organization_id' => (string) config('treck.agent.policy.organization_id'),
+                    'organization_id' => $organizationId !== null ? (string) $organizationId : (string) config('treck.agent.policy.organization_id'),
                     'minimum_agent_version' => (string) config('treck.agent.minimum_version'),
                     'health_report_interval_seconds' => (int) config('treck.agent.health_report_interval_seconds'),
                     'presence_offline_timeout_seconds' => (int) config('treck.presence.offline_timeout_seconds'),

@@ -37,7 +37,7 @@ Route::post('agent/register', [DeviceRegistrationController::class, 'store'])
     ->middleware('throttle:agent-register')
     ->name('agent.register');
 
-Route::middleware(['auth:sanctum', 'ability:agent:report', 'throttle:agent'])->group(function () {
+Route::middleware(['auth:sanctum', 'agent.token:agent:report', 'throttle:agent'])->group(function () {
     Route::get('agent/config', AgentConfigController::class)->name('agent.config');
     Route::post('agent/login', [WorkSessionController::class, 'login'])->name('agent.login');
     Route::post('activity', [ActivityController::class, 'store'])->name('agent.activity');

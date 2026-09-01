@@ -40,6 +40,14 @@ class WorkSessionController extends Controller
             'This computer is not assigned to an employee.',
         );
 
+        $resolution = $ownership->resolve($computer, $computer->employee_id);
+
+        abort_if(
+            $resolution->organizationId === null || $resolution->conflicted,
+            Response::HTTP_CONFLICT,
+            'This computer is not assigned to an employee in its organization.',
+        );
+
         $loginAt = isset($data['login_time']) ? Carbon::parse($data['login_time']) : now();
 
         // Keep the reported hostname current.
@@ -51,7 +59,7 @@ class WorkSessionController extends Controller
 
         // Idempotent: reuse an already-open session instead of duplicating.
         $session = $computer->openSession() ?? ActivityLog::create([
-            'organization_id' => $ownership->resolve($computer, $computer->employee_id)->organizationId,
+            'organization_id' => $resolution->organizationId,
             'employee_id' => $computer->employee_id,
             'computer_id' => $computer->id,
             'login_at' => $loginAt,

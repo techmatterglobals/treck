@@ -3,6 +3,8 @@
 namespace Tests\Feature\Agent;
 
 use App\Models\Employee;
+use App\Models\Organization;
+use App\Services\Agent\AgentEnrollmentCredentialService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -21,7 +23,7 @@ class AgentApiJsonErrorsTest extends TestCase
     private function body(array $overrides = []): array
     {
         return array_merge([
-            'enrollment_secret' => 'test-provisioning-key', // matches phpunit.xml
+            'enrollment_secret' => 'invalid-enrollment-secret',
             'device_uuid' => '809c6089-a94a-4eb4-9226-5d53c80b2f54',
             'employee_code' => 'EMP-0001',
             'computer_name' => 'PC-100100105',
@@ -32,8 +34,11 @@ class AgentApiJsonErrorsTest extends TestCase
 
     public function test_register_validation_failure_returns_json_not_login_redirect(): void
     {
+        $organization = Organization::factory()->create();
+        $secret = $this->enrollmentSecretFor($organization);
+
         // Plain POST (no Accept: application/json), unknown employee_code.
-        $response = $this->post('/api/agent/register', $this->body());
+        $response = $this->post('/api/agent/register', $this->body(['enrollment_secret' => $secret]));
 
         $response->assertStatus(422)
             ->assertHeader('content-type', 'application/json')
@@ -43,7 +48,8 @@ class AgentApiJsonErrorsTest extends TestCase
 
     public function test_register_bad_enrollment_secret_returns_json_403_not_redirect(): void
     {
-        Employee::factory()->create(['employee_code' => 'EMP-0001']);
+        $organization = Organization::factory()->create();
+        Employee::factory()->forOrganization($organization)->create(['employee_code' => 'EMP-0001']);
 
         $response = $this->post('/api/agent/register', $this->body(['enrollment_secret' => 'wrong-secret']));
 
@@ -53,9 +59,11 @@ class AgentApiJsonErrorsTest extends TestCase
 
     public function test_register_succeeds_with_valid_body_even_without_accept_header(): void
     {
-        Employee::factory()->create(['employee_code' => 'EMP-0001']);
+        $organization = Organization::factory()->create();
+        Employee::factory()->forOrganization($organization)->create(['employee_code' => 'EMP-0001']);
+        $secret = $this->enrollmentSecretFor($organization);
 
-        $response = $this->post('/api/agent/register', $this->body());
+        $response = $this->post('/api/agent/register', $this->body(['enrollment_secret' => $secret]));
 
         $response->assertCreated()
             ->assertHeader('content-type', 'application/json')
@@ -70,5 +78,13 @@ class AgentApiJsonErrorsTest extends TestCase
 
         $response->assertUnauthorized(); // 401
         $this->assertNull($response->headers->get('location'), 'must not redirect to /login');
+    }
+
+    private function enrollmentSecretFor(Organization $organization): string
+    {
+        return app(AgentEnrollmentCredentialService::class)->create(
+            organization: $organization,
+            name: 'Test enrollment',
+        )['secret'];
     }
 }

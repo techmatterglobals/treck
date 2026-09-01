@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureAgentToken;
 use App\Http\Middleware\EnsureCurrentOrganization;
 use App\Http\Middleware\EnsureOrganizationRole;
 use App\Http\Middleware\EnsureUserIsActive;
@@ -43,6 +44,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'active' => EnsureUserIsActive::class,
             'organization' => EnsureCurrentOrganization::class,
             'organization.role' => EnsureOrganizationRole::class,
+            'agent.token' => EnsureAgentToken::class,
 
             // Sanctum token ability gates.
             'abilities' => CheckAbilities::class,

@@ -6,7 +6,6 @@ use App\Enums\ComputerStatus;
 use App\Enums\PresenceStatus;
 use App\Events\PresenceChanged;
 use App\Models\Computer;
-use App\Models\Employee;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Testing\TestResponse;
@@ -21,11 +20,7 @@ class PresenceProjectionTest extends TestCase
 
     private function device(): array
     {
-        $computer = Computer::factory()->create([
-            'employee_id' => Employee::factory()->create()->id,
-            'paired_at' => now(),
-        ]);
-        $token = $computer->createToken('agent', ['agent:report'])->plainTextToken;
+        [, , $computer, $token] = $this->ownedAgentDevice();
 
         return [$computer, $token];
     }

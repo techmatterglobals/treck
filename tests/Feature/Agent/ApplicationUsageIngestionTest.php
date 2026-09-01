@@ -5,7 +5,6 @@ namespace Tests\Feature\Agent;
 use App\Enums\AgentEventKind;
 use App\Models\ApplicationUsage;
 use App\Models\Computer;
-use App\Models\Employee;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -23,11 +22,7 @@ class ApplicationUsageIngestionTest extends TestCase
     /** @return array{0:Computer,1:string} */
     private function device(): array
     {
-        $computer = Computer::factory()->create([
-            'employee_id' => Employee::factory()->create()->id,
-            'paired_at' => now(),
-        ]);
-        $token = $computer->createToken('agent', ['agent:report'])->plainTextToken;
+        [, , $computer, $token] = $this->ownedAgentDevice();
 
         return [$computer, $token];
     }

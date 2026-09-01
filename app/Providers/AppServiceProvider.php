@@ -8,6 +8,7 @@ use App\Listeners\EvaluatePresenceNotifications;
 use App\Models\ApplicationUsage;
 use App\Models\FileDownload;
 use App\Models\NotificationLog;
+use App\Models\PersonalAccessToken;
 use App\Observers\ApplicationUsageObserver;
 use App\Observers\FileDownloadObserver;
 use App\Policies\NotificationPolicy;
@@ -20,6 +21,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -30,6 +32,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+
         // Notifications (Phase 9): bridge existing events/models into the engine
         // without modifying the presence (Phase 6) or app-usage (Phase 7) code.
         Event::listen(PresenceChanged::class, EvaluatePresenceNotifications::class);

@@ -6,6 +6,7 @@ use App\Enums\AgentEventKind;
 use App\Models\AgentEvent;
 use App\Models\Computer;
 use App\Models\Employee;
+use App\Models\Organization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -26,12 +27,10 @@ class EventIngestionTest extends TestCase
 
     private function pairedComputer(?Employee $employee = null): Computer
     {
-        $employee ??= Employee::factory()->create();
+        $organization = $employee?->organization ?? Organization::factory()->create();
+        $employee ??= Employee::factory()->forOrganization($organization)->create();
 
-        return Computer::factory()->create([
-            'employee_id' => $employee->id,
-            'paired_at' => now(),
-        ]);
+        return Computer::factory()->forEmployee($employee)->create(['paired_at' => now()]);
     }
 
     /** @return array<string,mixed> */
@@ -53,7 +52,7 @@ class EventIngestionTest extends TestCase
 
     public function test_stores_a_heartbeat_event_and_binds_it_to_the_device_owner(): void
     {
-        $employee = Employee::factory()->create();
+        $employee = Employee::factory()->forOrganization(Organization::factory()->create())->create();
         $computer = $this->pairedComputer($employee);
         $body = $this->heartbeatPayload(['idempotency_key' => 'hb-1']);
 

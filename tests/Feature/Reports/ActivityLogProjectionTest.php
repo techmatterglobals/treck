@@ -8,6 +8,7 @@ use App\Models\ActivityLog;
 use App\Models\AgentEvent;
 use App\Models\Computer;
 use App\Models\Employee;
+use App\Models\Organization;
 use App\Services\Presence\ActivityLogProjector;
 use App\Services\Reporting\ReportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,9 +26,7 @@ class ActivityLogProjectionTest extends TestCase
 
     private function device(): array
     {
-        $employee = Employee::factory()->create();
-        $computer = Computer::factory()->create(['employee_id' => $employee->id, 'paired_at' => now()]);
-        $token = $computer->createToken('agent', ['agent:report'])->plainTextToken;
+        [, $employee, $computer, $token] = $this->ownedAgentDevice();
 
         return [$employee, $computer, $token];
     }
@@ -83,8 +82,8 @@ class ActivityLogProjectionTest extends TestCase
 
     public function test_backfill_rebuilds_activity_logs_from_existing_events(): void
     {
-        $employee = Employee::factory()->create();
-        $computer = Computer::factory()->create(['employee_id' => $employee->id, 'paired_at' => now()]);
+        $employee = Employee::factory()->forOrganization(Organization::factory()->create())->create();
+        $computer = Computer::factory()->forEmployee($employee)->create(['paired_at' => now()]);
 
         // Pre-existing heartbeats written straight to agent_events (no projector),
         // as if ingested before this feature existed → no activity_logs yet.
@@ -112,8 +111,8 @@ class ActivityLogProjectionTest extends TestCase
 
     public function test_backfill_is_idempotent(): void
     {
-        $employee = Employee::factory()->create();
-        $computer = Computer::factory()->create(['employee_id' => $employee->id, 'paired_at' => now()]);
+        $employee = Employee::factory()->forOrganization(Organization::factory()->create())->create();
+        $computer = Computer::factory()->forEmployee($employee)->create(['paired_at' => now()]);
 
         AgentEvent::create([
             'computer_id' => $computer->id,

@@ -89,6 +89,11 @@ class Organization extends Model
         return $this->hasMany(NotificationLog::class);
     }
 
+    public function agentEnrollmentCredentials(): HasMany
+    {
+        return $this->hasMany(AgentEnrollmentCredential::class);
+    }
+
     public function productivityReports(): HasMany
     {
         return $this->hasMany(ProductivityReport::class);

@@ -5,6 +5,8 @@ namespace Tests\Feature\Agent;
 use App\Models\AgentHealthReport;
 use App\Models\Computer;
 use App\Models\Employee;
+use App\Models\Organization;
+use App\Services\Agent\AgentEnrollmentCredentialService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\PersonalAccessToken;
 use Tests\TestCase;
@@ -15,8 +17,9 @@ class AgentConfigHealthTest extends TestCase
 
     public function test_registration_uses_enrollment_secret_payload(): void
     {
-        config(['treck.agent.enrollment_secret' => 'enroll-once']);
-        $employee = Employee::factory()->create(['employee_code' => 'EMP-SEC']);
+        $organization = Organization::factory()->create();
+        $employee = Employee::factory()->forOrganization($organization)->create(['employee_code' => 'EMP-SEC']);
+        $secret = $this->enrollmentSecretFor($organization);
 
         $this->postJson('/api/agent/register', [
             'enrollment_secret' => 'wrong',
@@ -25,7 +28,7 @@ class AgentConfigHealthTest extends TestCase
         ])->assertForbidden();
 
         $this->postJson('/api/agent/register', [
-            'enrollment_secret' => 'enroll-once',
+            'enrollment_secret' => $secret,
             'device_uuid' => 'device-1',
             'employee_code' => $employee->employee_code,
             'computer_name' => 'OPS-PC',
@@ -37,10 +40,11 @@ class AgentConfigHealthTest extends TestCase
 
     public function test_registration_upsert_keeps_one_live_device_token(): void
     {
-        config(['treck.agent.enrollment_secret' => 'enroll-once']);
-        $employee = Employee::factory()->create(['employee_code' => 'EMP-SEC']);
+        $organization = Organization::factory()->create();
+        $employee = Employee::factory()->forOrganization($organization)->create(['employee_code' => 'EMP-SEC']);
+        $secret = $this->enrollmentSecretFor($organization, maxUses: 2);
         $payload = [
-            'enrollment_secret' => 'enroll-once',
+            'enrollment_secret' => $secret,
             'device_uuid' => 'device-1',
             'employee_code' => $employee->employee_code,
         ];
@@ -55,8 +59,7 @@ class AgentConfigHealthTest extends TestCase
     public function test_agent_config_requires_agent_token_and_returns_revisioned_policy(): void
     {
         config(['treck.agent.policy.revision' => 'rev-2026-08-29']);
-        $computer = Computer::factory()->create();
-        $token = $computer->createToken('agent', ['agent:report'])->plainTextToken;
+        [, , $computer, $token] = $this->ownedAgentDevice();
 
         $this->getJson('/api/agent/config')->assertUnauthorized();
 
@@ -69,8 +72,8 @@ class AgentConfigHealthTest extends TestCase
 
     public function test_agent_health_upserts_for_authenticated_computer(): void
     {
-        $computer = Computer::factory()->create(['agent_version' => '0.9.0']);
-        $token = $computer->createToken('agent', ['agent:report'])->plainTextToken;
+        [, , $computer, $token] = $this->ownedAgentDevice();
+        $computer->forceFill(['agent_version' => '0.9.0'])->save();
 
         $this->postJson('/api/agent/health', $this->healthPayload())->assertUnauthorized();
 
@@ -88,6 +91,15 @@ class AgentConfigHealthTest extends TestCase
         $this->assertDatabaseCount('agent_health_reports', 1);
         $this->assertSame(2, AgentHealthReport::firstOrFail()->pending_event_count);
         $this->assertSame('1.0.0', $computer->refresh()->agent_version);
+    }
+
+    private function enrollmentSecretFor(Organization $organization, int $maxUses = 1): string
+    {
+        return app(AgentEnrollmentCredentialService::class)->create(
+            organization: $organization,
+            name: 'Test enrollment',
+            maxUses: $maxUses,
+        )['secret'];
     }
 
     /** @param array<string,mixed> $overrides */

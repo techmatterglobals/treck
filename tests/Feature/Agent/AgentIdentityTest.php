@@ -5,6 +5,7 @@ namespace Tests\Feature\Agent;
 use App\Models\ActivityLog;
 use App\Models\Computer;
 use App\Models\Employee;
+use App\Models\Organization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -14,17 +15,15 @@ class AgentIdentityTest extends TestCase
 
     private function pairedComputer(Employee $employee): Computer
     {
-        return Computer::factory()->create([
-            'employee_id' => $employee->id,
-            'paired_at' => now(),
-        ]);
+        return Computer::factory()->forEmployee($employee)->create(['paired_at' => now()]);
     }
 
     /** SEC-1: a device token cannot open a session for a different employee. */
     public function test_agent_cannot_open_session_for_another_employee(): void
     {
-        $owner = Employee::factory()->create();
-        $other = Employee::factory()->create();
+        $organization = Organization::factory()->create();
+        $owner = Employee::factory()->forOrganization($organization)->create();
+        $other = Employee::factory()->forOrganization($organization)->create();
 
         $computer = $this->pairedComputer($owner);
         $token = $computer->createToken('agent', ['agent:report'])->plainTextToken;
@@ -47,7 +46,8 @@ class AgentIdentityTest extends TestCase
 
     public function test_unpaired_computer_cannot_open_session(): void
     {
-        $computer = Computer::factory()->create(['employee_id' => null, 'paired_at' => null]);
+        $organization = Organization::factory()->create();
+        $computer = Computer::factory()->forOrganization($organization)->create(['employee_id' => null, 'paired_at' => null]);
         $token = $computer->createToken('agent', ['agent:report'])->plainTextToken;
 
         $this->withToken($token)->postJson('/api/agent/login', [])
@@ -62,8 +62,7 @@ class AgentIdentityTest extends TestCase
 
     public function test_token_without_agent_ability_is_forbidden(): void
     {
-        $computer = $this->pairedComputer(Employee::factory()->create());
-        $token = $computer->createToken('agent', ['something:else'])->plainTextToken;
+        [, , $computer, $token] = $this->ownedAgentDevice(abilities: ['something:else']);
 
         $this->withToken($token)->postJson('/api/agent/login', [])
             ->assertForbidden();

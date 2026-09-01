@@ -68,6 +68,29 @@ public class TreckApiClientTests
     }
 
     [Fact]
+    public async Task RegisterDeviceAsync_posts_tenant_enrollment_credential_without_organization_payload()
+    {
+        const string json = """
+        {"message":"Device registered.","data":{"computer_id":12,"employee_id":42,"token":"12|abc","token_type":"Bearer"}}
+        """;
+        var handler = new StubHandler(HttpStatusCode.Created, json);
+        var client = ClientWith(handler);
+
+        await client.RegisterDeviceAsync(
+            new RegisterDeviceRequest(
+                "treck_enroll_aaaaaaaaaaaaaaaa_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "uuid-1",
+                "EMP-1",
+                "PC-1",
+                "Windows 11",
+                "1.0.0"),
+            CancellationToken.None);
+
+        Assert.Contains("enrollment_secret", handler.LastBody);
+        Assert.DoesNotContain("organization_id", handler.LastBody);
+    }
+
+    [Fact]
     public async Task RegisterDeviceAsync_throws_Unauthorized_on_401()
     {
         var handler = new StubHandler(HttpStatusCode.Unauthorized, "{}");

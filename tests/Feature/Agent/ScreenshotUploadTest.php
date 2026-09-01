@@ -4,6 +4,7 @@ namespace Tests\Feature\Agent;
 
 use App\Models\Computer;
 use App\Models\Employee;
+use App\Models\Organization;
 use App\Models\Screenshot;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -29,11 +30,13 @@ class ScreenshotUploadTest extends TestCase
     /** @return array{0:Computer,1:string} */
     private function device(?Employee $employee = null): array
     {
-        $employee ??= Employee::factory()->create();
-        $computer = Computer::factory()->create([
-            'employee_id' => $employee->id,
-            'paired_at' => now(),
-        ]);
+        if ($employee === null) {
+            [, $employee, $computer, $token] = $this->ownedAgentDevice();
+
+            return [$computer, $token];
+        }
+
+        $computer = Computer::factory()->forEmployee($employee)->create(['paired_at' => now()]);
         $token = $computer->createToken('agent', ['agent:report'])->plainTextToken;
 
         return [$computer, $token];
@@ -119,9 +122,10 @@ class ScreenshotUploadTest extends TestCase
 
     public function test_owner_is_taken_from_the_device_not_the_body(): void
     {
-        $employee = Employee::factory()->create();
+        $organization = Organization::factory()->create();
+        $employee = Employee::factory()->forOrganization($organization)->create();
         [$computer, $token] = $this->device($employee);
-        $other = Employee::factory()->create();
+        $other = Employee::factory()->forOrganization($organization)->create();
 
         $this->upload($token, UploadedFile::fake()->image('a.jpg'), ['employee_id' => $other->id])
             ->assertCreated();
@@ -183,8 +187,7 @@ class ScreenshotUploadTest extends TestCase
 
     public function test_token_without_agent_ability_is_forbidden(): void
     {
-        $computer = Computer::factory()->create(['employee_id' => Employee::factory()->create()->id]);
-        $token = $computer->createToken('agent', ['something:else'])->plainTextToken;
+        [, , , $token] = $this->ownedAgentDevice(abilities: ['something:else']);
 
         $this->upload($token, UploadedFile::fake()->image('a.jpg'))->assertForbidden();
     }

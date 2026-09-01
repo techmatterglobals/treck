@@ -4,6 +4,7 @@ namespace Tests\Feature\Agent;
 
 use App\Models\Computer;
 use App\Models\Employee;
+use App\Models\Organization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -55,8 +56,8 @@ class UtcStorageConventionTest extends TestCase
 
     public function test_occurred_at_is_stored_in_utc_and_received_at_in_app_tz(): void
     {
-        $employee = Employee::factory()->create();
-        $computer = Computer::factory()->create(['employee_id' => $employee->id, 'paired_at' => now()]);
+        $employee = Employee::factory()->forOrganization(Organization::factory()->create())->create();
+        $computer = Computer::factory()->forEmployee($employee)->create(['paired_at' => now()]);
 
         $this->ingest($computer, [
             'kind' => 'heartbeat',
@@ -82,8 +83,8 @@ class UtcStorageConventionTest extends TestCase
 
     public function test_presence_activity_is_utc_but_synced_at_is_app_tz(): void
     {
-        $employee = Employee::factory()->create();
-        $computer = Computer::factory()->create(['employee_id' => $employee->id, 'paired_at' => now()]);
+        $employee = Employee::factory()->forOrganization(Organization::factory()->create())->create();
+        $computer = Computer::factory()->forEmployee($employee)->create(['paired_at' => now()]);
 
         $this->ingest($computer, [
             'kind' => 'heartbeat',
@@ -105,8 +106,8 @@ class UtcStorageConventionTest extends TestCase
 
     public function test_app_usage_used_at_is_stored_in_utc(): void
     {
-        $employee = Employee::factory()->create();
-        $computer = Computer::factory()->create(['employee_id' => $employee->id, 'paired_at' => now()]);
+        $employee = Employee::factory()->forOrganization(Organization::factory()->create())->create();
+        $computer = Computer::factory()->forEmployee($employee)->create(['paired_at' => now()]);
 
         $this->ingest($computer, [
             'kind' => 'app_usage',
@@ -129,8 +130,8 @@ class UtcStorageConventionTest extends TestCase
 
     public function test_file_download_downloaded_at_is_stored_in_utc(): void
     {
-        $employee = Employee::factory()->create();
-        $computer = Computer::factory()->create(['employee_id' => $employee->id, 'paired_at' => now()]);
+        $employee = Employee::factory()->forOrganization(Organization::factory()->create())->create();
+        $computer = Computer::factory()->forEmployee($employee)->create(['paired_at' => now()]);
 
         $this->ingest($computer, [
             'kind' => 'file_download',

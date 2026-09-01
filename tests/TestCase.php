@@ -5,6 +5,8 @@ namespace Tests;
 use App\Contracts\CurrentOrganization;
 use App\Enums\MembershipStatus;
 use App\Enums\OrganizationRole;
+use App\Models\Computer;
+use App\Models\Employee;
 use App\Models\Organization;
 use App\Models\OrganizationMembership;
 use App\Models\User;
@@ -48,6 +50,22 @@ abstract class TestCase extends BaseTestCase
         session([CurrentOrganization::SESSION_KEY => $organization->id]);
 
         return $user;
+    }
+
+    /**
+     * @return array{0:Organization,1:Employee,2:Computer,3:string}
+     */
+    protected function ownedAgentDevice(
+        ?Organization $organization = null,
+        ?Employee $employee = null,
+        array $abilities = ['agent:report'],
+    ): array {
+        $organization ??= $employee?->organization ?? Organization::factory()->create();
+        $employee ??= Employee::factory()->forOrganization($organization)->create();
+        $computer = Computer::factory()->forEmployee($employee)->create(['paired_at' => now()]);
+        $token = $computer->createToken('agent', $abilities)->plainTextToken;
+
+        return [$organization, $employee, $computer, $token];
     }
 
     protected function tearDown(): void
