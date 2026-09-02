@@ -1,0 +1,19 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+
+  <!--
+    Treck Agent bootstrapper. Produces TreckAgentSetup.exe from Bundle.wxs,
+    chaining the MSI built by Treck.Agent.Installer.wixproj. MsiPath is passed by
+    build-installer.ps1 (path to the built Treck.Agent.Installer.msi).
+  -->
+  <PropertyGroup>
+    <OutputName>TreckAgentSetup</OutputName>
+    <OutputType>Bundle</OutputType>
+    <MsiPath Condition="'$(MsiPath)' == ''">Treck.Agent.Installer.msi</MsiPath>
+    <DefineConstants>MsiPath=$(MsiPath)</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Bal.wixext" Version="5.0.2" />
+  </ItemGroup>
+
+</Project>

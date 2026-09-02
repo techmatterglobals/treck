@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Treck Agent bootstrapper (Burn) → TreckAgentSetup.exe.
+
+  Wraps the MSI in a single, self-contained setup executable with a Welcome →
+  (enrollment code) → Install → Finish flow. Because the agent is published
+  self-contained (win-x64), no .NET runtime prerequisite is chained.
+
+  The enrollment code is captured into the hidden, overridable bundle variable
+  EnrollmentCode and forwarded to the MSI as the ENROLLMENT_CODE property. Hidden
+  variables are masked in the Burn log, and the MSI lists ENROLLMENT_CODE in
+  MsiHiddenProperties, so the code is not written to any installer log.
+
+  UI note: this first cut uses the stock WixStdBA window. Supply the code via the
+  EnrollmentCode variable on the command line:
+      TreckAgentSetup.exe EnrollmentCode=TRK-XXXX-XXXX-XXXX
+  A custom theme with an in-window code field is a documented follow-up (README).
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
+
+  <?ifndef MsiPath ?><?define MsiPath = "Treck.Agent.Installer.msi" ?><?endif?>
+
+  <Bundle Name="Treck Agent"
+          Manufacturer="Treck"
+          Version="1.0.0.0"
+          UpgradeCode="a2b3c4d5-7e8f-4a1b-9c2d-3e4f5a6b7c8d">
+
+    <BootstrapperApplication>
+      <!-- Stock WixStdBA theme (no EULA: empty LicenseUrl). Produces a standard
+           Welcome / Install / Finish window. The in-window enrollment-code field
+           is a documented follow-up (custom theme.xml) — see README; until then
+           the code is supplied via the EnrollmentCode variable (command line) or
+           the MSI ENROLLMENT_CODE property. -->
+      <bal:WixStandardBootstrapperApplication
+          Theme="hyperlinkLicense"
+          LicenseUrl=""
+          SuppressOptionsUI="yes"
+          ShowVersion="yes" />
+    </BootstrapperApplication>
+
+    <!-- Captured by the theme's editbox (same name) or overridden on the command
+         line. Hidden => masked in the Burn log. -->
+    <Variable Name="EnrollmentCode" Type="string" Value="" Hidden="yes" bal:Overridable="yes" />
+    <Variable Name="BaseUrl" Type="string" Value="" Hidden="yes" bal:Overridable="yes" />
+
+    <Chain>
+      <MsiPackage Id="TreckAgentMsi"
+                  SourceFile="$(var.MsiPath)"
+                  Vital="yes"
+                  DisplayInternalUI="no">
+        <MsiProperty Name="ENROLLMENT_CODE" Value="[EnrollmentCode]" />
+        <MsiProperty Name="BASE_URL" Value="[BaseUrl]" />
+      </MsiPackage>
+    </Chain>
+  </Bundle>
+</Wix>
