@@ -71,6 +71,48 @@ public sealed class TreckApiClient : ITreckApiClient
             ?? throw new ApiException("Registration succeeded but the response body was empty.");
     }
 
+    public async Task<EnrollmentResponse> EnrollAsync(
+        EnrollmentRequest request,
+        CancellationToken cancellationToken)
+    {
+        // SECURITY: never log the enrollment code. Log only non-sensitive device
+        // facts, and never the request body (which carries the code) or the
+        // success response body (which carries the token).
+        _logger.LogInformation(
+            "Enrolling device: DeviceUuid={DeviceUuid} ComputerName={ComputerName} Os={Os} AgentVersion={AgentVersion}",
+            request.DeviceUuid,
+            request.ComputerName,
+            request.Os,
+            request.AgentVersion);
+
+        using var response = await _http.PostAsJsonAsync("api/agent/enroll", request, JsonOptions, cancellationToken);
+
+        // 422 = the server rejected the code (invalid/expired/used/revoked). The
+        // server's message never contains the submitted code, but we surface a
+        // fixed, safe reason rather than echoing anything from the request.
+        if ((int)response.StatusCode == 422)
+        {
+            throw new EnrollmentRejectedException(
+                "The enrollment code was rejected (invalid, expired, already used, or revoked).");
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            // Status only — do NOT read/log the request body (it holds the code).
+            _logger.LogError(
+                "Enrollment HTTP {Status} for device {DeviceUuid}.",
+                (int)response.StatusCode,
+                request.DeviceUuid);
+
+            throw ApiException.FromStatus((int)response.StatusCode);
+        }
+
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<EnrollmentResponse>>(JsonOptions, cancellationToken);
+
+        return envelope?.Data
+            ?? throw new ApiException("Enrollment succeeded but the response body was empty.");
+    }
+
     public async Task<bool> UploadEventAsync(string bearerToken, OfflineEventPayload payload, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "api/agent/events")
