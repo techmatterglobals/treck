@@ -4,20 +4,21 @@ namespace App\Services\Desktop;
 
 use App\Models\Computer;
 use App\Models\User;
-use App\Services\Hierarchy\EmployeeVisibility;
+use App\Services\Tenancy\MonitoringTenantAccess;
 
 class DesktopAgentHealthService
 {
-    public function __construct(private readonly EmployeeVisibility $visibility) {}
+    public function __construct(private readonly MonitoringTenantAccess $tenant) {}
 
     /** @return array<string,mixed> */
-    public function forUser(User $user): array
+    public function forUser(User $user, int $organizationId): array
     {
-        $computerIds = $this->visibility->computerIds($user);
+        $computerIds = $this->tenant->visibleComputerIds($user);
         $staleAfter = now()->subSeconds((int) config('treck.agent.health_stale_seconds'));
         $expectedVersion = (string) config('treck.agent.minimum_version');
 
         $query = Computer::query()
+            ->where('organization_id', $organizationId)
             ->with(['employee.department', 'agentHealthReport'])
             ->orderBy('hostname');
 

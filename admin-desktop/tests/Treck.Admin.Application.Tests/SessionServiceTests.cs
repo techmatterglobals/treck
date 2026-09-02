@@ -14,12 +14,14 @@ public sealed class SessionServiceTests
     {
         var tokens = new MemoryTokenStore();
         var desktop = new StubDesktopApi { Bootstrap = Bootstrap() };
-        var service = new SessionService(new StubAuthenticationApi(), desktop, tokens);
+        var organizations = new CurrentOrganizationService(new MemoryOrganizationStore());
+        var service = new SessionService(new StubAuthenticationApi(), desktop, tokens, organizations);
 
         var session = await service.SignInAsync("admin@example.com", "secret");
 
         Assert.Equal("token-123", tokens.Token);
         Assert.Equal("Admin User", session.User.Name);
+        Assert.Equal(10, organizations.SelectedOrganizationId);
         Assert.Equal(1, desktop.BootstrapCalls);
     }
 
@@ -31,7 +33,7 @@ public sealed class SessionServiceTests
         {
             Exception = new TreckApiException(HttpStatusCode.Forbidden, "Forbidden"),
         };
-        var service = new SessionService(new StubAuthenticationApi(), desktop, tokens);
+        var service = new SessionService(new StubAuthenticationApi(), desktop, tokens, new CurrentOrganizationService(new MemoryOrganizationStore()));
 
         await Assert.ThrowsAsync<TreckApiException>(() => service.SignInAsync("employee@example.com", "secret"));
 
@@ -47,11 +49,13 @@ public sealed class SessionServiceTests
         {
             Exception = new TreckApiException(HttpStatusCode.Unauthorized, "Expired"),
         };
-        var service = new SessionService(new StubAuthenticationApi(), desktop, tokens);
+        var organizations = new CurrentOrganizationService(new MemoryOrganizationStore { OrganizationId = 10 });
+        var service = new SessionService(new StubAuthenticationApi(), desktop, tokens, organizations);
 
         await Assert.ThrowsAsync<TreckApiException>(() => service.RestoreAsync());
 
         Assert.Null(tokens.Token);
+        Assert.Null(organizations.SelectedOrganizationId);
         Assert.Equal(1, tokens.ClearCalls);
     }
 
@@ -63,20 +67,83 @@ public sealed class SessionServiceTests
         {
             LogoutException = new TreckApiException(HttpStatusCode.Unauthorized, "Expired"),
         };
-        var service = new SessionService(authentication, new StubDesktopApi(), tokens);
+        var organizations = new CurrentOrganizationService(new MemoryOrganizationStore { OrganizationId = 10 });
+        await organizations.SelectAsync(AdminOrganization());
+        var service = new SessionService(authentication, new StubDesktopApi(), tokens, organizations);
 
         await service.SignOutAsync();
 
         Assert.Null(tokens.Token);
+        Assert.Null(organizations.SelectedOrganizationId);
         Assert.Equal(1, tokens.ClearCalls);
     }
 
+    [Fact]
+    public async Task Restore_revalidates_saved_organization_against_bootstrap()
+    {
+        var tokens = new MemoryTokenStore { Token = "restored" };
+        var store = new MemoryOrganizationStore { OrganizationId = 99 };
+        var organizations = new CurrentOrganizationService(store);
+        var service = new SessionService(new StubAuthenticationApi(), new StubDesktopApi { Bootstrap = Bootstrap() }, tokens, organizations);
+
+        await service.RestoreAsync();
+
+        Assert.Equal(10, organizations.SelectedOrganizationId);
+        Assert.Equal(10, store.OrganizationId);
+    }
+
+    [Fact]
+    public async Task Invalid_saved_organization_is_cleared_when_no_single_recommendation_exists()
+    {
+        var tokens = new MemoryTokenStore { Token = "restored" };
+        var store = new MemoryOrganizationStore { OrganizationId = 99 };
+        var organizations = new CurrentOrganizationService(store);
+        var service = new SessionService(new StubAuthenticationApi(), new StubDesktopApi
+        {
+            Bootstrap = Bootstrap([AdminOrganization(10, "First"), ManagerOrganization(20, "Second")]),
+        }, tokens, organizations);
+
+        await service.RestoreAsync();
+
+        Assert.Null(organizations.SelectedOrganizationId);
+        Assert.Null(store.OrganizationId);
+    }
+
     internal static DesktopBootstrap Bootstrap(bool screenshots = true, bool reports = true, bool health = false) => new(
+        "desktop-v2",
         new DesktopUser(1, "Admin User", "admin@example.com"),
         ["admin"],
         ["view dashboard", "view attendance", "view reports"],
+        [AdminOrganization(screenshots: screenshots, reports: reports, health: health)],
+        false,
+        AdminOrganization(screenshots: screenshots, reports: reports, health: health),
         new DesktopFeatures(true, true, reports, true, screenshots, true, health),
         new ServerInformation("1.0.0", "UTC", "Asia/Karachi", DateTimeOffset.UtcNow));
+
+    internal static DesktopBootstrap Bootstrap(IReadOnlyList<DesktopOrganization> organizations) => new(
+        "desktop-v2",
+        new DesktopUser(1, "Admin User", "admin@example.com"),
+        organizations.Select(organization => organization.Role).Distinct().ToArray(),
+        organizations.SelectMany(organization => organization.Permissions).Distinct().ToArray(),
+        organizations,
+        organizations.Count != 1,
+        organizations.Count == 1 ? organizations[0] : null,
+        new DesktopFeatures(true, true, true, true, true, true, true),
+        new ServerInformation("1.0.0", "UTC", "Asia/Karachi", DateTimeOffset.UtcNow));
+
+    internal static DesktopOrganization AdminOrganization(
+        long id = 10,
+        string name = "Acme",
+        bool screenshots = true,
+        bool reports = true,
+        bool health = false) => new(
+            id, name, "acme", "active", "admin",
+            reports ? ["view dashboard", "view attendance", "view reports"] : ["view dashboard", "view attendance"],
+            new DesktopFeatures(true, true, reports, true, screenshots, true, health, true, true, false));
+
+    internal static DesktopOrganization ManagerOrganization(long id = 20, string name = "Branch") => new(
+        id, name, "branch", "active", "manager", ["view dashboard"],
+        new DesktopFeatures(true, false, false, true, true, true, true, true, false, true));
 
     internal sealed class MemoryTokenStore : IAccessTokenStore
     {
@@ -96,6 +163,24 @@ public sealed class SessionServiceTests
         }
     }
 
+    internal sealed class MemoryOrganizationStore : ISelectedOrganizationStore
+    {
+        public long? OrganizationId { get; set; }
+        public int ClearCalls { get; private set; }
+        public Task<long?> ReadAsync(CancellationToken cancellationToken = default) => Task.FromResult(OrganizationId);
+        public Task WriteAsync(long organizationId, CancellationToken cancellationToken = default)
+        {
+            OrganizationId = organizationId;
+            return Task.CompletedTask;
+        }
+        public Task ClearAsync(CancellationToken cancellationToken = default)
+        {
+            OrganizationId = null;
+            ClearCalls++;
+            return Task.CompletedTask;
+        }
+    }
+
     internal sealed class StubAuthenticationApi : ITreckAuthenticationApi
     {
         public Exception? LogoutException { get; init; }
@@ -106,7 +191,7 @@ public sealed class SessionServiceTests
             LogoutException is null ? Task.CompletedTask : Task.FromException(LogoutException);
     }
 
-    internal sealed class StubDesktopApi : ITreckDesktopApi
+    internal class StubDesktopApi : ITreckDesktopApi
     {
         public DesktopBootstrap? Bootstrap { get; init; }
         public DesktopOverview? Overview { get; init; }
@@ -124,7 +209,7 @@ public sealed class SessionServiceTests
                 ? Task.FromResult(Bootstrap ?? SessionServiceTests.Bootstrap())
                 : Task.FromException<DesktopBootstrap>(Exception);
         }
-        public Task<DesktopOverview> GetOverviewAsync(CancellationToken cancellationToken = default)
+        public virtual Task<DesktopOverview> GetOverviewAsync(CancellationToken cancellationToken = default)
         {
             OverviewCalled.TrySetResult(true);
             return Task.FromResult(Overview ?? new DesktopOverview(

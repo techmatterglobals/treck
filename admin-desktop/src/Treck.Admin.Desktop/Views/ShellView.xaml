@@ -6,6 +6,9 @@
         <Border Background="#111C31" Padding="24">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Bottom">
+                    <TextBlock Text="{Binding OrganizationName}" Foreground="{StaticResource Accent}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <ComboBox ItemsSource="{Binding Organizations}" SelectedItem="{Binding SelectedOrganization, Mode=TwoWay}"
+                              DisplayMemberPath="Name" Margin="0,8,0,16" MinHeight="34" />
                     <TextBlock Text="{Binding UserName}" Foreground="{StaticResource PrimaryText}" FontWeight="SemiBold" />
                     <TextBlock Text="{Binding UserRole}" Margin="0,3,0,14" Foreground="{StaticResource SecondaryText}" />
                     <Button Content="Sign out" Padding="12,8" Command="{Binding SignOutCommand}" />

@@ -2,34 +2,31 @@
 
 namespace App\Http\Controllers\Api\V1\Desktop;
 
-use App\Http\Controllers\Api\V1\Desktop\Concerns\AuthorizesDesktopAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Services\Activity\ActivitySummaryService;
-use App\Services\Hierarchy\EmployeeVisibility;
 use App\Services\Presence\PresenceService;
+use App\Services\Tenancy\MonitoringTenantAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class EmployeeDetailController extends Controller
 {
-    use AuthorizesDesktopAccess;
-
     public function __invoke(
         Request $request,
         Employee $employee,
-        EmployeeVisibility $visibility,
+        MonitoringTenantAccess $tenant,
         ActivitySummaryService $activity,
         PresenceService $presence,
     ): JsonResponse {
         $user = $request->user();
-        $this->authorizeDesktopAccess($user);
-        abort_unless($visibility->canSeeEmployee($user, $employee->id), Response::HTTP_FORBIDDEN);
+        $organizationId = (int) $request->attributes->get('desktop_organization_id');
+        abort_unless($tenant->canSeeEmployee($user, $employee->id), Response::HTTP_NOT_FOUND);
 
         $employee->loadMissing(['user', 'department', 'manager']);
         $computerIds = $employee->computers()->pluck('id')->map(fn ($id) => (int) $id)->all();
-        $computers = $presence->rows($computerIds)->map(fn (array $row) => [
+        $computers = $presence->rows($computerIds, $organizationId)->map(fn (array $row) => [
             'computer_id' => $row['computer_id'],
             'computer_name' => $row['computer_name'],
             'status' => $row['status']->value,

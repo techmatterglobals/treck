@@ -19,6 +19,15 @@ public partial class EmployeeDetailViewModel : ObservableObject
 
     public event Action? BackRequested;
     public event Action<string>? AuthorizationLost;
+    public event Action<string>? OrganizationContextLost;
+
+    public void Clear()
+    {
+        _loadCancellation?.Cancel();
+        Detail = null;
+        ErrorMessage = null;
+        IsLoading = false;
+    }
 
     public async Task LoadAsync(long employeeId)
     {
@@ -36,6 +45,11 @@ public partial class EmployeeDetailViewModel : ObservableObject
         catch (TreckApiException exception) when (exception.IsUnauthorized)
         {
             AuthorizationLost?.Invoke("Your session expired. Sign in again.");
+        }
+        catch (TreckApiException exception) when (exception.IsOrganizationContextError)
+        {
+            Clear();
+            OrganizationContextLost?.Invoke("Select an authorized organization to continue.");
         }
         catch (TreckApiException exception) when (exception.IsForbidden)
         {

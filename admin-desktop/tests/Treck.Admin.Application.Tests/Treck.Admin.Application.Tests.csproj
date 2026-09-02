@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Treck.Admin.Application\Treck.Admin.Application.csproj" />
+    <ProjectReference Include="..\..\src\Treck.Admin.Api\Treck.Admin.Api.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />

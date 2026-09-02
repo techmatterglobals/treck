@@ -13,6 +13,7 @@ public partial class PresenceViewModel : ObservableObject, IPollingScreen
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(30);
     private readonly ITreckDesktopApi _api;
     private readonly PollingLoop _polling;
+    private readonly CurrentOrganizationService _organizations;
     private CancellationTokenSource? _pollingCancellation;
 
     [ObservableProperty] private PresenceRow? _selectedRow;
@@ -21,15 +22,20 @@ public partial class PresenceViewModel : ObservableObject, IPollingScreen
     [ObservableProperty] private DateTimeOffset? _lastUpdatedAt;
     [ObservableProperty] private bool _isRefreshing;
 
-    public PresenceViewModel(ITreckDesktopApi api, PollingLoop polling)
+    public PresenceViewModel(
+        ITreckDesktopApi api,
+        PollingLoop polling,
+        CurrentOrganizationService organizations)
     {
         _api = api;
         _polling = polling;
+        _organizations = organizations;
     }
 
     public ObservableCollection<PresenceRow> Rows { get; } = [];
     public event Action<long>? EmployeeRequested;
     public event Action<string>? AuthorizationLost;
+    public event Action<string>? OrganizationContextLost;
 
     public void Activate()
     {
@@ -43,6 +49,15 @@ public partial class PresenceViewModel : ObservableObject, IPollingScreen
         _pollingCancellation?.Cancel();
         _pollingCancellation?.Dispose();
         _pollingCancellation = null;
+    }
+
+    public void Clear()
+    {
+        Rows.Clear();
+        Summary = null;
+        SelectedRow = null;
+        LastUpdatedAt = null;
+        ConnectionStatus = "Select an organization";
     }
 
     [RelayCommand]
@@ -66,19 +81,26 @@ public partial class PresenceViewModel : ObservableObject, IPollingScreen
         try
         {
             IsRefreshing = true;
+            var generation = _organizations.Generation;
             var result = await _api.GetPresenceAsync(cancellationToken);
+            if (generation != _organizations.Generation) return;
             Rows.Clear();
             foreach (var row in result.Items) Rows.Add(row);
             Summary = result.Summary;
             LastUpdatedAt = DateTimeOffset.Now;
             ConnectionStatus = "Live";
         }
-        catch (TreckApiException exception) when (exception.IsUnauthorized || exception.IsForbidden)
+        catch (TreckApiException exception) when (exception.IsUnauthorized)
         {
+            Clear();
             Deactivate();
-            AuthorizationLost?.Invoke(exception.IsForbidden
-                ? "This account no longer has access to Treck Admin."
-                : "Your session expired. Sign in again.");
+            AuthorizationLost?.Invoke("Your session expired. Sign in again.");
+        }
+        catch (TreckApiException exception) when (exception.IsForbidden || exception.IsOrganizationContextError)
+        {
+            Clear();
+            Deactivate();
+            OrganizationContextLost?.Invoke("Select an authorized organization to continue.");
         }
         catch (HttpRequestException)
         {

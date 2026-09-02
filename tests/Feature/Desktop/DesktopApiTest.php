@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Desktop;
 
+use App\Enums\OrganizationRole;
 use App\Enums\PresenceStatus;
 use App\Models\ActivityLog;
 use App\Models\AgentEvent;
@@ -9,7 +10,9 @@ use App\Models\AgentHealthReport;
 use App\Models\Computer;
 use App\Models\ComputerPresence;
 use App\Models\Employee;
+use App\Models\Organization;
 use App\Models\User;
+use App\Services\Desktop\DesktopOrganizationAccess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -47,28 +50,37 @@ class DesktopApiTest extends TestCase
 
     public function test_employee_role_cannot_use_admin_desktop_api(): void
     {
-        $employee = tap(User::factory()->create(), fn (User $user) => $user->assignRole('employee'));
+        $organization = Organization::factory()->create();
+        $employee = $this->grantOrganizationRole(User::factory()->create(), $organization, OrganizationRole::Employee);
 
         $this->actingAs($employee, 'sanctum')
             ->getJson('/api/v1/desktop/bootstrap')
-            ->assertForbidden();
+            ->assertOk()
+            ->assertJsonCount(0, 'data.organizations');
     }
 
     public function test_admin_bootstrap_returns_stable_client_contract(): void
     {
         config(['treck.screenshots.enabled' => true, 'treck.display_timezone' => 'Asia/Karachi']);
-        $admin = tap(User::factory()->create(), fn (User $user) => $user->assignRole('admin'));
+        $organization = Organization::factory()->create(['name' => 'Desktop Org']);
+        $admin = $this->grantOrganizationRole(User::factory()->create(), $organization, OrganizationRole::Admin);
 
         $this->actingAs($admin, 'sanctum')
             ->getJson('/api/v1/desktop/bootstrap')
             ->assertOk()
+            ->assertJsonPath('data.contract_version', 'desktop-v2')
             ->assertJsonPath('data.user.id', $admin->id)
+            ->assertJsonPath('data.organizations.0.id', $organization->id)
+            ->assertJsonPath('data.organizations.0.role', 'admin')
+            ->assertJsonPath('data.recommended_organization.id', $organization->id)
+            ->assertJsonPath('data.organization_selection_required', false)
             ->assertJsonPath('data.features.screenshots', true)
             ->assertJsonPath('data.features.agent_health', true)
             ->assertJsonPath('data.server.display_timezone', 'Asia/Karachi')
             ->assertJsonStructure(['data' => [
+                'contract_version',
                 'user' => ['id', 'name', 'email'],
-                'roles', 'permissions',
+                'roles', 'permissions', 'organizations', 'organization_selection_required', 'recommended_organization',
                 'features' => ['presence', 'attendance', 'reports', 'application_usage', 'screenshots', 'downloads', 'agent_health'],
                 'server' => ['version', 'timezone', 'display_timezone', 'time'],
             ]]);
@@ -76,7 +88,8 @@ class DesktopApiTest extends TestCase
 
     public function test_manager_login_token_can_bootstrap_but_employee_token_is_forbidden(): void
     {
-        $manager = tap(User::factory()->create(), fn (User $user) => $user->assignRole('manager'));
+        $organization = Organization::factory()->create();
+        $manager = $this->grantOrganizationRole(User::factory()->create(), $organization, OrganizationRole::Manager);
         $managerToken = $this->postJson('/api/v1/auth/login', [
             'email' => $manager->email,
             'password' => 'password',
@@ -88,7 +101,7 @@ class DesktopApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.user.id', $manager->id);
 
-        $employee = tap(User::factory()->create(), fn (User $user) => $user->assignRole('employee'));
+        $employee = $this->grantOrganizationRole(User::factory()->create(), $organization, OrganizationRole::Employee);
         $employeeToken = $this->postJson('/api/v1/auth/login', [
             'email' => $employee->email,
             'password' => 'password',
@@ -97,19 +110,22 @@ class DesktopApiTest extends TestCase
 
         $this->withToken($employeeToken)
             ->getJson('/api/v1/desktop/bootstrap')
-            ->assertForbidden();
+            ->assertOk()
+            ->assertJsonCount(0, 'data.organizations');
     }
 
     public function test_manager_overview_is_scoped_to_their_team(): void
     {
-        $manager = tap(User::factory()->create(), fn (User $user) => $user->assignRole('manager'));
-        $otherManager = tap(User::factory()->create(), fn (User $user) => $user->assignRole('manager'));
+        $organization = Organization::factory()->create();
+        $manager = $this->grantOrganizationRole(User::factory()->create(), $organization, OrganizationRole::Manager);
+        $otherManager = $this->grantOrganizationRole(User::factory()->create(), $organization, OrganizationRole::Manager);
 
-        [$ownEmployee, $ownComputer] = $this->teamMember($manager, 'OWN-PC', PresenceStatus::Active, 45, 15);
-        $this->teamMember($otherManager, 'OTHER-PC', PresenceStatus::Idle, 10, 50);
-        ActivityLog::factory()->create(['employee_id' => $ownEmployee->id, 'computer_id' => $ownComputer->id, 'work_date' => today()]);
+        [$ownEmployee, $ownComputer] = $this->teamMember($manager, $organization, 'OWN-PC', PresenceStatus::Active, 45, 15);
+        $this->teamMember($otherManager, $organization, 'OTHER-PC', PresenceStatus::Idle, 10, 50);
+        ActivityLog::factory()->forOrganization($organization)->create(['employee_id' => $ownEmployee->id, 'computer_id' => $ownComputer->id, 'work_date' => today()]);
 
         $response = $this->actingAs($manager, 'sanctum')
+            ->withHeader(DesktopOrganizationAccess::HEADER, (string) $organization->id)
             ->getJson('/api/v1/desktop/overview')
             ->assertOk()
             ->assertJsonPath('data.scope', 'team')
@@ -126,13 +142,15 @@ class DesktopApiTest extends TestCase
 
     public function test_admin_overview_is_organization_wide(): void
     {
-        $admin = tap(User::factory()->create(), fn (User $user) => $user->assignRole('admin'));
-        $managerA = tap(User::factory()->create(), fn (User $user) => $user->assignRole('manager'));
-        $managerB = tap(User::factory()->create(), fn (User $user) => $user->assignRole('manager'));
-        $this->teamMember($managerA, 'A-PC', PresenceStatus::Active, 30, 0);
-        $this->teamMember($managerB, 'B-PC', PresenceStatus::Idle, 0, 30);
+        $organization = Organization::factory()->create();
+        $admin = $this->grantOrganizationRole(User::factory()->create(), $organization, OrganizationRole::Admin);
+        $managerA = $this->grantOrganizationRole(User::factory()->create(), $organization, OrganizationRole::Manager);
+        $managerB = $this->grantOrganizationRole(User::factory()->create(), $organization, OrganizationRole::Manager);
+        $this->teamMember($managerA, $organization, 'A-PC', PresenceStatus::Active, 30, 0);
+        $this->teamMember($managerB, $organization, 'B-PC', PresenceStatus::Idle, 0, 30);
 
         $this->actingAs($admin, 'sanctum')
+            ->withHeader(DesktopOrganizationAccess::HEADER, (string) $organization->id)
             ->getJson('/api/v1/desktop/overview')
             ->assertOk()
             ->assertJsonPath('data.scope', 'organization')
@@ -145,12 +163,14 @@ class DesktopApiTest extends TestCase
 
     public function test_manager_presence_contains_only_team_computers(): void
     {
-        $manager = tap(User::factory()->create(), fn (User $user) => $user->assignRole('manager'));
-        $otherManager = tap(User::factory()->create(), fn (User $user) => $user->assignRole('manager'));
-        $this->teamMember($manager, 'VISIBLE-PC', PresenceStatus::Active, 30, 0);
-        $this->teamMember($otherManager, 'HIDDEN-PC', PresenceStatus::Idle, 0, 30);
+        $organization = Organization::factory()->create();
+        $manager = $this->grantOrganizationRole(User::factory()->create(), $organization, OrganizationRole::Manager);
+        $otherManager = $this->grantOrganizationRole(User::factory()->create(), $organization, OrganizationRole::Manager);
+        $this->teamMember($manager, $organization, 'VISIBLE-PC', PresenceStatus::Active, 30, 0);
+        $this->teamMember($otherManager, $organization, 'HIDDEN-PC', PresenceStatus::Idle, 0, 30);
 
         $response = $this->actingAs($manager, 'sanctum')
+            ->withHeader(DesktopOrganizationAccess::HEADER, (string) $organization->id)
             ->getJson('/api/v1/desktop/presence')
             ->assertOk()
             ->assertJsonPath('data.summary.total', 1)
@@ -161,20 +181,23 @@ class DesktopApiTest extends TestCase
 
     public function test_manager_can_open_team_employee_but_not_another_team(): void
     {
-        $manager = tap(User::factory()->create(), fn (User $user) => $user->assignRole('manager'));
-        $otherManager = tap(User::factory()->create(), fn (User $user) => $user->assignRole('manager'));
-        [$visible] = $this->teamMember($manager, 'VISIBLE-PC', PresenceStatus::Active, 30, 0);
-        [$hidden] = $this->teamMember($otherManager, 'HIDDEN-PC', PresenceStatus::Idle, 0, 30);
+        $organization = Organization::factory()->create();
+        $manager = $this->grantOrganizationRole(User::factory()->create(), $organization, OrganizationRole::Manager);
+        $otherManager = $this->grantOrganizationRole(User::factory()->create(), $organization, OrganizationRole::Manager);
+        [$visible] = $this->teamMember($manager, $organization, 'VISIBLE-PC', PresenceStatus::Active, 30, 0);
+        [$hidden] = $this->teamMember($otherManager, $organization, 'HIDDEN-PC', PresenceStatus::Idle, 0, 30);
 
         $this->actingAs($manager, 'sanctum')
+            ->withHeader(DesktopOrganizationAccess::HEADER, (string) $organization->id)
             ->getJson("/api/v1/desktop/employees/{$visible->id}")
             ->assertOk()
             ->assertJsonPath('data.employee.id', $visible->id)
             ->assertJsonPath('data.computers.0.computer_name', 'VISIBLE-PC');
 
         $this->actingAs($manager, 'sanctum')
+            ->withHeader(DesktopOrganizationAccess::HEADER, (string) $organization->id)
             ->getJson("/api/v1/desktop/employees/{$hidden->id}")
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     public function test_manager_agent_health_contains_only_team_computers_and_uses_server_receipt_time(): void
@@ -183,24 +206,26 @@ class DesktopApiTest extends TestCase
             'treck.agent.minimum_version' => '1.0.0',
             'treck.agent.health_stale_seconds' => 180,
         ]);
-        $manager = tap(User::factory()->create(), fn (User $user) => $user->assignRole('manager'));
-        $otherManager = tap(User::factory()->create(), fn (User $user) => $user->assignRole('manager'));
-        [$ownEmployee, $ownComputer] = $this->teamMember($manager, 'VISIBLE-PC', PresenceStatus::Active, 30, 0);
-        [$otherEmployee, $otherComputer] = $this->teamMember($otherManager, 'HIDDEN-PC', PresenceStatus::Idle, 0, 30);
+        $organization = Organization::factory()->create();
+        $manager = $this->grantOrganizationRole(User::factory()->create(), $organization, OrganizationRole::Manager);
+        $otherManager = $this->grantOrganizationRole(User::factory()->create(), $organization, OrganizationRole::Manager);
+        [$ownEmployee, $ownComputer] = $this->teamMember($manager, $organization, 'VISIBLE-PC', PresenceStatus::Active, 30, 0);
+        [$otherEmployee, $otherComputer] = $this->teamMember($otherManager, $organization, 'HIDDEN-PC', PresenceStatus::Idle, 0, 30);
 
-        AgentHealthReport::factory()->for($ownComputer)->create([
+        AgentHealthReport::factory()->for($ownComputer)->forOrganization($organization)->create([
             'agent_version' => '1.0.0',
             'pending_event_count' => 3,
             'reported_at' => now()->subDay(),
             'received_at' => now(),
         ]);
-        AgentHealthReport::factory()->for($otherComputer)->create([
+        AgentHealthReport::factory()->for($otherComputer)->forOrganization($organization)->create([
             'agent_version' => '0.9.0',
             'pending_event_count' => 99,
             'received_at' => now(),
         ]);
 
         $response = $this->actingAs($manager, 'sanctum')
+            ->withHeader(DesktopOrganizationAccess::HEADER, (string) $organization->id)
             ->getJson('/api/v1/desktop/agent-health')
             ->assertOk()
             ->assertJsonPath('data.summary.total', 1)
@@ -216,12 +241,14 @@ class DesktopApiTest extends TestCase
     public function test_agent_health_marks_stale_and_never_reported(): void
     {
         config(['treck.agent.health_stale_seconds' => 180]);
-        $admin = tap(User::factory()->create(), fn (User $user) => $user->assignRole('admin'));
-        $stale = Computer::factory()->create(['hostname' => 'STALE-PC']);
-        Computer::factory()->create(['hostname' => 'NEVER-PC']);
-        AgentHealthReport::factory()->for($stale)->create(['received_at' => now()->subMinutes(10)]);
+        $organization = Organization::factory()->create();
+        $admin = $this->grantOrganizationRole(User::factory()->create(), $organization, OrganizationRole::Admin);
+        $stale = Computer::factory()->forOrganization($organization)->create(['hostname' => 'STALE-PC']);
+        Computer::factory()->forOrganization($organization)->create(['hostname' => 'NEVER-PC']);
+        AgentHealthReport::factory()->for($stale)->forOrganization($organization)->create(['received_at' => now()->subMinutes(10)]);
 
         $response = $this->actingAs($admin, 'sanctum')
+            ->withHeader(DesktopOrganizationAccess::HEADER, (string) $organization->id)
             ->getJson('/api/v1/desktop/agent-health')
             ->assertOk()
             ->assertJsonPath('data.summary.stale', 1)
@@ -233,12 +260,12 @@ class DesktopApiTest extends TestCase
     }
 
     /** @return array{0:Employee,1:Computer} */
-    private function teamMember(User $manager, string $hostname, PresenceStatus $status, int $active, int $idle): array
+    private function teamMember(User $manager, Organization $organization, string $hostname, PresenceStatus $status, int $active, int $idle): array
     {
-        $employee = Employee::factory()->create(['manager_user_id' => $manager->id]);
-        $computer = Computer::factory()->create(['employee_id' => $employee->id, 'hostname' => $hostname]);
-        ComputerPresence::factory()->for($computer)->status($status)->create();
-        AgentEvent::factory()->heartbeat()->for($computer)->create([
+        $employee = Employee::factory()->forOrganization($organization)->create(['manager_user_id' => $manager->id]);
+        $computer = Computer::factory()->forOrganization($organization)->create(['employee_id' => $employee->id, 'hostname' => $hostname]);
+        ComputerPresence::factory()->for($computer)->forOrganization($organization)->status($status)->create();
+        AgentEvent::factory()->heartbeat()->for($computer)->forOrganization($organization)->create([
             'employee_id' => $employee->id,
             'payload' => ['ActiveSeconds' => $active, 'IdleSeconds' => $idle, 'IsIdle' => $idle > 0],
             'occurred_at' => now(),

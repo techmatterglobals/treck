@@ -10,12 +10,18 @@ public sealed class SessionService
     private readonly ITreckAuthenticationApi _authentication;
     private readonly ITreckDesktopApi _desktop;
     private readonly IAccessTokenStore _tokens;
+    private readonly CurrentOrganizationService _organizations;
 
-    public SessionService(ITreckAuthenticationApi authentication, ITreckDesktopApi desktop, IAccessTokenStore tokens)
+    public SessionService(
+        ITreckAuthenticationApi authentication,
+        ITreckDesktopApi desktop,
+        IAccessTokenStore tokens,
+        CurrentOrganizationService organizations)
     {
         _authentication = authentication;
         _desktop = desktop;
         _tokens = tokens;
+        _organizations = organizations;
     }
 
     public DesktopBootstrap? Current { get; private set; }
@@ -30,6 +36,7 @@ public sealed class SessionService
         try
         {
             Current = await _desktop.GetBootstrapAsync(cancellationToken);
+            await _organizations.RevalidateAsync(Current, cancellationToken);
             return Current;
         }
         catch (TreckApiException exception) when (exception.IsUnauthorized || exception.IsForbidden)
@@ -52,6 +59,7 @@ public sealed class SessionService
         try
         {
             Current = await _desktop.GetBootstrapAsync(cancellationToken);
+            await _organizations.RevalidateAsync(Current, cancellationToken);
             return Current;
         }
         catch
@@ -77,6 +85,7 @@ public sealed class SessionService
         finally
         {
             Current = null;
+            await _organizations.ClearSelectionAsync(CancellationToken.None);
             await _tokens.ClearAsync(CancellationToken.None);
         }
     }
@@ -84,6 +93,7 @@ public sealed class SessionService
     private async Task ClearLocalSessionAsync(CancellationToken cancellationToken)
     {
         Current = null;
+        await _organizations.ClearSelectionAsync(cancellationToken);
         await _tokens.ClearAsync(cancellationToken);
     }
 }

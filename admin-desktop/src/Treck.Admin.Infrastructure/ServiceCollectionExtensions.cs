@@ -8,6 +8,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddTreckAdminInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton<IAccessTokenStore, DpapiAccessTokenStore>();
+        services.AddSingleton<ISelectedOrganizationStore, DpapiSelectedOrganizationStore>();
         return services;
     }
 }

@@ -9,6 +9,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddTreckAdminApplication(this IServiceCollection services)
     {
         services.AddSingleton<SessionService>();
+        services.AddSingleton<CurrentOrganizationService>();
         services.AddSingleton<PollingLoop>();
         services.AddSingleton<OverviewViewModel>();
         services.AddSingleton<PresenceViewModel>();

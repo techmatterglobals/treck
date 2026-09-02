@@ -45,6 +45,8 @@ directly to the area you need.
 | 35 | [SaaS Tenancy Phase A2](35-saas-tenancy-phase-a2.md) | Organization-scoped authorization foundation |
 | 36 | [SaaS Tenancy Phase B1](36-saas-tenancy-phase-b1.md) | Core tenant data ownership |
 | 37 | [SaaS Tenancy Phase B2](37-saas-tenancy-phase-b2.md) | Monitoring and reporting tenant isolation |
+| 38 | [SaaS Tenancy Phase B3](38-saas-tenancy-phase-b3.md) | Tenant-aware agent enrollment and tokens |
+| 39 | [SaaS Tenancy Phase B4](39-saas-tenancy-phase-b4.md) | Admin Desktop tenant isolation |
 
 ## Deployment artifacts
 

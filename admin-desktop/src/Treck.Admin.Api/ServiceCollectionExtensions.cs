@@ -8,12 +8,15 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddTreckDesktopApi(this IServiceCollection services, Uri baseAddress)
     {
         services.AddTransient<AccessTokenHandler>();
+        services.AddTransient<OrganizationContextHandler>();
         services.AddHttpClient<ITreckDesktopApi, TreckDesktopApi>(client =>
         {
             client.BaseAddress = baseAddress;
             client.Timeout = TimeSpan.FromSeconds(30);
             client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-        }).AddHttpMessageHandler<AccessTokenHandler>();
+        })
+            .AddHttpMessageHandler<AccessTokenHandler>()
+            .AddHttpMessageHandler<OrganizationContextHandler>();
 
         services.AddHttpClient<ITreckAuthenticationApi, TreckAuthenticationApi>(client =>
         {

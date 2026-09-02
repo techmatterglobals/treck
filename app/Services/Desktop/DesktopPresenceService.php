@@ -3,20 +3,21 @@
 namespace App\Services\Desktop;
 
 use App\Models\User;
-use App\Services\Hierarchy\EmployeeVisibility;
 use App\Services\Presence\PresenceService;
+use App\Services\Tenancy\MonitoringTenantAccess;
 
 class DesktopPresenceService
 {
     public function __construct(
-        private readonly EmployeeVisibility $visibility,
+        private readonly MonitoringTenantAccess $tenant,
         private readonly PresenceService $presence,
     ) {}
 
     /** @return array<string,mixed> */
-    public function forUser(User $user): array
+    public function forUser(User $user, int $organizationId): array
     {
-        $rows = $this->presence->rows($this->visibility->computerIds($user))
+        $computerIds = $this->tenant->visibleComputerIds($user);
+        $rows = $this->presence->rows($computerIds, $organizationId)
             ->map(fn (array $row) => [
                 'computer_id' => $row['computer_id'],
                 'employee_id' => $row['employee_id'],
@@ -33,7 +34,7 @@ class DesktopPresenceService
 
         return [
             'items' => $rows,
-            'summary' => $this->presence->summary($this->visibility->computerIds($user)),
+            'summary' => $this->presence->summary($computerIds, $organizationId),
             'refresh_after_seconds' => 30,
             'generated_at' => now()->utc()->toIso8601String(),
         ];

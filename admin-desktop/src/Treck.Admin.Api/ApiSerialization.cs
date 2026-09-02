@@ -16,18 +16,20 @@ internal static class ApiSerialization
         if (response.IsSuccessStatusCode) return;
 
         string message;
+        string? code = null;
         try
         {
             var error = await response.Content.ReadFromJsonAsync<ErrorEnvelope>(JsonOptions, cancellationToken);
             message = error?.Message ?? "The Treck server rejected the request.";
+            code = error?.Code;
         }
         catch (Exception exception) when (exception is JsonException or NotSupportedException)
         {
             message = "The Treck server returned an invalid error response.";
         }
 
-        throw new TreckApiException(response.StatusCode, message);
+        throw new TreckApiException(response.StatusCode, message, code);
     }
 
-    private sealed record ErrorEnvelope(string Message);
+    private sealed record ErrorEnvelope(string Message, string? Code);
 }

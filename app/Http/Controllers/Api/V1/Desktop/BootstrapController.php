@@ -2,33 +2,46 @@
 
 namespace App\Http\Controllers\Api\V1\Desktop;
 
-use App\Http\Controllers\Api\V1\Desktop\Concerns\AuthorizesDesktopAccess;
+use App\Contracts\CurrentOrganization;
 use App\Http\Controllers\Controller;
+use App\Services\Desktop\DesktopOrganizationAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class BootstrapController extends Controller
 {
-    use AuthorizesDesktopAccess;
-
-    public function __invoke(Request $request): JsonResponse
-    {
+    public function __invoke(
+        Request $request,
+        DesktopOrganizationAccess $access,
+        CurrentOrganization $currentOrganization,
+    ): JsonResponse {
         $user = $request->user()->loadMissing('employee.department');
-        $this->authorizeDesktopAccess($user);
+        $currentOrganization->clear();
+        $organizations = $access->authorizedOrganizations($user);
+        $recommended = $organizations->count() === 1 ? $organizations->first() : null;
+        $roles = $organizations->pluck('role')->unique()->values();
+        $permissions = $organizations
+            ->flatMap(fn (array $organization) => $organization['permissions'])
+            ->unique()
+            ->values();
 
         return response()->json([
             'data' => [
+                'contract_version' => 'desktop-v2',
                 'user' => [
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
                 ],
-                'roles' => $user->getRoleNames()->values(),
-                'permissions' => $user->getAllPermissions()->pluck('name')->values(),
+                'roles' => $roles,
+                'permissions' => $permissions,
+                'organizations' => $organizations,
+                'organization_selection_required' => $organizations->count() !== 1,
+                'recommended_organization' => $recommended,
                 'features' => [
                     'presence' => true,
-                    'attendance' => $user->can('view attendance'),
-                    'reports' => $user->can('view reports'),
+                    'attendance' => $organizations->contains(fn (array $organization) => $organization['features']['attendance']),
+                    'reports' => $organizations->contains(fn (array $organization) => $organization['features']['reports']),
                     'application_usage' => true,
                     'screenshots' => (bool) config('treck.screenshots.enabled'),
                     'downloads' => true,

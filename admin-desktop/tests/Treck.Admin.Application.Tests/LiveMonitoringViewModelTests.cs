@@ -15,7 +15,8 @@ public sealed class LiveMonitoringViewModelTests
             new PresenceOverview(12, 9, 3, 7, 1, 1, 0),
             new ActivityOverview(21_600, 7_200, 28_800, 75), "team", DateTimeOffset.UtcNow);
         var api = new SessionServiceTests.StubDesktopApi { Overview = expected };
-        var viewModel = new OverviewViewModel(api, new PollingLoop());
+        var viewModel = new OverviewViewModel(api, new PollingLoop(),
+            new CurrentOrganizationService(new SessionServiceTests.MemoryOrganizationStore()));
 
         viewModel.Activate();
         await api.OverviewCalled.Task.WaitAsync(TimeSpan.FromSeconds(1));
@@ -31,7 +32,8 @@ public sealed class LiveMonitoringViewModelTests
     [Fact]
     public void Presence_selection_requests_employee_detail()
     {
-        var viewModel = new PresenceViewModel(new SessionServiceTests.StubDesktopApi(), new PollingLoop());
+        var viewModel = new PresenceViewModel(new SessionServiceTests.StubDesktopApi(), new PollingLoop(),
+            new CurrentOrganizationService(new SessionServiceTests.MemoryOrganizationStore()));
         long? requested = null;
         viewModel.EmployeeRequested += employeeId => requested = employeeId;
         viewModel.SelectedRow = new PresenceRow(5, 42, "PC-42", "Employee", "Operations", "active",
@@ -74,7 +76,8 @@ public sealed class LiveMonitoringViewModelTests
             60,
             DateTimeOffset.UtcNow);
         var api = new SessionServiceTests.StubDesktopApi { AgentHealth = expected };
-        var viewModel = new AgentHealthViewModel(api, new PollingLoop());
+        var viewModel = new AgentHealthViewModel(api, new PollingLoop(),
+            new CurrentOrganizationService(new SessionServiceTests.MemoryOrganizationStore()));
 
         viewModel.Activate();
         await api.AgentHealthCalled.Task.WaitAsync(TimeSpan.FromSeconds(1));
@@ -85,5 +88,75 @@ public sealed class LiveMonitoringViewModelTests
         Assert.Same(expected.Summary, viewModel.Summary);
         Assert.Equal("Live", viewModel.ConnectionStatus);
         Assert.Single(viewModel.Rows);
+    }
+
+    [Fact]
+    public async Task Old_generation_overview_response_is_discarded_after_organization_switch()
+    {
+        var organizations = new CurrentOrganizationService(new SessionServiceTests.MemoryOrganizationStore());
+        await organizations.SelectAsync(SessionServiceTests.AdminOrganization());
+        var api = new DelayedOverviewApi();
+        var viewModel = new OverviewViewModel(api, new PollingLoop(), organizations);
+
+        var refresh = viewModel.RefreshCommand.ExecuteAsync(null);
+        await api.RequestStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        await organizations.SelectAsync(SessionServiceTests.ManagerOrganization());
+        api.Complete();
+        await refresh;
+
+        Assert.Null(viewModel.Overview);
+    }
+
+    [Fact]
+    public async Task Clearing_presence_and_agent_health_removes_tenant_data()
+    {
+        var organizations = new CurrentOrganizationService(new SessionServiceTests.MemoryOrganizationStore());
+        var polling = new PollingLoop();
+        var presence = new PresenceViewModel(new SessionServiceTests.StubDesktopApi
+        {
+            Presence = new DesktopPresence(
+                [new PresenceRow(1, 2, "PC", "User", "Ops", "active", null, null, 1, 0)],
+                new PresenceOverview(1, 1, 0, 1, 0, 0, 0),
+                30,
+                DateTimeOffset.UtcNow),
+        }, polling, organizations);
+        var health = new AgentHealthViewModel(new SessionServiceTests.StubDesktopApi
+        {
+            AgentHealth = new DesktopAgentHealth(
+                [new AgentHealthRow(1, 2, "PC", "User", "Ops", "healthy", null, "1.0.0", "unknown", null, null, null, null, null, null, null, null, null, null)],
+                new AgentHealthSummary(1, 1, 0, 0, 0, 0),
+                60,
+                DateTimeOffset.UtcNow),
+        }, polling, organizations);
+
+        await presence.RefreshCommand.ExecuteAsync(null);
+        await health.RefreshCommand.ExecuteAsync(null);
+        presence.Clear();
+        health.Clear();
+
+        Assert.Empty(presence.Rows);
+        Assert.Null(presence.Summary);
+        Assert.Empty(health.Rows);
+        Assert.Null(health.Summary);
+    }
+
+    private sealed class DelayedOverviewApi : SessionServiceTests.StubDesktopApi
+    {
+        public TaskCompletionSource<bool> RequestStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<DesktopOverview> _response = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void Complete() => _response.SetResult(new DesktopOverview(
+            DateOnly.FromDateTime(DateTime.Today),
+            new EmployeeOverview(1, 1, 100),
+            new PresenceOverview(1, 1, 0, 1, 0, 0, 0),
+            new ActivityOverview(10, 0, 10, 100),
+            "organization",
+            DateTimeOffset.UtcNow));
+
+        public override Task<DesktopOverview> GetOverviewAsync(CancellationToken cancellationToken = default)
+        {
+            RequestStarted.TrySetResult(true);
+            return _response.Task;
+        }
     }
 }

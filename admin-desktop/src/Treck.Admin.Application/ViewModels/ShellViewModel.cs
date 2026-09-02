@@ -12,6 +12,7 @@ public partial class ShellViewModel : ObservableObject
 {
     private readonly ITreckDesktopApi _api;
     private readonly SessionService _session;
+    private readonly CurrentOrganizationService _organizations;
     private readonly OverviewViewModel _overview;
     private readonly PresenceViewModel _presence;
     private readonly AgentHealthViewModel _agentHealth;
@@ -21,12 +22,17 @@ public partial class ShellViewModel : ObservableObject
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _userName = string.Empty;
     [ObservableProperty] private string _userRole = string.Empty;
+    [ObservableProperty] private string _organizationName = "No organization selected";
+    [ObservableProperty] private DesktopOrganization? _selectedOrganization;
     [ObservableProperty] private ObservableObject? _currentPage;
     [ObservableProperty] private NavigationItem? _selectedNavigation;
+    [ObservableProperty] private bool _isSwitchingOrganization;
+    private bool _suppressSelectionChange;
 
     public ShellViewModel(
         ITreckDesktopApi api,
         SessionService session,
+        CurrentOrganizationService organizations,
         OverviewViewModel overview,
         PresenceViewModel presence,
         AgentHealthViewModel agentHealth,
@@ -34,28 +40,42 @@ public partial class ShellViewModel : ObservableObject
     {
         _api = api;
         _session = session;
+        _organizations = organizations;
         _overview = overview;
         _presence = presence;
         _agentHealth = agentHealth;
         _employeeDetail = employeeDetail;
         _overview.AuthorizationLost += OnAuthorizationLost;
+        _overview.OrganizationContextLost += OnOrganizationContextLost;
         _presence.AuthorizationLost += OnAuthorizationLost;
+        _presence.OrganizationContextLost += OnOrganizationContextLost;
         _agentHealth.AuthorizationLost += OnAuthorizationLost;
+        _agentHealth.OrganizationContextLost += OnOrganizationContextLost;
         _presence.EmployeeRequested += OnEmployeeRequested;
         _employeeDetail.AuthorizationLost += OnAuthorizationLost;
+        _employeeDetail.OrganizationContextLost += OnOrganizationContextLost;
         _employeeDetail.BackRequested += OnEmployeeDetailBackRequested;
     }
 
     public ObservableCollection<NavigationItem> Navigation { get; } = [];
+    public ObservableCollection<DesktopOrganization> Organizations { get; } = [];
     public event Action<string?>? SignedOut;
 
     public void Initialize(DesktopBootstrap bootstrap)
     {
         UserName = bootstrap.User.Name;
-        UserRole = bootstrap.Roles.FirstOrDefault() ?? "authorized user";
-        Status = "Connected";
+        ReplaceOrganizations(bootstrap);
+        ApplySelectedOrganization();
+        Status = SelectedOrganization is null ? "Select an organization to continue." : "Connected";
         BuildNavigation(bootstrap);
-        Navigate(Navigation.First(item => item.Key == "overview"));
+        if (Navigation.Any(item => item.Key == "overview"))
+        {
+            Navigate(Navigation.First(item => item.Key == "overview"));
+        }
+        else
+        {
+            CurrentPage = new MessageViewModel("Organization required", "Select an authorized organization before loading tenant data.");
+        }
     }
 
     [RelayCommand]
@@ -66,7 +86,9 @@ public partial class ShellViewModel : ObservableObject
         try
         {
             IsBusy = true;
-            Initialize(await _api.GetBootstrapAsync(cancellationToken));
+            var bootstrap = await _api.GetBootstrapAsync(cancellationToken);
+            await _organizations.RevalidateAsync(bootstrap, cancellationToken);
+            Initialize(bootstrap);
         }
         catch (TreckApiException exception) when (exception.IsUnauthorized)
         {
@@ -85,6 +107,54 @@ public partial class ShellViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    partial void OnSelectedOrganizationChanged(DesktopOrganization? value)
+    {
+        if (_suppressSelectionChange || value is null || value.Id == _organizations.SelectedOrganizationId) return;
+        _ = SwitchOrganizationAsync(value, CancellationToken.None);
+    }
+
+    private async Task SwitchOrganizationAsync(DesktopOrganization organization, CancellationToken cancellationToken)
+    {
+        if (IsSwitchingOrganization) return;
+
+        try
+        {
+            IsSwitchingOrganization = true;
+            Status = "Switching organization...";
+            DeactivateCurrentPage();
+            ClearTenantData();
+            Navigation.Clear();
+            SelectedNavigation = null;
+
+            await _organizations.SelectAsync(organization, cancellationToken);
+            var bootstrap = await _api.GetBootstrapAsync(cancellationToken);
+            if (!bootstrap.Organizations.Any(candidate => candidate.Id == organization.Id))
+            {
+                await _organizations.ClearSelectionAsync(cancellationToken);
+            }
+
+            Initialize(bootstrap);
+        }
+        catch (TreckApiException exception) when (exception.IsUnauthorized)
+        {
+            await CloseSessionAsync("Your session expired. Sign in again.");
+        }
+        catch (TreckApiException exception) when (exception.IsForbidden || exception.IsOrganizationContextError)
+        {
+            ClearTenantData();
+            Status = "This organization is no longer available.";
+        }
+        catch (HttpRequestException)
+        {
+            ClearTenantData();
+            Status = "Unable to reach the Treck server.";
+        }
+        finally
+        {
+            IsSwitchingOrganization = false;
         }
     }
 
@@ -152,6 +222,25 @@ public partial class ShellViewModel : ObservableObject
         await CloseSessionAsync(message);
     }
 
+    private async void OnOrganizationContextLost(string message)
+    {
+        DeactivateCurrentPage();
+        ClearTenantData();
+        await _organizations.ClearSelectionAsync(CancellationToken.None);
+        Status = message;
+        CurrentPage = new MessageViewModel("Organization required", message);
+        try
+        {
+            var bootstrap = await _api.GetBootstrapAsync(CancellationToken.None);
+            await _organizations.RevalidateAsync(bootstrap, CancellationToken.None);
+            Initialize(bootstrap);
+        }
+        catch (HttpRequestException)
+        {
+            Status = "Unable to refresh organizations.";
+        }
+    }
+
     private async Task CloseSessionAsync(string message)
     {
         DeactivateCurrentPage();
@@ -166,18 +255,60 @@ public partial class ShellViewModel : ObservableObject
         if (CurrentPage is EmployeeDetailViewModel detail) detail.Cancel();
     }
 
+    private void ClearTenantData()
+    {
+        _overview.Clear();
+        _presence.Clear();
+        _agentHealth.Clear();
+        _employeeDetail.Clear();
+    }
+
     private void BuildNavigation(DesktopBootstrap bootstrap)
     {
         Navigation.Clear();
+        if (SelectedOrganization is null) return;
+
+        var features = SelectedOrganization.Features;
+        var permissions = SelectedOrganization.Permissions;
         Navigation.Add(new NavigationItem("overview", "Overview"));
-        if (bootstrap.Features.Presence) Navigation.Add(new NavigationItem("presence", "Live presence"));
-        if (bootstrap.Features.Attendance && bootstrap.Permissions.Contains("view attendance"))
+        if (features.Presence) Navigation.Add(new NavigationItem("presence", "Live presence"));
+        if (features.Attendance && permissions.Contains("view attendance"))
             Navigation.Add(new NavigationItem("attendance", "Attendance"));
-        if (bootstrap.Features.ApplicationUsage) Navigation.Add(new NavigationItem("applications", "Applications"));
-        if (bootstrap.Features.Screenshots) Navigation.Add(new NavigationItem("screenshots", "Screenshots"));
-        if (bootstrap.Features.Downloads) Navigation.Add(new NavigationItem("downloads", "Downloads"));
-        if (bootstrap.Features.Reports && bootstrap.Permissions.Contains("view reports"))
+        if (features.ApplicationUsage) Navigation.Add(new NavigationItem("applications", "Applications"));
+        if (features.Screenshots) Navigation.Add(new NavigationItem("screenshots", "Screenshots"));
+        if (features.Downloads) Navigation.Add(new NavigationItem("downloads", "Downloads"));
+        if (features.Reports && permissions.Contains("view reports"))
             Navigation.Add(new NavigationItem("reports", "Reports"));
-        if (bootstrap.Features.AgentHealth) Navigation.Add(new NavigationItem("health", "Agent health"));
+        if (features.AgentHealth) Navigation.Add(new NavigationItem("health", "Agent health"));
+    }
+
+    private void ReplaceOrganizations(DesktopBootstrap bootstrap)
+    {
+        _suppressSelectionChange = true;
+        try
+        {
+            Organizations.Clear();
+            foreach (var organization in bootstrap.Organizations) Organizations.Add(organization);
+            SelectedOrganization = _organizations.Selected is null
+                ? null
+                : Organizations.FirstOrDefault(organization => organization.Id == _organizations.Selected.Id);
+        }
+        finally
+        {
+            _suppressSelectionChange = false;
+        }
+    }
+
+    private void ApplySelectedOrganization()
+    {
+        if (SelectedOrganization is null)
+        {
+            OrganizationName = "No organization selected";
+            UserRole = "authorized user";
+            return;
+        }
+
+        OrganizationName = SelectedOrganization.Name;
+        UserRole = SelectedOrganization.Role;
     }
 }
