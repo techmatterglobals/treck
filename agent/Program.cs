@@ -41,6 +41,12 @@ try
     // redeem the code, store the device credential, and exit — never starting the
     // monitoring loop. An optional --base-url overrides the server for testing and
     // must be applied before options/HttpClient bind below.
+    //
+    // The code may be supplied either as the token after --enroll (admin / GPO
+    // command line) or via the TRECK_ENROLLMENT_CODE environment variable. The
+    // installer's custom action uses the environment variable so the code never
+    // appears on this process's command line; the argument form still works and
+    // takes precedence when both are present.
     var isEnroll = args.Contains("--enroll");
     if (isEnroll)
     {
@@ -198,7 +204,12 @@ try
         builder.Services.AddSingleton<IEnrollmentService, EnrollmentService>();
         using var enrollHost = builder.Build();
 
-        var enrollmentCode = GetArgValue(args, "--enroll");
+        // Prefer the command-line token (admin/GPO); fall back to the
+        // environment variable the installer's custom action sets on this
+        // process only (keeps the code off the command line). EnrollmentService
+        // reports a usage error if neither is present.
+        var enrollmentCode = GetArgValue(args, "--enroll")
+            ?? Environment.GetEnvironmentVariable("TRECK_ENROLLMENT_CODE");
         var force = args.Contains("--force") || args.Contains("--force-enroll");
         var enrollment = enrollHost.Services.GetRequiredService<IEnrollmentService>();
 
