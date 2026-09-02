@@ -1,0 +1,21 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+
+  <!--
+    Treck Agent MSI. Produces Treck.Agent.Installer.msi from Package.wxs.
+    PublishDir/CaDir are passed by build-installer.ps1 as MSBuild properties and
+    forwarded to the WiX preprocessor via DefineConstants.
+  -->
+  <PropertyGroup>
+    <OutputName>Treck.Agent.Installer</OutputName>
+    <OutputType>Package</OutputType>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <PublishDir Condition="'$(PublishDir)' == ''">..\publish</PublishDir>
+    <CaDir Condition="'$(CaDir)' == ''">ca\bin\Release\net472</CaDir>
+    <DefineConstants>PublishDir=$(PublishDir);CaDir=$(CaDir)</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Util.wixext" Version="5.0.2" />
+  </ItemGroup>
+
+</Project>

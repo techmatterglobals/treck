@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Managed WiX custom action (WixToolset.Dtf). Targets .NET Framework 4.7.2 —
+    DTF custom actions are hosted by MSI's native shim, not the .NET 8 runtime.
+    The DTF MSBuild targets package the class library into a self-extracting CA
+    DLL at build time; reference that packaged DLL from Package.wxs (<Binary>).
+    Verify the exact packaged filename on your build host (commonly
+    "<AssemblyName>.CA.dll") and align Package.wxs / build-installer.ps1 to it.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>Treck.Agent.Installer.CA</AssemblyName>
+    <RootNamespace>Treck.Agent.Installer.CA</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Dtf.CustomAction" Version="5.0.2" />
+  </ItemGroup>
+
+</Project>

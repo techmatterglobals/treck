@@ -1,0 +1,7 @@
+# WiX / build outputs
+artifacts/
+publish/
+bin/
+obj/
+*.wixpdb
+*.wixobj
