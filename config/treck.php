@@ -135,4 +135,16 @@ return [
         'provisioning_key' => env('TRECK_AGENT_PROVISIONING_KEY'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Agent enrollment (installer flow)
+    |--------------------------------------------------------------------------
+    | Defaults for one-time enrollment codes: how long a freshly generated code
+    | stays valid, and how many computers it may enroll (1 = single-use).
+    */
+    'enrollment' => [
+        'default_ttl_days' => (int) env('TRECK_ENROLLMENT_TTL_DAYS', 14),
+        'default_max_uses' => (int) env('TRECK_ENROLLMENT_MAX_USES', 1),
+    ],
+
 ];
