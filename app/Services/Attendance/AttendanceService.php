@@ -15,12 +15,13 @@ use Illuminate\Support\Carbon;
  */
 class AttendanceService
 {
-    public function deriveDaily(Carbon|string|null $date = null): int
+    public function deriveDaily(Carbon|string|null $date = null, ?int $organizationId = null): int
     {
         $date = $date ? Carbon::parse($date) : today();
         $dateStr = $date->toDateString();
 
         $sessions = ActivityLog::whereDate('work_date', $dateStr)
+            ->when($organizationId !== null, fn ($query) => $query->where('organization_id', $organizationId))
             ->selectRaw('employee_id,
                 MAX(organization_id) as organization_id,
                 MIN(login_at)  as first_in,
@@ -33,7 +34,7 @@ class AttendanceService
 
         $processed = 0;
 
-        foreach (Employee::all() as $employee) {
+        foreach (Employee::query()->when($organizationId !== null, fn ($query) => $query->where('organization_id', $organizationId))->get() as $employee) {
             $attendance = Attendance::firstOrNew([
                 'employee_id' => $employee->id,
                 'work_date' => $dateStr,

@@ -50,16 +50,13 @@ class ScreenshotService
         }
 
         $capturedAt = Carbon::parse($data['captured_at']);
-        [$path, $filename] = $this->storage->store($file, $computer->id, $hash, $capturedAt->toDateString());
-
-        [$width, $height] = $this->dimensions($file, $data);
-
-        // Attribute the capture to the employee behind the reported Windows
-        // account on shared computers (Phase 11); legacy uploads without a
-        // username resolve to the computer's assigned employee.
         $windowsUsername = $data['windows_username'] ?? $data['source_user'] ?? null;
         $employeeId = $this->resolver->resolve($computer, $windowsUsername)->employeeId;
         $organizationId = $this->ownership->resolve($computer, $employeeId)->organizationId;
+
+        [$path, $filename] = $this->storage->store($file, $organizationId, $computer->id, $hash, $capturedAt->toDateString());
+
+        [$width, $height] = $this->dimensions($file, $data);
 
         $attributes = [
             'organization_id' => $organizationId,

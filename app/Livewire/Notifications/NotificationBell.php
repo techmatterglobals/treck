@@ -34,7 +34,7 @@ class NotificationBell extends Component
     public function getListeners(): array
     {
         return [
-            "echo-private:notifications.user.{$this->userId},.NotificationCreated" => '$refresh',
+            "echo-private:organization.{$this->organizationId}.notifications.user.{$this->userId},.NotificationCreated" => '$refresh',
         ];
     }
 

@@ -6,7 +6,6 @@ use App\Livewire\Concerns\ScopesToViewer;
 use App\Services\Presence\PresenceService;
 use App\Services\Tenancy\MonitoringTenantAccess;
 use Illuminate\Contracts\View\View;
-use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
@@ -20,16 +19,25 @@ class PresenceBoard extends Component
 {
     use ScopesToViewer;
 
-    public function mount(): void
+    public int $organizationId;
+
+    public function mount(MonitoringTenantAccess $tenant): void
     {
         $this->authorizeViewer();
+        $this->organizationId = $tenant->organizationId(auth()->user());
     }
 
     /**
      * Echo pushes PresenceChanged on the private `presence` channel; the mere
      * arrival re-renders the component with fresh materialized state.
      */
-    #[On('echo-private:presence,.PresenceChanged')]
+    public function getListeners(): array
+    {
+        return [
+            "echo-private:organization.{$this->organizationId}.presence,.PresenceChanged" => 'onPresenceChanged',
+        ];
+    }
+
     public function onPresenceChanged(): void
     {
         // No state to merge: render() re-reads the presence table.

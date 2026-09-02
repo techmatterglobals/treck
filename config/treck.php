@@ -74,6 +74,9 @@ return [
         'disk' => env('TRECK_SCREENSHOT_DISK', 'local'),
         // Path prefix within the disk.
         'directory' => env('TRECK_SCREENSHOT_DIR', 'screenshots'),
+        // Temporary compatibility window for authorized rows whose bytes still
+        // exist at the pre-B5 path. Disable after storage migration verifies.
+        'legacy_fallback' => (bool) env('TRECK_SCREENSHOT_LEGACY_FALLBACK', true),
         // Max accepted upload size in kilobytes (validation guard).
         'max_upload_kb' => (int) env('TRECK_SCREENSHOT_MAX_KB', 8192),
         // Signed view-URL lifetime, in minutes.

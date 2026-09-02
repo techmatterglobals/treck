@@ -19,18 +19,20 @@ use Illuminate\Support\Carbon;
  */
 class ProductivityService
 {
-    public function generateDaily(Carbon|string|null $date = null): int
+    public function generateDaily(Carbon|string|null $date = null, ?int $organizationId = null): int
     {
         $date = $date ? Carbon::parse($date) : today();
         $dateStr = $date->toDateString();
 
         $employeeIds = ActivityLog::whereDate('work_date', $dateStr)
+            ->when($organizationId !== null, fn ($query) => $query->where('organization_id', $organizationId))
             ->distinct()
             ->pluck('employee_id');
 
         foreach ($employeeIds as $employeeId) {
             $activity = ActivityLog::whereDate('work_date', $dateStr)
                 ->where('employee_id', $employeeId)
+                ->when($organizationId !== null, fn ($query) => $query->where('organization_id', $organizationId))
                 ->selectRaw('MAX(organization_id) as organization_id, COALESCE(SUM(active_seconds),0) a, COALESCE(SUM(idle_seconds),0) i')
                 ->first();
 
@@ -39,6 +41,7 @@ class ProductivityService
 
             $usage = ApplicationUsage::whereDate('used_at', $dateStr)
                 ->where('employee_id', $employeeId)
+                ->when($organizationId !== null, fn ($query) => $query->where('organization_id', $organizationId))
                 ->selectRaw('
                     COALESCE(SUM(CASE WHEN productivity = ? THEN duration_seconds END),0) p,
                     COALESCE(SUM(CASE WHEN productivity = ? THEN duration_seconds END),0) u,

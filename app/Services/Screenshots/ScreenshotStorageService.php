@@ -5,6 +5,7 @@ namespace App\Services\Screenshots;
 use App\Models\Screenshot;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -36,12 +37,13 @@ class ScreenshotStorageService
      *
      * @return array{0:string,1:string}
      */
-    public function store(UploadedFile $file, int $computerId, string $hash, string $capturedAtDate): array
+    public function store(UploadedFile $file, ?int $organizationId, int $computerId, string $hash, string $capturedAtDate): array
     {
-        $directory = trim((string) config('treck.screenshots.directory', 'screenshots'), '/');
         $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'jpg');
         $filename = "{$hash}.{$extension}";
-        $path = "{$directory}/{$computerId}/{$capturedAtDate}/{$filename}";
+        $path = $organizationId
+            ? $this->tenantPath($organizationId, $computerId, $capturedAtDate, $filename)
+            : $this->legacyPath($computerId, $capturedAtDate, $filename);
 
         // putFileAs writes to the configured (private) disk.
         $this->filesystem()->putFileAs(dirname($path), $file, basename($path));
@@ -52,7 +54,7 @@ class ScreenshotStorageService
     /** True if the object still exists on its disk. */
     public function exists(Screenshot $screenshot): bool
     {
-        return Storage::disk($screenshot->disk ?: $this->disk())->exists($screenshot->path);
+        return $this->readablePath($screenshot) !== null;
     }
 
     /** Delete the underlying image file (best-effort; used on prune). */
@@ -92,7 +94,7 @@ class ScreenshotStorageService
     /** Stream the image bytes for the signed/authorized route. */
     public function response(Screenshot $screenshot): StreamedResponse
     {
-        return Storage::disk($screenshot->disk ?: $this->disk())->response($screenshot->path);
+        return Storage::disk($screenshot->disk ?: $this->disk())->response($this->readablePath($screenshot) ?? $screenshot->path);
     }
 
     /** Force a download response for the image (authorized users only). */
@@ -100,6 +102,76 @@ class ScreenshotStorageService
     {
         $name = $screenshot->filename ?: basename($screenshot->path);
 
-        return Storage::disk($screenshot->disk ?: $this->disk())->download($screenshot->path, $name);
+        return Storage::disk($screenshot->disk ?: $this->disk())->download($this->readablePath($screenshot) ?? $screenshot->path, $name);
+    }
+
+    public function tenantPath(int $organizationId, int $computerId, string $capturedAtDate, string $filename): string
+    {
+        $directory = trim((string) config('treck.screenshots.directory', 'screenshots'), '/');
+
+        return "organizations/{$organizationId}/{$directory}/{$computerId}/{$capturedAtDate}/{$filename}";
+    }
+
+    public function legacyPath(int $computerId, string $capturedAtDate, string $filename): string
+    {
+        $directory = trim((string) config('treck.screenshots.directory', 'screenshots'), '/');
+
+        return "{$directory}/{$computerId}/{$capturedAtDate}/{$filename}";
+    }
+
+    public function expectedTenantPath(Screenshot $screenshot): ?string
+    {
+        if ($screenshot->organization_id === null || $screenshot->computer_id === null || $screenshot->captured_at === null) {
+            return null;
+        }
+
+        $filename = $screenshot->filename ?: basename($screenshot->path);
+
+        return $this->tenantPath(
+            (int) $screenshot->organization_id,
+            (int) $screenshot->computer_id,
+            $screenshot->captured_at->toDateString(),
+            $filename,
+        );
+    }
+
+    public function expectedLegacyPath(Screenshot $screenshot): ?string
+    {
+        if ($screenshot->computer_id === null || $screenshot->captured_at === null) {
+            return null;
+        }
+
+        $filename = $screenshot->filename ?: basename($screenshot->path);
+
+        return $this->legacyPath((int) $screenshot->computer_id, $screenshot->captured_at->toDateString(), $filename);
+    }
+
+    private function readablePath(Screenshot $screenshot): ?string
+    {
+        $disk = $screenshot->disk ?: $this->disk();
+        $filesystem = Storage::disk($disk);
+
+        if ($screenshot->path && $filesystem->exists($screenshot->path)) {
+            return $screenshot->path;
+        }
+
+        if (! config('treck.screenshots.legacy_fallback', true)) {
+            return null;
+        }
+
+        $legacyPath = $this->expectedLegacyPath($screenshot);
+        $tenantPath = $this->expectedTenantPath($screenshot);
+
+        if ($legacyPath !== null && $tenantPath !== null && $legacyPath !== $tenantPath && $filesystem->exists($legacyPath)) {
+            Log::warning('Using legacy screenshot storage fallback.', [
+                'screenshot_id' => $screenshot->id,
+                'organization_id' => $screenshot->organization_id,
+                'computer_id' => $screenshot->computer_id,
+            ]);
+
+            return $legacyPath;
+        }
+
+        return null;
     }
 }

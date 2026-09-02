@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Middleware\SetOrganizationContext;
 use App\Models\Computer;
 use App\Models\Employee;
 use App\Services\Notifications\NotificationContext;
@@ -30,6 +31,11 @@ class EvaluateNotificationsJob implements ShouldQueue
         public readonly array $data = [],
         public readonly ?int $organizationId = null,
     ) {}
+
+    public function middleware(): array
+    {
+        return [new SetOrganizationContext];
+    }
 
     public function handle(NotificationEngine $engine): void
     {

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Middleware\SetOrganizationContext;
 use App\Services\Attendance\AttendanceService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -13,10 +14,18 @@ class RollUpDailyAttendance implements ShouldQueue
 {
     use Queueable;
 
-    public function __construct(public readonly ?string $date = null) {}
+    public function __construct(
+        public readonly ?string $date = null,
+        public readonly ?int $organizationId = null,
+    ) {}
+
+    public function middleware(): array
+    {
+        return [new SetOrganizationContext];
+    }
 
     public function handle(AttendanceService $service): void
     {
-        $service->deriveDaily($this->date);
+        $service->deriveDaily($this->date, $this->organizationId);
     }
 }

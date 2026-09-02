@@ -25,6 +25,10 @@ class NotificationCreated implements ShouldBroadcast
     /** @return array<int, Channel> */
     public function broadcastOn(): array
     {
+        if ($this->log->organization_id !== null) {
+            return [new PrivateChannel('organization.'.$this->log->organization_id.'.notifications.user.'.$this->log->recipient_id)];
+        }
+
         return [new PrivateChannel('notifications.user.'.$this->log->recipient_id)];
     }
 
@@ -37,6 +41,7 @@ class NotificationCreated implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
+            'organization_id' => $this->log->organization_id,
             'id' => $this->log->id,
             'event_type' => $this->log->event_type,
             'severity' => $this->log->severity,

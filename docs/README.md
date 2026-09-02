@@ -47,6 +47,8 @@ directly to the area you need.
 | 37 | [SaaS Tenancy Phase B2](37-saas-tenancy-phase-b2.md) | Monitoring and reporting tenant isolation |
 | 38 | [SaaS Tenancy Phase B3](38-saas-tenancy-phase-b3.md) | Tenant-aware agent enrollment and tokens |
 | 39 | [SaaS Tenancy Phase B4](39-saas-tenancy-phase-b4.md) | Admin Desktop tenant isolation |
+| 40 | [SaaS Tenancy Phase B5](40-saas-tenancy-phase-b5.md) | Infrastructure tenant isolation and production readiness |
+| 41 | [SaaS Production Rollout Runbook](41-saas-production-rollout.md) | A1-B5 rehearsal, backfill, storage migration, and readiness order |
 
 ## Deployment artifacts
 

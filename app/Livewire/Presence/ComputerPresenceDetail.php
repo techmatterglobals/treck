@@ -23,6 +23,8 @@ class ComputerPresenceDetail extends Component
 {
     public int $computerId;
 
+    public int $organizationId;
+
     public function mount(Computer $computer, MonitoringTenantAccess $tenant): void
     {
         $user = auth()->user();
@@ -32,13 +34,14 @@ class ComputerPresenceDetail extends Component
         abort_unless($tenant->canSeeComputer($user, $computer->id), 403);
 
         $this->computerId = $computer->id;
+        $this->organizationId = (int) $computer->organization_id;
     }
 
     /** Dynamic Echo listener bound to this computer's private channel. */
     public function getListeners(): array
     {
         return [
-            "echo-private:presence.computer.{$this->computerId},.PresenceChanged" => 'onPresenceChanged',
+            "echo-private:organization.{$this->organizationId}.presence.computer.{$this->computerId},.PresenceChanged" => 'onPresenceChanged',
         ];
     }
 

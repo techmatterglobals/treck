@@ -7,7 +7,6 @@ use App\Models\NotificationLog;
 use App\Services\Tenancy\MonitoringTenantAccess;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
-use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -59,7 +58,13 @@ class NotificationDashboard extends Component
         $this->resetPage();
     }
 
-    #[On('echo-private:notifications.user.{userId},.NotificationCreated')]
+    public function getListeners(): array
+    {
+        return [
+            "echo-private:organization.{$this->organizationId}.notifications.user.{$this->userId},.NotificationCreated" => 'onNotificationCreated',
+        ];
+    }
+
     public function onNotificationCreated(): void
     {
         // Arrival re-renders with fresh data.

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Middleware\SetOrganizationContext;
 use App\Models\NotificationLog;
 use App\Services\Notifications\NotificationDeliveryService;
 use Illuminate\Bus\Queueable;
@@ -28,6 +29,11 @@ class SendNotificationJob implements ShouldQueue
         public readonly int $notificationLogId,
         public readonly ?int $organizationId = null,
     ) {}
+
+    public function middleware(): array
+    {
+        return [new SetOrganizationContext];
+    }
 
     public function handle(NotificationDeliveryService $delivery): void
     {

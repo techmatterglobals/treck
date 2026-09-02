@@ -29,6 +29,15 @@ class PresenceChanged implements ShouldBroadcast
     /** @return array<int, Channel> */
     public function broadcastOn(): array
     {
+        $organizationId = $this->organizationId();
+
+        if ($organizationId !== null) {
+            return [
+                new PrivateChannel('organization.'.$organizationId.'.presence'),
+                new PrivateChannel('organization.'.$organizationId.'.presence.computer.'.$this->presence->computer_id),
+            ];
+        }
+
         return [
             new PrivateChannel('presence'),
             new PrivateChannel('presence.computer.'.$this->presence->computer_id),
@@ -50,6 +59,7 @@ class PresenceChanged implements ShouldBroadcast
         $status = $this->presence->status;
 
         return [
+            'organization_id' => $this->organizationId(),
             'computer_id' => $this->presence->computer_id,
             'computer_name' => $computer?->hostname,
             'employee' => $employee?->name,
@@ -63,5 +73,12 @@ class PresenceChanged implements ShouldBroadcast
             'last_activity_at' => $this->presence->last_activity_at?->toIso8601String(),
             'last_synced_at' => $this->presence->last_synced_at?->toIso8601String(),
         ];
+    }
+
+    private function organizationId(): ?int
+    {
+        $organizationId = $this->presence->organization_id ?: $this->presence->computer?->organization_id;
+
+        return $organizationId ? (int) $organizationId : null;
     }
 }
