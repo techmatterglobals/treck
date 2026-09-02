@@ -64,6 +64,20 @@ public sealed class DeviceRegistrationService : IDeviceRegistrationService
 
     private async Task<string> RegisterAsync(CancellationToken cancellationToken)
     {
+        // New (enrollment-based) installs have no provisioning key: they are
+        // enrolled once via `TreckAgent.exe --enroll <CODE>`, which stores the
+        // device token directly. Reaching here without a token AND without a key
+        // means the device was never enrolled — fail with a clear, actionable
+        // message instead of a doomed empty-key registration attempt. The legacy
+        // provisioning-key flow (key present) is unchanged.
+        if (string.IsNullOrWhiteSpace(_options.ProvisioningKey))
+        {
+            throw new InvalidOperationException(
+                "This device is not enrolled and no provisioning key is configured. "
+                + "Run 'TreckAgent.exe --enroll <CODE>' to enroll it, or set Agent:ProvisioningKey "
+                + "(+ Agent:EmployeeCode) for the legacy registration flow.");
+        }
+
         var deviceUuid = _deviceIdStore.GetOrCreate();
 
         var request = new RegisterDeviceRequest(

@@ -13,6 +13,14 @@ public interface ITreckApiClient
     Task<RegisterDeviceResponse> RegisterDeviceAsync(RegisterDeviceRequest request, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Enrolls this computer with a one-time enrollment code (installer flow) and
+    /// returns its credentials (device token, ids). Never logs the code. Throws
+    /// <see cref="EnrollmentRejectedException"/> when the code is rejected (422)
+    /// and <see cref="ApiException"/> on other non-success responses.
+    /// </summary>
+    Task<EnrollmentResponse> EnrollAsync(EnrollmentRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Uploads one queued event to <c>/api/agent/events</c> using the device
     /// bearer token. Returns true on any 2xx (stored or idempotent duplicate);
     /// throws <see cref="UnauthorizedApiException"/> on 401 so the caller can

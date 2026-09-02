@@ -15,12 +15,18 @@ public sealed class AgentOptions
     [Url]
     public string BaseUrl { get; set; } = string.Empty;
 
-    /// <summary>Shared provisioning key used once to register the device (M2).</summary>
-    [Required]
+    /// <summary>
+    /// Shared provisioning key for the LEGACY registration flow (M2). Optional:
+    /// new installs enroll with a one-time code (TreckAgent.exe --enroll) and
+    /// store a device token instead, so this is absent from their config.
+    /// </summary>
     public string ProvisioningKey { get; set; } = string.Empty;
 
-    /// <summary>Employee code this workstation is assigned to.</summary>
-    [Required]
+    /// <summary>
+    /// Employee code for the LEGACY registration flow. Optional: enrollment is
+    /// computer-scoped (no employee code); the employee is resolved at runtime
+    /// from the Windows username via computer_users.
+    /// </summary>
     public string EmployeeCode { get; set; } = string.Empty;
 
     /// <summary>How often to report activity, in seconds.</summary>

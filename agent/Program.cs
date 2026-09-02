@@ -37,6 +37,20 @@ try
     var isCaptureHelperTest = args.Contains("--capture-helper-test");
     var isCaptureHelper = args.Contains("--capture-helper");
 
+    // One-shot enrollment mode (installer / `TreckAgent.exe --enroll <CODE>`):
+    // redeem the code, store the device credential, and exit — never starting the
+    // monitoring loop. An optional --base-url overrides the server for testing and
+    // must be applied before options/HttpClient bind below.
+    var isEnroll = args.Contains("--enroll");
+    if (isEnroll)
+    {
+        var baseUrlOverride = GetArgValue(args, "--base-url");
+        if (!string.IsNullOrWhiteSpace(baseUrlOverride))
+        {
+            builder.Configuration["Agent:BaseUrl"] = baseUrlOverride;
+        }
+    }
+
     // Topology is decided by the SESSION the process runs in, not by
     // WindowsServiceHelpers.IsWindowsService() (whose parent-process heuristic
     // proved unreliable and left the supervisor unregistered). A Windows service
@@ -77,10 +91,11 @@ try
     // IsWindowsService() is false for it, yet its working directory is still
     // Program Files (not user-writable). Redirect its log sink to ProgramData too,
     // to a distinct file so the two processes never contend on the same log.
-    if (runningInSession0 || WindowsServiceHelpers.IsWindowsService() || isCaptureHelper || isCaptureHelperTest)
+    if (runningInSession0 || WindowsServiceHelpers.IsWindowsService() || isCaptureHelper || isCaptureHelperTest || isEnroll)
     {
         var logFile = isCaptureHelperTest ? "treck-agent-selftest-.jsonl"
             : isCaptureHelper ? "treck-agent-helper-.jsonl"
+            : isEnroll ? "treck-agent-enroll-.jsonl"
             : "treck-agent-.jsonl";
         builder.Configuration["Serilog:WriteTo:1:Args:path"] = ResolveServiceLogFilePath(builder.Configuration, logFile);
     }
@@ -174,6 +189,22 @@ try
     builder.Services.AddSingleton<IEventUploader, AgentEventUploader>();
     builder.Services.AddSingleton<ISyncService, SyncService>();
 
+    // --- One-shot enrollment (--enroll <CODE>) ---
+    // Reuses the API client, the DPAPI token store and the device-id store; it
+    // stores the returned credential and EXITS. No hosted/monitoring service is
+    // registered on this path, so enrollment never starts the agent loop.
+    if (isEnroll)
+    {
+        builder.Services.AddSingleton<IEnrollmentService, EnrollmentService>();
+        using var enrollHost = builder.Build();
+
+        var enrollmentCode = GetArgValue(args, "--enroll");
+        var force = args.Contains("--force") || args.Contains("--force-enroll");
+        var enrollment = enrollHost.Services.GetRequiredService<IEnrollmentService>();
+
+        return await enrollment.RunAsync(enrollmentCode, force, CancellationToken.None);
+    }
+
     // --- One-shot capture self-test (--capture-helper-test) ---
     if (isCaptureHelperTest)
     {
@@ -250,6 +281,20 @@ catch (Exception ex)
 finally
 {
     Log.CloseAndFlush();
+}
+
+// Returns the value following a "--name" argument (e.g. the code after --enroll
+// or the URL after --base-url), or null when absent or when the next token is
+// itself a flag. Local functions are in scope for the whole top-level program.
+static string? GetArgValue(string[] args, string name)
+{
+    var index = Array.IndexOf(args, name);
+    if (index >= 0 && index + 1 < args.Length && !args[index + 1].StartsWith("--", StringComparison.Ordinal))
+    {
+        return args[index + 1];
+    }
+
+    return null;
 }
 
 // Resolves a log file path under the agent's writable data directory (mirrors
