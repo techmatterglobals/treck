@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Localization for the custom TreckAgentSetup theme (EnrollTheme.xml).
+  Based on the stock WixStdBA hyperlink theme strings, with the Install-page
+  strings replaced by the "Connect this computer to Treck" enrollment step.
+-->
+<WixLocalization Culture="en-us" Language="1033" xmlns="http://wixtoolset.org/schemas/v4/wxl">
+  <String Id="Caption" Value="[WixBundleName] Setup" />
+  <String Id="Title" Value="[WixBundleName]" />
+  <String Id="CheckingForUpdatesLabel" Value="Checking for updates" />
+
+  <!-- Install page: enrollment step. -->
+  <String Id="ConnectHeader" Value="Connect this computer to Treck" />
+  <String Id="ConnectIntro" Value="Enter the enrollment code provided by your administrator. This connects the computer to Treck; who is using it is determined automatically at sign-in." />
+  <String Id="EnrollCodeLabel" Value="Enrollment code:" />
+  <String Id="BaseUrlLabel" Value="Server URL (optional — leave blank to use the preconfigured server):" />
+  <String Id="InstallInstallButton" Value="&amp;Install" />
+  <String Id="InstallCancelButton" Value="&amp;Cancel" />
+
+  <String Id="ConfirmCancelMessage" Value="Are you sure you want to cancel?" />
+  <String Id="ExecuteUpgradeRelatedBundleMessage" Value="Previous version" />
+
+  <String Id="HelpHeader" Value="Setup Help" />
+  <String Id="HelpText" Value="/install | /repair | /uninstall | /layout [directory] - installs, repairs, uninstalls or&#xA;   creates a complete local copy of the bundle in directory. Install is the default.&#xA;&#xA;/passive | /quiet -  displays minimal UI with no prompts or displays no UI and&#xA;   no prompts. By default UI and all prompts are displayed.&#xA;&#xA;/norestart   - suppress any attempts to restart. By default UI will prompt before restart.&#xA;/log log.txt - logs to a specific file. By default a log file is created in %TEMP%." />
+  <String Id="HelpCloseButton" Value="&amp;Close" />
+
+  <String Id="ProgressHeader" Value="Setup Progress" />
+  <String Id="ProgressLabel" Value="Processing:" />
+  <String Id="OverallProgressPackageText" Value="Initializing..." />
+  <String Id="ProgressCancelButton" Value="&amp;Cancel" />
+
+  <String Id="ModifyHeader" Value="Modify Setup" />
+  <String Id="ModifyRepairButton" Value="&amp;Repair" />
+  <String Id="ModifyUninstallButton" Value="&amp;Uninstall" />
+  <String Id="ModifyCancelButton" Value="&amp;Cancel" />
+
+  <String Id="SuccessHeader" Value="Setup Successful" />
+  <String Id="SuccessCacheHeader" Value="Cache Successfully Completed" />
+  <String Id="SuccessInstallHeader" Value="Installation Successfully Completed" />
+  <String Id="SuccessLayoutHeader" Value="Layout Successfully Completed" />
+  <String Id="SuccessModifyHeader" Value="Modify Successfully Completed" />
+  <String Id="SuccessRepairHeader" Value="Repair Successfully Completed" />
+  <String Id="SuccessUninstallHeader" Value="Uninstall Successfully Completed" />
+  <String Id="SuccessUnsafeUninstallHeader" Value="Uninstall Successfully Completed" />
+  <String Id="SuccessRestartText" Value="You must restart your computer before you can use the software." />
+  <String Id="SuccessUninstallRestartText" Value="You must restart your computer to complete the removal of the software." />
+  <String Id="SuccessRestartButton" Value="&amp;Restart" />
+  <String Id="SuccessCloseButton" Value="&amp;Close" />
+
+  <String Id="FailureHeader" Value="Setup Failed" />
+  <String Id="FailureCacheHeader" Value="Cache Failed" />
+  <String Id="FailureInstallHeader" Value="Setup Failed" />
+  <String Id="FailureLayoutHeader" Value="Layout Failed" />
+  <String Id="FailureModifyHeader" Value="Modify Failed" />
+  <String Id="FailureRepairHeader" Value="Repair Failed" />
+  <String Id="FailureUninstallHeader" Value="Uninstall Failed" />
+  <String Id="FailureUnsafeUninstallHeader" Value="Uninstall Failed" />
+  <String Id="FailureHyperlinkLogText" Value="One or more issues caused the setup to fail. Please fix the issues and then retry setup. For more information see the &lt;a href=&quot;#&quot;&gt;log file&lt;/a&gt;." />
+  <String Id="FailureRestartText" Value="You must restart your computer to complete the rollback of the software." />
+  <String Id="FailureRestartButton" Value="&amp;Restart" />
+  <String Id="FailureCloseButton" Value="&amp;Close" />
+</WixLocalization>

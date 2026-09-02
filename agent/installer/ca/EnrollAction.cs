@@ -13,9 +13,10 @@ namespace Treck.Agent.Installer.CA
     ///
     /// SECURITY: the enrollment code arrives via CustomActionData (its property is
     /// listed in MsiHiddenProperties, so it is never written to the MSI log). This
-    /// action never logs the code — only the agent's exit code. The code is passed
-    /// to the child agent as an argument, so it is briefly visible on that single
-    /// child process's command line during enrollment (documented limitation).
+    /// action never logs the code — only the agent's exit code. The code is handed
+    /// to the child agent through a process-scoped environment variable
+    /// (TRECK_ENROLLMENT_CODE), never on the command line, so it is not visible via
+    /// Process Explorer / WMI and is not persisted anywhere.
     /// </summary>
     public static class EnrollActions
     {
@@ -43,10 +44,14 @@ namespace Treck.Agent.Installer.CA
                 return ActionResult.Failure;
             }
 
+            // Pass the code to the agent via a process-scoped environment variable
+            // so it never appears on the child's command line (not visible in
+            // Process Explorer / WMI). The variable lives only for this child
+            // process and its lifetime, and is not persisted anywhere. The agent's
+            // --enroll path reads TRECK_ENROLLMENT_CODE when no code argument is
+            // given. Only the (space/quote-free) --base-url is passed as an arg.
             // net472 has no ProcessStartInfo.ArgumentList; build a quoted string.
-            // Codes are TRK-XXXX-XXXX-XXXX and URLs have no spaces/quotes; strip
-            // any stray quotes defensively to avoid argument injection.
-            var args = "--enroll " + Quote(code);
+            var args = "--enroll";
             if (!string.IsNullOrWhiteSpace(baseUrl))
             {
                 args += " --base-url " + Quote(baseUrl);
@@ -58,6 +63,9 @@ namespace Treck.Agent.Installer.CA
                 UseShellExecute = false,
                 CreateNoWindow = true,
             };
+
+            // EnvironmentVariables requires UseShellExecute = false (set above).
+            startInfo.EnvironmentVariables["TRECK_ENROLLMENT_CODE"] = code;
 
             try
             {

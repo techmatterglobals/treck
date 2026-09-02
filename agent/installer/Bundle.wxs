@@ -6,18 +6,20 @@
   (enrollment code) → Install → Finish flow. Because the agent is published
   self-contained (win-x64), no .NET runtime prerequisite is chained.
 
-  The enrollment code is captured into the hidden, overridable bundle variable
-  EnrollmentCode and forwarded to the MSI as the ENROLLMENT_CODE property. Hidden
-  variables are masked in the Burn log, and the MSI lists ENROLLMENT_CODE in
-  MsiHiddenProperties, so the code is not written to any installer log.
-
-  UI note: this first cut uses the stock WixStdBA window. Supply the code via the
-  EnrollmentCode variable on the command line:
+  The installer window presents a "Connect this computer to Treck" step (custom
+  WixStdBA theme, theme\EnrollTheme.xml) with an in-window Enrollment code field.
+  WixStdBA two-way binds the theme's "EnrollmentCode" / "BaseUrl" editboxes to the
+  hidden, overridable bundle variables of the same name; those are forwarded to the
+  MSI as the ENROLLMENT_CODE / BASE_URL properties. Hidden variables are masked in
+  the Burn log, and the MSI lists ENROLLMENT_CODE in MsiHiddenProperties, so the
+  code is not written to any installer log. A bal:Condition blocks Install until a
+  code is entered. The same variables can still be supplied on the command line for
+  silent/GPO installs:
       TreckAgentSetup.exe EnrollmentCode=TRK-XXXX-XXXX-XXXX
-  A custom theme with an in-window code field is a documented follow-up (README).
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
-     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
   <?ifndef MsiPath ?><?define MsiPath = "Treck.Agent.Installer.msi" ?><?endif?>
 
@@ -27,22 +29,41 @@
           UpgradeCode="a2b3c4d5-7e8f-4a1b-9c2d-3e4f5a6b7c8d">
 
     <BootstrapperApplication>
-      <!-- Stock WixStdBA theme (no EULA: empty LicenseUrl). Produces a standard
-           Welcome / Install / Finish window. The in-window enrollment-code field
-           is a documented follow-up (custom theme.xml) — see README; until then
-           the code is supplied via the EnrollmentCode variable (command line) or
-           the MSI ENROLLMENT_CODE property. -->
+      <!-- Custom theme (Theme="none" + ThemeFile/LocalizationFile). The Install
+           page collects the enrollment code in-window (see theme\EnrollTheme.xml).
+           No EULA (empty LicenseUrl); the Options/install-folder UI is suppressed
+           because the install location is fixed. -->
       <bal:WixStandardBootstrapperApplication
-          Theme="hyperlinkLicense"
+          Theme="none"
+          ThemeFile="theme\EnrollTheme.xml"
+          LocalizationFile="theme\EnrollTheme.wxl"
           LicenseUrl=""
           SuppressOptionsUI="yes"
           ShowVersion="yes" />
     </BootstrapperApplication>
 
-    <!-- Captured by the theme's editbox (same name) or overridden on the command
+    <!-- Bound to the theme's editboxes (same Name) and overridable on the command
          line. Hidden => masked in the Burn log. -->
     <Variable Name="EnrollmentCode" Type="string" Value="" Hidden="yes" bal:Overridable="yes" />
     <Variable Name="BaseUrl" Type="string" Value="" Hidden="yes" bal:Overridable="yes" />
+
+    <!-- Detect an existing enrollment (mirrors the MSI's TRECK_TOKEN_EXISTS) so
+         the code is required ONLY for a fresh install — never on upgrade, repair or
+         uninstall. Burn runs searches during Detect, before conditions evaluate. -->
+    <util:FileSearch Id="TreckTokenSearch"
+                     Variable="TreckTokenExists"
+                     Path="[CommonAppDataFolder]TreckAgent\token.dat"
+                     Result="exists" />
+
+    <!-- Require a code before a FRESH install proceeds. WixStdBA evaluates
+         conditions for install/repair/uninstall, so scope this to a true install
+         (WixBundleAction = 6) with no existing token; otherwise it must pass or it
+         would block upgrades/uninstalls. WixStdBA shows this message and stops if
+         the field is left empty on a fresh install. The authoritative
+         validity/format check is the server enrollment during install, which rolls
+         the install back and shows the failure page on a bad code. -->
+    <bal:Condition Condition="WixBundleAction &lt;&gt; 6 OR TreckTokenExists OR EnrollmentCode &lt;&gt; &quot;&quot;"
+                   Message="Please enter your enrollment code to continue." />
 
     <Chain>
       <MsiPackage Id="TreckAgentMsi"
