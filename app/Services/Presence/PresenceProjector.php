@@ -73,6 +73,18 @@ class PresenceProjector
                 return null;
             }
 
+            // Materialize the runtime owner (shared-PC attribution). The event's
+            // employee_id was resolved at ingest from the reported Windows user
+            // (Windows user -> computer_users -> employee), so this is the person
+            // actually at the keyboard. Only advance it on an accepted, attributed
+            // event: the stale/out-of-order guard above already ran, so an older
+            // delayed heartbeat from a different employee can never steal the
+            // current owner. A null employee_id (malformed/unattributed event)
+            // must NOT erase a known owner, so leave it untouched in that case.
+            if ($event->employee_id !== null) {
+                $presence->current_employee_id = $event->employee_id;
+            }
+
             $presence->last_event_at = $event->occurred_at;
             $presence->last_synced_at = $event->received_at;
             $presence->save();

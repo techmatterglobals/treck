@@ -23,6 +23,7 @@ class ComputerPresence extends Model
 
     protected $fillable = [
         'computer_id',
+        'current_employee_id',
         'status',
         'last_heartbeat_at',
         'last_activity_at',
@@ -46,12 +47,25 @@ class ComputerPresence extends Model
             // stored in the app timezone and read back with the default cast.
             'last_synced_at' => 'datetime',
             'idle_seconds' => 'integer',
+            'current_employee_id' => 'integer',
         ];
     }
 
     public function computer(): BelongsTo
     {
         return $this->belongsTo(Computer::class);
+    }
+
+    /**
+     * The employee currently attributed to this computer's presence - the person
+     * from the newest accepted presence-driving event (Windows user ->
+     * computer_users -> employee). On a shared PC this differs from the computer's
+     * static owner (computers.employee_id); null on legacy rows, where the read
+     * model falls back to the static owner.
+     */
+    public function currentEmployee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'current_employee_id');
     }
 
     /**

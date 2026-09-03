@@ -88,12 +88,22 @@ class PresenceService
 
         return Computer::query()
             ->when($computerIds !== null, fn ($q) => $q->whereIn('id', $computerIds ?: [0]))
-            ->with(['employee.department', 'presence'])
+            ->with([
+                'employee.user', 'employee.department',
+                // Runtime owner for shared PCs (+ user for the name accessor and
+                // department for the label). Eager-loaded to avoid N+1.
+                'presence.currentEmployee.user', 'presence.currentEmployee.department',
+            ])
             ->orderBy('hostname')
             ->get()
             ->map(function (Computer $computer) use ($activity) {
                 $presence = $computer->presence;
                 $status = $presence?->status ?? PresenceStatus::Offline;
+
+                // Prefer the employee currently attributed to the presence row
+                // (correct for shared PCs); fall back to the computer's static
+                // owner for legacy rows without a materialized current employee.
+                $runtimeEmployee = $presence?->currentEmployee ?? $computer->employee;
 
                 $act = $activity->get($computer->id);
                 $todayActive = (int) ($act->active ?? 0);
@@ -102,8 +112,8 @@ class PresenceService
                 return [
                     'computer_id' => $computer->id,
                     'computer_name' => $computer->hostname,
-                    'employee' => $computer->employee?->name,
-                    'department' => $computer->employee?->department?->name,
+                    'employee' => $runtimeEmployee?->name,
+                    'department' => $runtimeEmployee?->department?->name,
                     'status' => $status,
                     'last_heartbeat_at' => $presence?->last_heartbeat_at,
                     'last_activity_at' => $presence?->last_activity_at,
@@ -118,18 +128,19 @@ class PresenceService
     // ---- Employee-level read model (shared by dashboard + employees) -------
 
     /**
-     * Distinct employees with at least one computer currently online
-     * (Active / Idle / Locked) - the same rule the presence board uses.
+     * Distinct employees currently online (Active / Idle / Locked), attributed by
+     * the presence row's runtime owner (current_employee_id) - so a shared PC
+     * counts the person actually using it, not its static owner. An employee with
+     * several computers is counted once. Legacy rows (null current_employee_id)
+     * fall back to the computer's static owner.
      */
     public function onlineEmployeeCount(): int
     {
-        return (int) ComputerPresence::query()
-            ->online()
-            ->join('computers', 'computers.id', '=', 'computer_presence.computer_id')
-            ->whereNull('computers.deleted_at')
-            ->whereNotNull('computers.employee_id')
-            ->distinct()
-            ->count('computers.employee_id');
+        $online = [PresenceStatus::Active, PresenceStatus::Idle, PresenceStatus::Locked];
+
+        return $this->effectiveEmployeePresence()
+            ->filter(fn (object $e): bool => in_array($e->status, $online, true))
+            ->count();
     }
 
     /**
@@ -142,51 +153,71 @@ class PresenceService
     public function employeeRows(): Collection
     {
         $activity = $this->todaysActivityByEmployee();
+        $presence = $this->effectiveEmployeePresence();
 
         return Employee::query()
-            ->with(['user', 'department', 'computers.presence'])
+            ->with(['user', 'department'])
             ->orderBy('id')
             ->get()
-            ->map(function (Employee $employee) use ($activity) {
+            ->map(function (Employee $employee) use ($activity, $presence) {
                 $act = $activity->get($employee->id);
                 $active = (int) ($act->active ?? 0);
                 $idle = (int) ($act->idle ?? 0);
+                $live = $presence->get($employee->id);
 
                 return [
                     'id' => $employee->id,
                     'name' => $employee->name,
                     'department' => $employee->department?->name,
-                    'status' => $this->bestStatus($employee->computers),
+                    'status' => $live->status ?? PresenceStatus::Offline,
                     'active_seconds' => $active,
                     'idle_seconds' => $idle,
                     'active_label' => $this->hoursMinutes($active),
                     'idle_label' => $this->hoursMinutes($idle),
                     'active_ratio' => $this->ratio($active, $idle),
-                    'last_activity_at' => $this->employeeLastActivity($employee),
+                    'last_activity_at' => $live->last_activity ?? null,
                 ];
             });
     }
 
     /**
-     * Map of employee id -> PresenceStatus for an already-loaded set of
-     * employees (their `computers.presence` must be eager-loaded). Used by the
-     * paginated employees page so it shows the same status as everywhere else.
+     * Map of employee id -> PresenceStatus for a set of employees, from the shared
+     * presence source. Used by the paginated employees page so it shows the same
+     * status as everywhere else. Status is attributed by the presence row's runtime
+     * owner (current_employee_id), so a shared PC never shows its static owner
+     * online while someone else is using it.
      *
      * @param  iterable<Employee>  $employees
      * @return array<int, PresenceStatus>
      */
     public function employeeStatusMap(iterable $employees): array
     {
+        $presence = $this->effectiveEmployeePresence();
+
         $map = [];
         foreach ($employees as $employee) {
-            $map[$employee->id] = $this->bestStatus($employee->computers);
+            $map[$employee->id] = $presence->get($employee->id)->status ?? PresenceStatus::Offline;
         }
 
         return $map;
     }
 
-    /** The most-connected presence status across a set of computers. */
-    public function bestStatus(Collection $computers): PresenceStatus
+    /**
+     * The best status and latest activity per RUNTIME employee, read only from the
+     * materialized `computer_presence` table (one row per computer) - never by
+     * scanning `agent_events`, so this stays O(presence rows).
+     *
+     * Each presence row is attributed to a single "effective" employee: its
+     * current_employee_id (the runtime owner) when set, else the computer's static
+     * employee_id (legacy fallback). A row therefore counts for exactly one
+     * employee, so an employee is never double-counted and a shared PC's static
+     * owner is not shown online while another employee currently owns the row. An
+     * employee with multiple computers gets the best status across their attributed
+     * rows.
+     *
+     * @return Collection<int, object{status: PresenceStatus, last_activity: ?Carbon}>
+     */
+    private function effectiveEmployeePresence(): Collection
     {
         $priority = [
             PresenceStatus::Active->value => 5,
@@ -196,16 +227,41 @@ class PresenceService
             PresenceStatus::Offline->value => 1,
         ];
 
-        $best = PresenceStatus::Offline;
+        $byEmployee = [];
 
-        foreach ($computers as $computer) {
-            $status = $computer->presence?->status ?? PresenceStatus::Offline;
-            if ($priority[$status->value] > $priority[$best->value]) {
-                $best = $status;
-            }
-        }
+        ComputerPresence::query()
+            ->whereHas('computer') // exclude soft-deleted computers
+            ->with('computer:id,employee_id')
+            ->get()
+            ->each(function (ComputerPresence $presence) use (&$byEmployee, $priority) {
+                $employeeId = $presence->current_employee_id ?? $presence->computer?->employee_id;
+                if ($employeeId === null) {
+                    return;
+                }
 
-        return $best;
+                $status = $presence->status;
+                $lastActivity = $presence->last_activity_at ?? $presence->last_synced_at;
+
+                if (! isset($byEmployee[$employeeId])) {
+                    $byEmployee[$employeeId] = (object) [
+                        'status' => $status,
+                        'last_activity' => $lastActivity,
+                    ];
+
+                    return;
+                }
+
+                $current = $byEmployee[$employeeId];
+                if ($priority[$status->value] > $priority[$current->status->value]) {
+                    $current->status = $status;
+                }
+                if ($lastActivity !== null
+                    && ($current->last_activity === null || $lastActivity->gt($current->last_activity))) {
+                    $current->last_activity = $lastActivity;
+                }
+            });
+
+        return collect($byEmployee);
     }
 
     /**
@@ -248,15 +304,6 @@ class PresenceService
                 COALESCE(SUM(json_extract(payload, '$.IdleSeconds')), 0) as idle")
             ->get()
             ->keyBy('computer_id');
-    }
-
-    /** Latest activity across an employee's computers (last active, else last contact). */
-    private function employeeLastActivity(Employee $employee): ?Carbon
-    {
-        return $employee->computers
-            ->map(fn (Computer $c) => $c->presence?->last_activity_at ?? $c->presence?->last_synced_at)
-            ->filter()
-            ->max();
     }
 
     // ---- Maintenance -------------------------------------------------------
