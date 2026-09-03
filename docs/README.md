@@ -49,6 +49,8 @@ directly to the area you need.
 | 39 | [SaaS Tenancy Phase B4](39-saas-tenancy-phase-b4.md) | Admin Desktop tenant isolation |
 | 40 | [SaaS Tenancy Phase B5](40-saas-tenancy-phase-b5.md) | Infrastructure tenant isolation and production readiness |
 | 41 | [SaaS Production Rollout Runbook](41-saas-production-rollout.md) | A1-B5 rehearsal, backfill, storage migration, and readiness order |
+| 42 | [SaaS Phase B6 Security Audit](42-saas-phase-b6-security-audit.md) | Final tenancy security audit, findings, and bounded release-candidate fixes |
+| 43 | [SaaS Release Candidate Checklist](43-saas-release-candidate-checklist.md) | Go/no-go gates for the A1-B6 tenancy foundation release candidate |
 
 ## Deployment artifacts
 

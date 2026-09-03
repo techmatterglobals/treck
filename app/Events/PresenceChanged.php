@@ -14,9 +14,9 @@ use Illuminate\Queue\SerializesModels;
  * Broadcast when a computer's presence changes (Phase 6). Carries a compact,
  * secret-free snapshot so the admin dashboard updates live without polling.
  *
- * Broadcast on two private channels (admin-authorized in routes/channels.php):
- *   - `presence`                    the board (all computers)
- *   - `presence.computer.{id}`      the per-computer details page
+ * Broadcast on two private, organization-scoped channels:
+ *   - `organization.{id}.presence`
+ *   - `organization.{id}.presence.computer.{computer_id}`
  *
  * Device tokens, provisioning keys and other credentials are never included.
  */
@@ -31,16 +31,13 @@ class PresenceChanged implements ShouldBroadcast
     {
         $organizationId = $this->organizationId();
 
-        if ($organizationId !== null) {
-            return [
-                new PrivateChannel('organization.'.$organizationId.'.presence'),
-                new PrivateChannel('organization.'.$organizationId.'.presence.computer.'.$this->presence->computer_id),
-            ];
+        if ($organizationId === null) {
+            return [];
         }
 
         return [
-            new PrivateChannel('presence'),
-            new PrivateChannel('presence.computer.'.$this->presence->computer_id),
+            new PrivateChannel('organization.'.$organizationId.'.presence'),
+            new PrivateChannel('organization.'.$organizationId.'.presence.computer.'.$this->presence->computer_id),
         ];
     }
 
@@ -77,7 +74,7 @@ class PresenceChanged implements ShouldBroadcast
 
     private function organizationId(): ?int
     {
-        $organizationId = $this->presence->organization_id ?: $this->presence->computer?->organization_id;
+        $organizationId = $this->presence->organization_id;
 
         return $organizationId ? (int) $organizationId : null;
     }

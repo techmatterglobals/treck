@@ -12,9 +12,9 @@ use Illuminate\Queue\SerializesModels;
 
 /**
  * Broadcast when an in-app notification is delivered (Phase 9), so the admin's
- * bell/badge and list update live without polling. Sent on the recipient's
- * private channel `notifications.user.{id}` (admin-authorized in
- * routes/channels.php). Carries a compact, secret-free payload.
+ * bell/badge and list update live without polling. Organization notifications
+ * are sent only on tenant-bearing private channels. Null-owned platform or
+ * legacy rows are deliberately not broadcast.
  */
 class NotificationCreated implements ShouldBroadcast
 {
@@ -25,11 +25,11 @@ class NotificationCreated implements ShouldBroadcast
     /** @return array<int, Channel> */
     public function broadcastOn(): array
     {
-        if ($this->log->organization_id !== null) {
-            return [new PrivateChannel('organization.'.$this->log->organization_id.'.notifications.user.'.$this->log->recipient_id)];
+        if ($this->log->organization_id === null) {
+            return [];
         }
 
-        return [new PrivateChannel('notifications.user.'.$this->log->recipient_id)];
+        return [new PrivateChannel('organization.'.$this->log->organization_id.'.notifications.user.'.$this->log->recipient_id)];
     }
 
     public function broadcastAs(): string

@@ -114,13 +114,20 @@ class MigrateTenantStorage extends Command
             $summary['copied']++;
         }
 
-        if (! $filesystem->exists($tenantPath) || $filesystem->size($tenantPath) !== $filesystem->size($legacyPath)) {
+        if (! $filesystem->exists($tenantPath)
+            || $filesystem->size($tenantPath) !== $filesystem->size($legacyPath)
+            || $this->checksum($filesystem, $tenantPath) !== $this->checksum($filesystem, $legacyPath)) {
             $summary['verification_failures']++;
 
             return;
         }
 
         $screenshot->forceFill(['path' => $tenantPath])->save();
+    }
+
+    private function checksum($filesystem, string $path): string
+    {
+        return hash('sha256', $filesystem->get($path));
     }
 
     private function resolveOrganization(): ?Organization
